@@ -33,7 +33,7 @@
   },
   "scripts": {
     "lint": "rome check src tests",
-    "lint:fix": "rome check src tests --apply-suggested",
+    "lint:fix": "rome check src tests --apply-unsafe",
     "fmt:dry": "rome format src tests",
     "fmt": "rome format src tests --write",
     "ci": "rome ci src tests",
