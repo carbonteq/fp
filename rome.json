@@ -1,61 +1,59 @@
 {
   "$schema": "./node_modules/rome/configuration_schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "files": {
+    "ignore": [
+      "node_modules/*",
+      "dist/*",
+      ".idea/*",
+      ".vscode/*",
+      ".husky/*",
+      ".git/*",
+      ".github/*"
+    ]
+  },
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
       "nursery": {
-        "noBannedTypes": "warn",
-        "noInvalidConstructorSuper": "warn",
-        "useExhaustiveDependencies": "warn",
-        "noDuplicateObjectKeys": "error",
-        "noConstructorReturn": "error",
-        "noExtraNonNullAssertion": "error",
-        "noSetterReturn": "error",
-        "noStringCaseMismatch": "error",
-        "useConst": "error",
-        "noVar": "error",
-        "useNumericLiterals": "warn",
-        "useDefaultSwitchClauseLast": "error",
-        "useDefaultParameterLast": "error",
-        "noUnsafeFinally": "error",
-        "useEnumInitializers": "off"
+        "noBannedTypes": "off",
+        "useExhaustiveDependencies": "warn"
       },
       "correctness": {
+        "noInvalidConstructorSuper": "off",
+        "noSetterReturn": "error",
+        "noUnsafeFinally": "error",
+        "noStringCaseMismatch": "error",
+        "noConstructorReturn": "error",
         "noConstAssign": "error",
         "useValidForDirection": "warn"
+      },
+      "style": {
+        "noVar": "error",
+        "useEnumInitializers": "off",
+        "useDefaultParameterLast": "error",
+        "useNumericLiterals": "warn",
+        "useConst": "error"
       },
       "complexity": {
         "useFlatMap": "warn"
       },
       "suspicious": {
+        "noExtraNonNullAssertion": "error",
+        "noDuplicateObjectKeys": "error",
+        "useDefaultSwitchClauseLast": "error",
         "noExplicitAny": "off"
       }
-    },
-    "ignore": [
-      "node_modules/*",
-      "prisma/*",
-      "dist/*",
-      ".idea/*",
-      ".vscode/*",
-      ".husky/*",
-      ".github/*"
-    ]
+    }
   },
   "formatter": {
     "enabled": true,
     "formatWithErrors": true,
     "indentSize": 2,
-    "indentStyle": "tab",
-    "ignore": [
-      "node_modules/*",
-      "prisma/*",
-      "dist/*",
-      ".idea/*",
-      ".vscode/*",
-      ".husky/*",
-      ".github/*"
-    ]
+    "indentStyle": "space"
   },
   "javascript": {
     "formatter": {
