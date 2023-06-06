@@ -1,0 +1,66 @@
+{
+  "$schema": "./node_modules/rome/configuration_schema.json",
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "nursery": {
+        "noBannedTypes": "warn",
+        "noInvalidConstructorSuper": "warn",
+        "useExhaustiveDependencies": "warn",
+        "noDuplicateObjectKeys": "error",
+        "noConstructorReturn": "error",
+        "noExtraNonNullAssertion": "error",
+        "noSetterReturn": "error",
+        "noStringCaseMismatch": "error",
+        "useConst": "error",
+        "noVar": "error",
+        "useNumericLiterals": "warn",
+        "useDefaultSwitchClauseLast": "error",
+        "useDefaultParameterLast": "error",
+        "noUnsafeFinally": "error",
+        "useEnumInitializers": "off"
+      },
+      "correctness": {
+        "noConstAssign": "error",
+        "useValidForDirection": "warn"
+      },
+      "complexity": {
+        "useFlatMap": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
+      }
+    },
+    "ignore": [
+      "node_modules/*",
+      "prisma/*",
+      "dist/*",
+      ".idea/*",
+      ".vscode/*",
+      ".husky/*",
+      ".github/*"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": true,
+    "indentSize": 2,
+    "indentStyle": "tab",
+    "ignore": [
+      "node_modules/*",
+      "prisma/*",
+      "dist/*",
+      ".idea/*",
+      ".vscode/*",
+      ".husky/*",
+      ".github/*"
+    ]
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingComma": "all"
+    }
+  }
+}
