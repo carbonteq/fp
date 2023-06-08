@@ -1,3 +1,5 @@
+import { type TUnit, UNIT } from './unit';
+
 type OptMapper<T, U> = (val: T) => Option<U>;
 type AsyncOptMapper<T, U> = (val: T) => Promise<Option<U>>;
 
@@ -9,10 +11,13 @@ export class UnwrappedNone extends Error {
 
 const UNWRAPPED_NONE_ERR = new UnwrappedNone();
 
+export type UnitOption = Option<TUnit>;
+
 export class Option<T> {
   private constructor(readonly val: T, private readonly ok: boolean) {}
 
   static readonly None: Option<never> = new Option({} as never, false);
+  static readonly UNIT_OPT: UnitOption = new Option(UNIT, true);
 
   static Some<X>(val: X): Option<X> {
     return new Option(val, true);

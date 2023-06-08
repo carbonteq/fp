@@ -1,3 +1,5 @@
+import { type TUnit, UNIT } from './unit';
+
 export class UnwrappedErrWithOk extends Error {
   constructor(r: Result<any, any>) {
     super(`Attempted to call unwrapErr on an okay value: <${r}>`);
@@ -9,6 +11,8 @@ export class UnwrappedOkWithErr extends Error {
     super(`Attempted to call unwrap on an Err value: <${r}>`);
   }
 }
+
+export type UnitResult<E = never> = Result<TUnit, E>;
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -35,6 +39,8 @@ type CombinedResultErr<T extends Result<unknown, unknown>[]> = {
 }[number];
 
 export class Result<T, E> {
+  static readonly UNIT_RESULT: UnitResult = new Result(UNIT, null as never);
+
   protected constructor(
     private readonly val: T | null,
     private readonly error: E | null,
