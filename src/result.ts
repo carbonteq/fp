@@ -38,6 +38,11 @@ type CombinedResultErr<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>['err'];
 }[number];
 
+export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
+  CombinedResultOk<T>,
+  CombinedResultErr<T>
+>;
+
 export class Result<T, E> {
   static readonly UNIT_RESULT: UnitResult = new Result(UNIT, null as never);
 
@@ -46,11 +51,11 @@ export class Result<T, E> {
     private readonly error: E | null,
   ) {}
 
-  static Ok<T, E>(val: T): Result<T, E> {
+  static Ok<T, E = never>(val: T): Result<T, E> {
     return new Result(val, null) as Result<T, E>;
   }
 
-  static Err<T, E>(err: E): Result<T, E> {
+  static Err<E, T = never>(err: E): Result<T, E> {
     return new Result(null, err) as Result<T, E>;
   }
 
