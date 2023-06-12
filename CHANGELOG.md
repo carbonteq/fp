@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.3.2
+
+### Patch Changes
+
+- 53b1e45: Fix type inference for Result methods
+
 ## 0.3.1
 
 ### Patch Changes
