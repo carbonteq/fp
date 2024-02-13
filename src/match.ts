@@ -16,6 +16,24 @@ type UnwrapResult<T> = T extends Result<infer U, any> ? U : never;
 type UnwrapResultError<T> = T extends Result<any, infer E> ? E : never;
 type UnwrapOption<T> = T extends Option<infer U> ? U : never;
 
+export const match = <T extends MonadicType<unknown, unknown>, U>(
+  r: T,
+  branches: Branches<T, U>
+): U => {
+  if (r instanceof Result) {
+    if (r.isOk()) {
+      return (branches as ResultBranches<unknown, unknown, U>).Ok(r.unwrap());
+    }
+    return (branches as ResultBranches<unknown, unknown, U>).Err(r.unwrapErr());
+  } else if (r instanceof Option) {
+    if (r.isSome()) {
+      return (branches as OptionBranches<unknown, U>).Some(r.unwrap());
+    }
+    return (branches as OptionBranches<unknown, U>).None();
+  }
+  throw new Error('Unsupported monad type');
+};
+
 export const matchRes = <T, E, U>(
   r: Result<T, E>,
   branches: { Ok: (val: T) => U; Err: (err: E) => U },
