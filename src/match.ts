@@ -3,6 +3,15 @@ import { Result } from './result';
 
 type MonadicType<T, E = never> = Result<T, E> | Option<T>;
 
+type ResultBranches<T, E, U> = { Ok: (val: T) => U; Err: (err: E) => U };
+type OptionBranches<T, U> = { Some: (val: T) => U; None: () => U };
+
+type Branches<T, U> = T extends Result<unknown, unknown>
+  ? ResultBranches<UnwrapResult<T>, UnwrapResultError<T>, U>
+  : T extends Option<unknown>
+  ? OptionBranches<UnwrapOption<T>, U>
+  : never;
+
 type UnwrapResult<T> = T extends Result<infer U, any> ? U : never;
 type UnwrapResultError<T> = T extends Result<any, infer E> ? E : never;
 type UnwrapOption<T> = T extends Option<infer U> ? U : never;
