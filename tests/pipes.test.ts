@@ -42,4 +42,19 @@ describe('pipe construction', () => {
 
     expect(res).toBe(6 || 12);
   });
+
+  it('nested pipes', async () => {
+    
+    const res = await pipe(
+      2,
+      (a) => a + 3,
+      (b) => pipe(
+        b,
+        (c) => c * 3,
+        (d) => d > 10 ? true : false
+      )
+    );
+
+    expect(res).toBe(true);
+  });
 });
