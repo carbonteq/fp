@@ -1,6 +1,9 @@
 import { Option } from './option';
 import { Result } from './result';
 
+type MonadicType<T, E = never> = Result<T, E> | Option<T>;
+
+
 export const matchRes = <T, E, U>(
   r: Result<T, E>,
   branches: { Ok: (val: T) => U; Err: (err: E) => U },

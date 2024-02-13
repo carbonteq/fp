@@ -58,4 +58,5 @@ describe('match Option', () => {
     expect(spyFn).toHaveBeenCalledTimes(1);
     expect(spyFn).toHaveBeenCalledWith();
   });
+
 });
