@@ -25,4 +25,21 @@ describe('pipe construction', () => {
 
     expect(res).toBe(12);
   });
+
+  it('pipe should handle complex transformation functions', async () => {
+    const res = await pipe(
+      2,
+      (a) => {
+        const x = Math.pow(2, 2);
+        const y = Math.random();
+        if (y > 0.5) {
+          return x;
+        }
+        return a;
+      },
+      async (b) => await b * 3,
+    );
+
+    expect(res).toBe(6 || 12);
+  });
 });
