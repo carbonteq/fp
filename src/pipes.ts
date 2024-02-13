@@ -19,6 +19,26 @@ interface Pipe {
     ): E;
 }
 
+/**
+ * Represents a function that pipes a value through a series of functions.
+ * @param {any} value - The initial value to be processed.
+ * @param {...Function} fns - Functions to be applied sequentially to the value.
+ * @returns {unknown} The result after applying all functions to the initial value.
+ * @typedef {Function} Pipe
+ * 
+ * @example
+ * const addTwo = (x) => x + 2;
+ * const multiplyByThree = (x) => x * 3;
+ * const square = (x) => x * x;
+ *
+ * const result = pipe(
+ *    2,
+ *    addTwo, // 4
+ *    multiplyByThree, // 12
+ *    square // 144
+ * );
+ * 
+ */
 export const pipe: Pipe = (value: any, ...fns: Function[]): unknown => {
     return fns.reduce((acc, fn) => fn(acc), value);
 };
