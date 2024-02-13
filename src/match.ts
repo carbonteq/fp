@@ -3,6 +3,9 @@ import { Result } from './result';
 
 type MonadicType<T, E = never> = Result<T, E> | Option<T>;
 
+type UnwrapResult<T> = T extends Result<infer U, any> ? U : never;
+type UnwrapResultError<T> = T extends Result<any, infer E> ? E : never;
+type UnwrapOption<T> = T extends Option<infer U> ? U : never;
 
 export const matchRes = <T, E, U>(
   r: Result<T, E>,
