@@ -15,4 +15,14 @@ describe('pipe construction', () => {
 
     expect(res).toBe(16);
   });
+
+  it('pipe should handle async functions', async () => {
+    const res = await pipe(
+      2,
+      async (a) => await a + 2,
+      async (b) => await b * 3,
+    );
+
+    expect(res).toBe(12);
+  });
 });
