@@ -16,18 +16,34 @@ type UnwrapResult<T> = T extends Result<infer U, any> ? U : never;
 type UnwrapResultError<T> = T extends Result<any, infer E> ? E : never;
 type UnwrapOption<T> = T extends Option<infer U> ? U : never;
 
+/**
+ * Matches a monadic type (Result or Option) and executes the corresponding branch.
+ * @param {Result<T, E> | Option<T>} r - The monadic value to match.
+ * @param {Branches<typeof m, U>} branches - The branches to execute based on the monadic value.
+ * @returns {U} The result of executing the matched branch.
+ * @template U - The type of the return value.
+ * 
+ * @example
+ * const result = Result.Ok(23);
+ * 
+ * const resultValue = match(result, {
+ *   Ok: (val) => `Success: ${val}`, // this gets executed
+ *   Err: (err) => `Error: ${err}`,
+ * });
+ * 
+ */
 export const match = <T extends MonadicType<unknown, unknown>, U>(
-  r: T,
+  m: T,
   branches: Branches<T, U>
 ): U => {
-  if (r instanceof Result) {
-    if (r.isOk()) {
-      return (branches as ResultBranches<unknown, unknown, U>).Ok(r.unwrap());
+  if (m instanceof Result) {
+    if (m.isOk()) {
+      return (branches as ResultBranches<unknown, unknown, U>).Ok(m.unwrap());
     }
-    return (branches as ResultBranches<unknown, unknown, U>).Err(r.unwrapErr());
-  } else if (r instanceof Option) {
-    if (r.isSome()) {
-      return (branches as OptionBranches<unknown, U>).Some(r.unwrap());
+    return (branches as ResultBranches<unknown, unknown, U>).Err(m.unwrapErr());
+  } else if (m instanceof Option) {
+    if (m.isSome()) {
+      return (branches as OptionBranches<unknown, U>).Some(m.unwrap());
     }
     return (branches as OptionBranches<unknown, U>).None();
   }
