@@ -1,5 +1,16 @@
 # @carbonteq/fp
 
+## 0.4.0
+
+### Minor Changes
+
+- 91bf286: - Add more composition methods to Option
+  - Fix a bug in Result (Result.Ok(null) will behave as expected)
+  - Update Result internals
+  - Add method docs and examples
+  - Update toolchain
+  - Update to Typescript 5
+
 ## 0.3.2
 
 ### Patch Changes
