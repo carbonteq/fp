@@ -30,13 +30,12 @@ const config: RollupOptions =
 					minify: true,
 					tsconfig: "./tsconfig.build.json",
 					jsc: {
+						keepClassNames: true,
 						minify: {
 							mangle: false,
 							compress: true,
 						},
-						experimental: {
-							keepImportAssertions: true,
-						},
+						experimental: { keepImportAttributes: true },
 					},
 				}),
 			),
