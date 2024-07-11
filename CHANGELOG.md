@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.5.0
+
+### Minor Changes
+
+- d6e3780: Add combine and bindErr utils. Remove zipAsync. Simplify zip and bind internally
+
 ## 0.4.0
 
 ### Minor Changes
