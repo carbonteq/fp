@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.5.1
+
+### Patch Changes
+
+- 7db4034: Add async map
+
 ## 0.5.0
 
 ### Minor Changes
