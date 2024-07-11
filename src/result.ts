@@ -139,10 +139,12 @@ export class Result<T, E> {
 	 * const result1 = r.map(mapper) // Result containing 64 as the ok value
 	 * const result2 = r2.map(mapper) // mapper won't be applied, as r2 was in error state
 	 */
-	map<U>(fn: (val: T) => U): Result<U, E>;
 	map<U>(fn: (val: T) => Promise<U>): Promise<Result<U, E>>;
-	map<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
-		if (this.val === Sentinel) return Result.Err(this.error);
+	map<U>(fn: (val: T) => U): Result<U, E>;
+	map<U>(
+		fn: Mapper<T, U> | AsyncMapper<T, U>,
+	): Result<U, E> | Promise<Result<U, E>> {
+		if (this.val === Sentinel) return Result.Err(this.error) as Result<U, E>;
 
 		const r = fn(this.val);
 
@@ -200,10 +202,10 @@ export class Result<T, E> {
 	 * const result1 = r.map(mapper) // Type is Result<Result<number, InvalidNumStringError>, SomeError>
 	 * const result2 = r.bind(mapper) // Type is Result<number, SomeError | InvalidNumStringError>
 	 */
-	bind<U, E2>(fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
 	bind<U, E2>(
 		fn: (val: T) => Promise<Result<U, E | E2>>,
 	): Promise<Result<U, E | E2>>;
+	bind<U, E2>(fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
 	bind<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
 		if (this.val !== Sentinel) return fn(this.val);
 
@@ -220,10 +222,10 @@ export class Result<T, E> {
 	 * const res1 = r.bindErr(binderOk) // Result<string, SomeError | SomeOtherError> - Value: Result.Ok('42') - No change in Ok type
 	 * const res2 = r.bindErr(binderErr) // Result<string, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
 	 */
-	bindErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
 	bindErr<E2>(
 		fn: (val: T) => Promise<Result<unknown, E2>>,
 	): Promise<Result<T, E | E2>>;
+	bindErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
 	bindErr<E2>(
 		fn: ResMapper<T, unknown, E | E2> | AsyncResMapper<T, unknown, E | E2>,
 	) {
@@ -259,8 +261,8 @@ export class Result<T, E> {
 		return this;
 	}
 
-	combine<U>(fn: (val: T) => U): Result<[T, U], E>;
 	combine<U>(fn: (val: T) => Promise<U>): Promise<Result<[T, U], E>>;
+	combine<U>(fn: (val: T) => U): Result<[T, U], E>;
 	combine<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
 		if (this.val === Sentinel) return Result.Err(this.error);
 
@@ -273,10 +275,10 @@ export class Result<T, E> {
 	}
 
 	/** For combining two results lazily. For the eager eval version, see {@link and} */
-	zip<U, E2>(fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
 	zip<U, E2>(
 		fn: (val: T) => Promise<Result<U, E2>>,
 	): Promise<Result<[T, U], E | E2>>;
+	zip<U, E2>(fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
 	zip<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
 		if (this.val === Sentinel) return Result.Err(this.error);
 
@@ -350,8 +352,4 @@ export class Result<T, E> {
 		return (r.val as Promise<T>).then((v) => Result.Ok(v));
 	}
 	//#endregion
-}
-
-const res1 = Result.Ok<string, Error>("3");
-if (res1.isOk()) {
 }
