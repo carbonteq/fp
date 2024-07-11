@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.5.2
+
+### Patch Changes
+
+- 98350ae: Fix function overloading
+
 ## 0.5.1
 
 ### Patch Changes
