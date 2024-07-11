@@ -139,13 +139,18 @@ export class Result<T, E> {
 	 * const result1 = r.map(mapper) // Result containing 64 as the ok value
 	 * const result2 = r2.map(mapper) // mapper won't be applied, as r2 was in error state
 	 */
-	map<U>(f: Mapper<T, U>): Result<U, E> {
-		if (this.val === Sentinel)
-			return new Result(Sentinel, this.error) as Result<U, E>;
+	map<U>(fn: (val: T) => U): Result<U, E>;
+	map<U>(fn: (val: T) => Promise<U>): Promise<Result<U, E>>;
+	map<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
+		if (this.val === Sentinel) return Result.Err(this.error);
 
-		const valPrime = f(this.val);
+		const r = fn(this.val);
 
-		return new Result(valPrime, this.error);
+		if (isPromise(r)) {
+			return r.then((val) => Result.Ok(val) as Result<U, E>);
+		}
+
+		return Result.Ok(r) as Result<U, E>;
 	}
 
 	/** Same as map, but for the error value instead of the Ok value */
