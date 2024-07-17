@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.5.3
+
+### Patch Changes
+
+- 6d3876a: Extensions to Option monad
+
 ## 0.5.2
 
 ### Patch Changes
