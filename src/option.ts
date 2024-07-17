@@ -30,6 +30,10 @@ export class Option<T> {
 		return new Option(val, true);
 	}
 
+	static fromNullable<T>(val: T): Option<NonNullable<T>> {
+		return val === null ? Option.None : Option.Some(val as NonNullable<T>);
+	}
+
 	isSome(): this is Option<T> {
 		return this.ok;
 	}
@@ -44,6 +48,13 @@ export class Option<T> {
 		}
 
 		throw UNWRAPPED_NONE_ERR;
+	}
+
+	/* Useful to serialize. Inverse operation for `fromNullable` */
+	safeUnwrap(): T | null {
+		if (this.ok) return this.val;
+
+		return null;
 	}
 
 	toString(): string {
