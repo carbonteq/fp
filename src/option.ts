@@ -3,6 +3,18 @@ import { UNIT } from "./unit";
 type OptMapper<T, U> = (val: T) => Option<U>;
 type AsyncOptMapper<T, U> = (val: T) => Promise<Option<U>>;
 
+type InnerMapMapper<T, U> = T extends Array<infer Inner>
+	? (val: Inner) => U
+	: never;
+
+type InnerMapReturn<T, U> = T extends Array<unknown> ? Option<Array<U>> : never;
+// type ArrayInner<T> = T extends Array<infer R> ? R : never;
+// type ArrayOpt<Opt extends Option<unknown>> = Opt extends Option<infer T>
+// 	? T extends Array<infer Inner>
+// 		? Inner
+// 		: never
+// 	: never;
+
 export class UnwrappedNone extends Error {
 	constructor() {
 		super("Unwrapped Option<None>");
@@ -10,6 +22,7 @@ export class UnwrappedNone extends Error {
 }
 
 const UNWRAPPED_NONE_ERR = new UnwrappedNone();
+const NONE_VAL = Symbol.for("None");
 
 export type UnitOption = Option<UNIT>;
 export type UnwrapOption<T> = T extends Option<infer R> ? R : never;
@@ -23,7 +36,10 @@ export class Option<T> {
 		private readonly ok: boolean,
 	) {}
 
-	static readonly None: Option<never> = new Option({} as never, false);
+	static readonly None: Option<never> = new Option(
+		NONE_VAL,
+		false,
+	) as Option<never>;
 	static readonly UNIT_OPT: UnitOption = new Option(UNIT, true);
 
 	static Some<Inner>(val: Inner): Option<Inner> {
@@ -162,5 +178,33 @@ export class Option<T> {
 		if (!opt.ok) return Promise.resolve(Option.None);
 
 		return opt.val.then((val) => Option.Some(val));
+	}
+
+	// innerMap<Inner, U>(
+	// 	this: Option<Array<Inner>>,
+	// 	mapper: (val: Inner) => U,
+	// ): Option<Array<U>>;
+	// innerMap<U>(this: Option<T>, mapper: (val: never) => U): never;
+	// innerMap<U>(this: Option<T>, mapper: (val: T) => U) {
+	// 	if (this.isNone()) return this;
+	//
+	// 	if (Array.isArray(this.val)) {
+	// 		return Option.Some(this.val.map(mapper));
+	// 	}
+	//
+	// 	throw new Error("Can only be called for Option<Array<T>>");
+	// }
+
+	innerMap<U>(mapper: InnerMapMapper<T, U>): InnerMapReturn<T, U> {
+		type Ret = InnerMapReturn<T, U>;
+
+		//@ts-expect-error
+		if (this.isNone()) return this as Ret;
+
+		if (Array.isArray(this.val)) {
+			return Option.Some(this.val.map(mapper)) as Ret;
+		}
+
+		throw new Error("Can only be called for Option<Array<T>>");
 	}
 }
