@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.5.4
+
+### Patch Changes
+
+- e82ec24: Add innerMap for Option and Result
+
 ## 0.5.3
 
 ### Patch Changes
