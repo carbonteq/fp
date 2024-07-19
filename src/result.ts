@@ -52,6 +52,14 @@ export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
 	CombinedResultErr<T>
 >;
 
+type InnerMapMapper<T, U> = T extends Array<infer Inner>
+	? (val: Inner) => U
+	: never;
+
+type InnerMapReturn<T, E, U> = T extends Array<unknown>
+	? Result<Array<U>, E>
+	: never;
+
 /** Sentinel value */
 const Sentinel = Symbol.for("ResultSentinel");
 type Sentinel = typeof Sentinel;
@@ -352,4 +360,38 @@ export class Result<T, E> {
 		return (r.val as Promise<T>).then((v) => Result.Ok(v));
 	}
 	//#endregion
+
+	// static innerMap<T, U, E>(
+	// 	r: Result<Array<T>, E>,
+	// 	mapper: (val: T) => U,
+	// ): Result<Array<U>, E> {
+	// 	return r.map((inner) => inner.map(mapper));
+	// }
+	// innerMap<Inner, U>(
+	// 	this: Result<Array<Inner>, E>,
+	// 	mapper: (val: T) => U,
+	// ): Result<Array<U>, E>;
+	// innerMap<U>(this: Result<unknown, E>, mapper: (val: T) => U): never;
+	// innerMap<U>(this: Result<unknown, E>, mapper: (val: T) => U) {
+	// 	if (this.val === Sentinel) return this;
+	//
+	// 	if (Array.isArray(this.val)) {
+	// 		return Result.Ok(this.val.map(mapper));
+	// 	}
+	//
+	// 	throw new Error("Can only be called for Result<Array<T>, E>");
+	// }
+
+	innerMap<U>(mapper: InnerMapMapper<T, U>): InnerMapReturn<T, E, U> {
+		type RetType = InnerMapReturn<T, E, U>;
+
+		// @ts-expect-error
+		if (this.val === Sentinel) return this;
+
+		if (Array.isArray(this.val)) {
+			return Result.Ok(this.val.map(mapper)) as RetType;
+		}
+
+		throw new Error("Can only be called for Result<Array<T>, E>");
+	}
 }
