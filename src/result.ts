@@ -1,3 +1,4 @@
+import { isPromise } from "node:util/types";
 import { UNIT } from "./unit";
 
 export class UnwrappedErrWithOk extends Error {
@@ -10,15 +11,6 @@ export class UnwrappedOkWithErr extends Error {
 	constructor(r: Result<unknown, unknown>) {
 		super(`Attempted to call unwrap on an Err value: <${r}>`);
 	}
-}
-
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-function isPromise<T>(obj: any): obj is Promise<T> {
-	return (
-		!!obj &&
-		(typeof obj === "object" || typeof obj === "function") &&
-		typeof obj.then === "function"
-	);
 }
 
 export type UnitResult<E = never> = Result<UNIT, E>;
@@ -88,6 +80,10 @@ export class Result<T, E> {
 		return this.error !== Sentinel;
 	}
 
+	isUnit(): this is Result<UNIT, never> {
+		return this.val === UNIT;
+	}
+
 	toString(): string {
 		if (this.val !== Sentinel) {
 			return `Result::Ok<${this.val}>`;
@@ -138,7 +134,7 @@ export class Result<T, E> {
 
 	/**
 	 *
-	 * @param {Mapper<T, U>} f The mapping/endofunctor to apply to the internal Ok value (T -> U)
+	 * @param {Mapper<T, U>} fn The mapping/endofunctor to apply to the internal Ok value (T -> U)
 	 * @returns Result<U, E> containing the mapped value
 	 * @example
 	 * const r = Result.Ok({data: 42})
@@ -186,7 +182,7 @@ export class Result<T, E> {
 		return fn(this.val);
 	}
 
-	/** For combining two results. For the lazy eval version, see {@link zip} and {@link zipAsync} */
+	/** For combining two results. For the lazy eval version, see {@link flatZip} and {@link zipAsync} */
 	and<U, E2>(r: Result<U, E2>): Result<[T, U], E | E2> {
 		if (this.isErr()) return this;
 
@@ -197,7 +193,31 @@ export class Result<T, E> {
 	}
 
 	/**
-	 * Also known as `andThen` or `fmap`
+	 * Also known as `andThen`, `bind` or `fmap`
+	 * Like Result.map but used in cases where the mapper func returns a Result instead of a containable value
+	 * @example
+	 * const r: Result<string, SomeError> = Result.Ok("42")
+	 * const mapper = (d: string) => {
+	 *   const n = Number.parseInt(d)
+	 *   if(Number.isNumber(n) && !Number.isNaN(n)) return Result.Ok(n)
+	 *
+	 *   return Result.Err(new InvalidNumStringError(d))
+	 * }
+	 * const result1 = r.map(mapper) // Type is Result<Result<number, InvalidNumStringError>, SomeError>
+	 * const result2 = r.flatMap(mapper) // Type is Result<number, SomeError | InvalidNumStringError>
+	 */
+	flatMap<U, E2>(
+		fn: (val: T) => Promise<Result<U, E | E2>>,
+	): Promise<Result<U, E | E2>>;
+	flatMap<U, E2>(fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
+	flatMap<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
+		if (this.val !== Sentinel) return fn(this.val);
+
+		return Result.Err(this.error);
+	}
+
+	/**
+	 * Also known as `andThen`, `fmap` or `flatMap`
 	 * Like Result.map but used in cases where the mapper func returns a Result instead of a containable value
 	 * @example
 	 * const r: Result<string, SomeError> = Result.Ok("42")
@@ -227,14 +247,14 @@ export class Result<T, E> {
 	 * const binderOk = (d: string) => Result.Ok<number, SomeOtherError>(0909)
 	 * const binderErr = (d: string) => Result.Err<number, SomeOtherError>(new SomeOtherError())
 	 *
-	 * const res1 = r.bindErr(binderOk) // Result<string, SomeError | SomeOtherError> - Value: Result.Ok('42') - No change in Ok type
-	 * const res2 = r.bindErr(binderErr) // Result<string, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
+	 * const res1 = r.zipErr(binderOk) // Result<string, SomeError | SomeOtherError> - Value: Result.Ok('42') - No change in Ok type
+	 * const res2 = r.zipErr(binderErr) // Result<string, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
 	 */
-	bindErr<E2>(
+	zipErr<E2>(
 		fn: (val: T) => Promise<Result<unknown, E2>>,
 	): Promise<Result<T, E | E2>>;
-	bindErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
-	bindErr<E2>(
+	zipErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
+	zipErr<E2>(
 		fn: ResMapper<T, unknown, E | E2> | AsyncResMapper<T, unknown, E | E2>,
 	) {
 		if (this.val === Sentinel) return Result.Err(this.error);
@@ -249,7 +269,7 @@ export class Result<T, E> {
 	}
 
 	/** For running infallible side-effects on the contained value. Up to the programmer to ensure the underlying function doesn't fail */
-	do(fn: (val: T) => void): Result<T, E> {
+	tap(fn: (val: T) => void): Result<T, E> {
 		if (this.val !== Sentinel) {
 			fn(this.val);
 		}
@@ -258,10 +278,10 @@ export class Result<T, E> {
 	}
 
 	/**
-	 * Async version of {@link do}
-	 * @see {@link do}
+	 * Async version of {@link tap}
+	 * @see {@link tap}
 	 */
-	async doAsync(fn: (val: T) => Promise<void>): Promise<Result<T, E>> {
+	async tapAsync(fn: (val: T) => Promise<void>): Promise<Result<T, E>> {
 		if (this.val !== Sentinel) {
 			await fn(this.val);
 		}
@@ -269,9 +289,9 @@ export class Result<T, E> {
 		return this;
 	}
 
-	combine<U>(fn: (val: T) => Promise<U>): Promise<Result<[T, U], E>>;
-	combine<U>(fn: (val: T) => U): Result<[T, U], E>;
-	combine<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
+	zip<U>(fn: (val: T) => Promise<U>): Promise<Result<[T, U], E>>;
+	zip<U>(fn: (val: T) => U): Result<[T, U], E>;
+	zip<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
 		if (this.val === Sentinel) return Result.Err(this.error);
 
 		const r = fn(this.val);
@@ -281,23 +301,72 @@ export class Result<T, E> {
 
 		return Result.Ok([this.val, r]) as Result<[T, U], E>;
 	}
+	// zip<U>(fn: (val: T) => Promise<U>): Promise<Result<AppendToTuple<T, U>, E>>;
+	// zip<U>(fn: (val: T) => U): Result<AppendToTuple<T, U>, E>;
+	// zip<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
+	// 	if (this.val === Sentinel) return Result.Err(this.error);
+	//
+	// 	type Tup = AppendToTuple<T, U>;
+	// 	const isTup = isTuple(this.val);
+	//
+	// 	const r = fn(this.val);
+	// 	if (isPromise(r)) {
+	// 		return r.then((u) => {
+	// 			const tuple: Tuple<Tup> = setAsTuple(
+	// 				//@ts-expect-error
+	// 				isTup ? [...this.val, u] : [this.val, u],
+	// 			);
+	//
+	// 			//@ts-expect-error
+	// 			return Result.Ok(tuple) as Result<AppendToTuple<T, U>, E>;
+	// 		});
+	// 	}
+	//
+	// 	const tuple: Tuple<Tup> = setAsTuple(
+	// 		//@ts-expect-error
+	// 		isTup ? [...this.val, r] : [this.val, r],
+	// 	);
+	//
+	// 	//@ts-expect-error
+	// 	return Result.Ok(tuple) as Result<AppendToTuple<T, U>, E>;
+	// }
 
 	/** For combining two results lazily. For the eager eval version, see {@link and} */
-	zip<U, E2>(
+	flatZip<U, E2>(
 		fn: (val: T) => Promise<Result<U, E2>>,
 	): Promise<Result<[T, U], E | E2>>;
-	zip<U, E2>(fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
-	zip<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
+	flatZip<U, E2>(fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
+	flatZip<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
 		if (this.val === Sentinel) return Result.Err(this.error);
 
 		const r = fn(this.val);
-
 		if (isPromise(r)) {
-			return r.then((other) => other.map((u) => [this.val, u] as [T, U]));
+			return r.then((other) => other.map((u) => [this.val, u]));
 		}
 
-		return r.map((u) => [this.val, u] as [T, U]);
+		return r.map((u) => [this.val, u]);
 	}
+	// flatZip<U, E2>(
+	// 	fn: (val: T) => Promise<Result<U, E2>>,
+	// ): Promise<Result<AppendToTuple<T, U>, E | E2>>;
+	// flatZip<U, E2>(
+	// 	fn: (val: T) => Result<U, E2>,
+	// ): Result<AppendToTuple<T, U>, E | E2>;
+	// flatZip<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
+	// 	if (this.val === Sentinel) return Result.Err(this.error);
+	//
+	// 	type Tup = AppendToTuple<T, U>;
+	// 	const isTup = isTuple(this.val);
+	//
+	// 	const r = fn(this.val);
+	// 	if (isPromise(r)) {
+	// 		return r.then((other) =>
+	// 			other.map((u) => (isTup ? [...this.val, u] : [this.val, u]) as Tup),
+	// 		);
+	// 	}
+	//
+	// 	return r.map((u) => (isTup ? [...this.val, u] : [this.val, u]) as Tup);
+	// }
 
 	//#region General combo functions
 	/** Type guard specifying all array results as Ok/Err */
@@ -393,5 +462,85 @@ export class Result<T, E> {
 		}
 
 		throw new Error("Can only be called for Result<Array<T>, E>");
+	}
+
+	// @ts-expect-error
+	pipe<U>(fn: (val: T) => U): Result<U, E>;
+	pipe<U, V>(fn: (val: T) => U, fn2: (val: U) => V): Result<V, E>;
+	pipe<U, V, W>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+	): Result<W, E>;
+	pipe<U, V, W, X>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+	): Result<X, E>;
+	pipe<U, V, W, X, Y>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+		fn5: (val: X) => Y,
+	): Result<Y, E>;
+	pipe<U, V, W, X, Y, Z>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+		fn5: (val: X) => Y,
+		fn6: (val: Y) => Z,
+	): Result<Z, E>;
+	pipe<U, V, W, X, Y, Z, A>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+		fn5: (val: X) => Y,
+		fn6: (val: Y) => Z,
+		fn7: (val: Z) => A,
+	): Result<A, E>;
+	pipe<U, V, W, X, Y, Z, A, B>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+		fn5: (val: X) => Y,
+		fn6: (val: Y) => Z,
+		fn7: (val: Z) => A,
+		fn8: (val: A) => B,
+	): Result<B, E>;
+	pipe<U, V, W, X, Y, Z, A, B, C>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+		fn5: (val: X) => Y,
+		fn6: (val: Y) => Z,
+		fn7: (val: Z) => A,
+		fn8: (val: A) => B,
+		fn9: (val: B) => C,
+	): Result<C, E>;
+	pipe<U, V, W, X, Y, Z, A, B, C, D>(
+		fn: (val: T) => U,
+		fn2: (val: U) => V,
+		fn3: (val: V) => W,
+		fn4: (val: W) => X,
+		fn5: (val: X) => Y,
+		fn6: (val: Y) => Z,
+		fn7: (val: Z) => A,
+		fn8: (val: A) => B,
+		fn9: (val: B) => C,
+		fn10: (val: C) => D,
+	): Result<D, E>;
+	pipe(...fns: Mapper<unknown, unknown>[]) {
+		let res = this;
+		for (const fn of fns) {
+			// @ts-expect-error
+			res = res.map(fn);
+		}
+		return res;
 	}
 }
