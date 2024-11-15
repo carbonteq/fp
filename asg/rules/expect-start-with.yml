@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+
+id: expect-start-with
+language: TypeScript
+rule:
+  pattern: expect($OBJ).toStartWith($START)
+fix: assert.ok(typeof $OBJ === "string" && $OBJ.startsWith($START))

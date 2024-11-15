@@ -1,0 +1,4 @@
+ruleDirs:
+  - ./asg/rules
+utilDirs:
+  - ./asg/utils

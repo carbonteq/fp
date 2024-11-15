@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+
+id: expect-match
+language: TypeScript
+rule:
+  pattern: expect($OBJ).toMatch($MATCH)
+fix: assert.match($OBJ, $MATCH)
