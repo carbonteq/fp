@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.7.1
+
+### Patch Changes
+
+- 03a96f6: Test publish
+
 ## 0.7.0
 
 ### Minor Changes

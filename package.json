@@ -1,6 +1,6 @@
 {
   "name": "@carbonteq/fp",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "FP utils",
   "author": "Arslan <rslnkrmt2552@gmail.com>",
   "main": "lib/index.js",
@@ -15,7 +15,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["/dist"],
+  "files": [
+    "/dist"
+  ],
   "scope": "@carbonteq",
   "repository": {
     "type": "git",
