@@ -1,0 +1,20 @@
+name: Publish (JSR)
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    name: Publish to JSR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish
+        run: npx jsr publish --allow-slow-types
