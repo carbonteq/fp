@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.7.0
+
+### Minor Changes
+
+- d304e29: Update tooling
+
 ## 0.6.0
 
 ### Minor Changes
