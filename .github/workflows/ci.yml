@@ -1,13 +1,14 @@
-name: CI (Build & Test)
+name: Build & Test
 
 on:
   push:
     branches:
-      - main
+      - dev
 
   pull_request:
     branches-ignore:
-      - 'changeset-release/main'
+      - "changeset-release/main"
+      - "dev"
 
     types:
       - opened
@@ -18,31 +19,37 @@ jobs:
     name: Build and Test
     timeout-minutes: 15
     runs-on: ubuntu-22.04
-    if: ${{ github.ref != 'refs/heads/changeset-release/main' }}
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    # if: ${{ github.ref != 'refs/heads/changeset-release/main' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v2
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
-          cache: 'yarn'
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: yarn
+        run: pnpm install
 
       - name: Build
-        run: yarn build
+        run: pnpm build
 
       - name: Type check
-        run: yarn tc
+        run: pnpm tc
 
       - name: Lint
-        run: yarn lint
+        run: pnpm lint
 
       - name: Test
-        run: yarn test
+        run: pnpm test
