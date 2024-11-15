@@ -15,7 +15,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["/dist"],
+  "files": [
+    "/dist"
+  ],
   "scope": "@carbonteq",
   "repository": {
     "type": "git",
@@ -51,6 +53,7 @@
     "@tsconfig/node20": "^20.1.4",
     "@types/node": "^20.14.9",
     "changesets": "^1.0.2",
+    "jsr": "^0.13.2",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.5.3"
