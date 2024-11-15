@@ -1,33 +1,15 @@
 {
-	"$schema": "https://raw.githubusercontent.com/hougesen/mdsf/main/schemas/v0.2.1/mdsf.schema.json",
-	"format_finished_document": false,
-	"javascript_runtime": "node",
-	"languages": {
-		"c": "clang-format",
-		"cpp": "clang-format",
-		"csharp": [["csharpier", "clang-format"]],
-		"css": [["prettier", "stylelint"]],
-		"go": [
-			["gci", "goimports-reviser", "goimports"],
-			["gofumpt", "gofmt", "crlfmt"]
-		],
-		"haskell": [["fourmolu", "ormolu", "hindent", "stylish-haskell"]],
-		"html": [["prettier", "djlint"]],
-		"java": [["google-java-format", "clang-format"]],
-		"javascript": ["biome"],
-		"json": ["biome"],
-		"lua": [["stylua", "luaformatter"]],
-		"python": [
-			["usort", "isort"],
-			["ruff", "blue", "black", "yapf", "autopep8", "pyink"]
-		],
-		"rust": "rustfmt",
-		"shell": [["shfmt", "beautysh"]],
-		"sql": [["sqlfluff", "sql-formatter"]],
-		"toml": "taplo",
-		"typescript": ["biome"],
-		"yaml": [["prettier", "yamlfmt", "yamlfix"]]
-	},
-	"custom_file_extensions": {}
+  "$schema": "https://raw.githubusercontent.com/hougesen/mdsf/main/schemas/v0.3.1/mdsf.schema.json",
+  "format_finished_document": false,
+  "javascript_runtime": "node",
+  "languages": {
+    "css": [["prettier", "stylelint"]],
+    "html": [["prettier", "djlint"]],
+    "javascript": ["biome:format"],
+    "json": ["biome:format"],
+    "shell": [["shfmt", "beautysh"]],
+    "sh": [["shfmt", "beautysh"]],
+    "typescript": ["biome:format"],
+    "yaml": [["prettier", "yamlfmt", "yamlfix"]]
+  }
 }
-

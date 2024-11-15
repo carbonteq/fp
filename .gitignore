@@ -42,3 +42,4 @@ tsconfig.build.tsbuildinfo
 
 lib
 tmp.ts
+dist

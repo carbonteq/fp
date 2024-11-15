@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+
+id: expect-simple
+language: TypeScript
+rule:
+  pattern: expect($OBJ);
+fix: assert.ok($OBJ);
+# utils: Extract repeated rule as local utility here.
+

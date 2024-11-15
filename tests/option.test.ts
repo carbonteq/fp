@@ -1,29 +1,31 @@
-import { Option, UnwrappedNone } from "../lib";
+import * as assert from "node:assert";
+import { describe, it } from "node:test";
+import { Option, UnwrappedNone } from "@/option.js";
 
 describe("option construction", () => {
-	it("should construct Some opt", () => {
-		const opt = Option.Some(123456);
+  it("should construct Some opt", () => {
+    const opt = Option.Some(123456);
 
-		expect(opt).toBeDefined();
-	});
+    assert.ok(opt !== undefined);
+  });
 
-	it("should construct None opt", () => {
-		const opt = Option.None;
+  it("should construct None opt", () => {
+    const opt = Option.None;
 
-		expect(opt).toBeDefined();
-	});
+    assert.ok(opt !== undefined);
+  });
 });
 
 describe("option unwrapping", () => {
-	it("should return value for Some", () => {
-		const opt = Option.Some(123456);
+  it("should return value for Some", () => {
+    const opt = Option.Some(123456);
 
-		expect(opt).toBeDefined();
-	});
+    assert.ok(opt !== undefined);
+  });
 
-	it("should throw UnwrappedNone on None", () => {
-		const opt = Option.None;
+  it("should throw UnwrappedNone on None", () => {
+    const opt = Option.None;
 
-		expect(() => opt.unwrap()).toThrow(UnwrappedNone);
-	});
+    assert.throws(() => opt.unwrap(), UnwrappedNone);
+  });
 });

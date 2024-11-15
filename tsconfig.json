@@ -1,28 +1,37 @@
 {
-	"extends": "@tsconfig/node18/tsconfig.json",
-	"compilerOptions": {
-		"target": "ES2020",
-		"composite": false,
-		"declarationMap": true,
-		"forceConsistentCasingInFileNames": true,
-		"inlineSources": false,
-		"isolatedModules": true,
-		"moduleResolution": "Node16",
-		"noUnusedLocals": false,
-		"noUnusedParameters": false,
-		"preserveWatchOutput": true,
-		"allowJs": false,
-		"strict": true,
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
-		"declaration": true,
-		"resolveJsonModule": true,
-		"sourceMap": true,
-		"baseUrl": ".",
-		"paths": {
-			"@carbonteq/hexapp": ["./src"],
-			"@carbonteq/hexapp/*": ["./src/*"]
-		}
-	},
-	"exclude": ["node_modules", "jest.config.js", "lib"]
+  "extends": "@tsconfig/node20/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "moduleResolution": "node16",
+    "module": "Node16",
+    "composite": false,
+    "declarationMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "inlineSources": false,
+    "isolatedModules": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "preserveWatchOutput": true,
+    "allowJs": false,
+    "strict": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "declaration": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@": ["./src"],
+      "@/*": ["./src/*"],
+      "@carbonteq/hexapp": ["./src"],
+      "@carbonteq/hexapp/*": ["./src/*"]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "jest.config.js",
+    "dist",
+    "tsup.config.ts",
+    "rollup.config.ts"
+  ]
 }

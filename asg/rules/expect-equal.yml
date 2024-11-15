@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+
+id: expect-equal
+language: TypeScript
+rule:
+  pattern: expect($OBJ).toEqual($EXPECTED)
+fix: assert.deepStrictEqual($OBJ, $EXPECTED)

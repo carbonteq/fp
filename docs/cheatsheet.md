@@ -13,7 +13,7 @@ const res3 = Result.Err<Array<number>, SomeOtherError>;
 const mapper = (str: string) => new Date();
 
 const anotherMapper = (b: boolean): Result<number, BazError> =>
-	b ? Result.Ok(420) : new BazError("");
+ b ? Result.Ok(420) : new BazError("");
 ```
 
 |                   | Mapper returns primitive | Mapper returns Result |

@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+
+id: expect-date
+language: TypeScript
+rule:
+  pattern: expect($OBJ).toBeDate()
+fix: assert.ok($OBJ instanceof Date)
