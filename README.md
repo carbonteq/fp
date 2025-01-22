@@ -25,11 +25,14 @@ bun add @carbonteq/fp
 ```
 # Table of Contents
 - [Usage](#usage)
-- [Without using the `fp` library](#without-using-the-fp-library)
-- [Option](#option-handling-optional-values)
-- [Result](#result-handling-success-and-failure)
+  - [Without using the `fp` library](#without-using-the-fp-library)
+  - [Option](#option-handling-optional-values)
+  - [Result](#result-handling-success-and-failure)
 - [Cheatsheet](#cheatsheet)
-- [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
+  - [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
+- [Build Your First Pipeline](#build-your-first-pipeline)
+  - [Synchronous Pipeline](#synchronous-pipeline)
+  - [Asynchronous Pipeline](#asynchronous-pipeline)
 
 # Usage
 
@@ -243,13 +246,156 @@ console.log(combined.unwrap()); // Output: [5, 10]
 
 | **Method**            | **`map`**                                                         | **`flatMap`**                                                                                | **`zip`**                                                                                    | **`flatZip`**                                                           |   |
 | --------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | - |
-| **Purpose**           | Transforms the value inside an `Ok` without changing the context. | Chains dependent computations where each computation returns a `Result`.                     | Combines the current value with another derived value into a tuple `[T, U]`.                 | Combines two independent `Result` values into a tuple `[T, U]`.         |   |
-| **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` to transform the current value into another `Result`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.             | A function `(val: T) => Result<U, E2>` that returns another `Result`.   |   |
-| **Output**            | `Result<U, E>`                                                    | `Result<U, E>`                                                                            | `Result<[T, U], E>`                                                                        | `Result<[T, U], E>`.                                                    |   |
-| **Error Propagation** | Propagates `Err` if the `Result` is `Err`.                        | Propagates the first `Err` encountered in the chain.                                         | Propagates `Err` if the current `Result` or derived value is `Err`.                          | Propagates the first `Err` encountered between the two `Result` values. |   |
-| **Use Case**          | When you want to transform a value inside `Ok`.                   | When the next computation depends on the current value and returns a `Result`.               | When you want to pair the current value with a derived one. | When you want to combine two independent `Result` values into a tuple.  |   |
+| **Purpose**           | Transforms the value inside an `Ok`. | Chains dependent computations where each computation returns a `Result`.                     | Combines the current value with another derived value into a tuple `[T, U]`.                 | Combines two independent `Result` values into a tuple `[T, U]`.         |
+| **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` to transform the current value into another `Result`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.             | A function `(val: T) => Result<U, E2>` that returns another `Result`.   |
+| **Output**            | `Result<U, E>`                                                    | `Result<U, E>`                                                                            | `Result<[T, U], E>`                                                                        | `Result<[T, U], E>`.                                                    |
+| **Error Propagation** | Propagates `Err` if the `Result` is `Err`.                        | Propagates the first `Err` encountered in the chain.                                         | Propagates `Err` if the current `Result` or derived value is `Err`.                          | Propagates the first `Err` encountered between the two `Result` values. |
+| **Use Case**          | When you want to transform a value inside `Ok`.                   | When the next computation depends on the current value and returns a `Result`.               | When you want to pair the current value with a derived one. | When you want to combine two independent `Result` values into a tuple.  |
 
 ---
+
+## Build Your First Pipeline
+
+The pipeline will use the concepts explained above, such as `Option` and `Result`, to handle optional values and errors in a clean and functional way.
+
+Let's say we're working on a financial application that processes transactions. We need to check if the transaction has a valid amount, if the user is active, and if the transaction is successful. Our goal is to process these transactions and ensure that we handle any missing or invalid values gracefully.
+
+### Problem
+
+We have a list of transactions, each with the following properties:
+- `amount`: The amount of money in the transaction (it could be `null` or `undefined`).
+- `userId`: The user associated with the transaction.
+- `status`: The status of the transaction, which could be `"pending"`, `"completed"`, or `"failed"`.
+
+Our task is to:
+1. Check if the `amount` is present and valid.
+2. Ensure the user is active.
+3. Process the transaction if the status is `"completed"`.
+
+### Solution Using `Option` and `Result`
+
+Let's walk through how we can achieve this using `Option` for handling optional values and `Result` for error handling.
+
+#### Synchronous Pipeline
+
+```typescript
+import { Option, Result, matchOpt, matchRes } from "@carbonteq/fp";
+
+// Simulate an API call to check if the user is active
+function getUserStatus(userId: string): Result<boolean, string> {
+  const activeUsers = ["user1", "user2", "user3"];
+  return activeUsers.includes(userId)
+    ? Result.Ok(true)
+    : Result.Err("User is not active");
+}
+
+// Validate if the transaction amount is valid
+function validateAmount(amount: number | null | undefined): Option<number> {
+  return amount && amount > 0 ? Option.Some(amount) : Option.None;
+}
+
+// Simulate a payment gateway processing the transaction
+function processTransaction(amount: number): Result<string, string> {
+  return amount > 1000
+    ? Result.Ok("Transaction processed successfully")
+    : Result.Err("Transaction failed due to low amount");
+}
+
+// Our pipeline: process each transaction and handle errors using Option and Result
+function processUserTransaction(transaction: { userId: string; amount: number | null | undefined; status: string }) {
+  const amountOption = validateAmount(transaction.amount)
+        .map((amount) => getUserStatus(transaction.userId)
+            .flatMap(() => transaction.status === "completed" ? processTransaction(amount) : Result.Err("User is not active"))
+    )
+
+  // Match the Option to handle valid and invalid amounts
+  matchOpt(amountOption, {
+    Some: (res) => {
+        matchRes(res, {
+            Ok: (value) => console.log(value),
+            Err: (error) => console.error(error)
+        });
+    },
+    None: () => console.error("Invalid transaction amount")
+  });
+}
+
+// Example transactions
+const transactions = [
+  { userId: "user1", amount: 500, status: "completed" },
+  { userId: "user2", amount: null, status: "completed" },
+  { userId: "user4", amount: 2000, status: "pending" },
+  { userId: "user3", amount: 1200, status: "completed" },
+];
+
+// Process all transactions
+transactions.forEach(processUserTransaction);
+// Output:
+// Invalid transaction amount
+// User is not active
+// Transaction failed due to low amount
+// Transaction processed successfully
+```
+
+#### Asynchronous Pipeline
+
+```typescript
+import { Option, Result, matchOpt, matchRes } from "@carbonteq/fp";
+
+// Simulate an API call to check if the user is active
+async function getUserStatus(userId: string): Promise<Result<boolean, string>> {
+  const activeUsers = ["user1", "user2", "user3"];
+  return activeUsers.includes(userId)
+    ? Result.Ok(true)
+    : Result.Err("User is not active");
+}
+
+// Validate if the transaction amount is valid
+async function validateAmount(amount: number | null | undefined): Promise<Option<number>> {
+  return amount && amount > 0 ? Option.Some(amount) : Option.None;
+}
+
+// Simulate a payment gateway processing the transaction
+async function processTransaction(amount: number): Promise<Result<string, string>> {
+  return amount > 1000
+    ? Result.Ok("Transaction processed successfully")
+    : Result.Err("Transaction failed due to low amount");
+}
+
+// Our pipeline: process each transaction and handle errors using Option and Result
+async function processUserTransaction(transaction: { userId: string; amount: number | null | undefined; status: string }) {
+  const amountOption = await validateAmount(transaction.amount)
+
+  // Match the Option to handle valid and invalid amounts
+  matchOpt(amountOption, {
+    Some: async (opt) => {
+        const res = await (await getUserStatus(transaction.userId))
+            .flatMap(async () => transaction.status === "completed" ? await processTransaction(opt) : Result.Err("User is not active"))
+        matchRes(res, {
+            Ok: (value) => console.log(value),
+            Err: (error) => console.error(error)
+        });
+    },
+    None: () => console.error("Invalid transaction amount")
+  });
+}
+
+// Example transactions
+const transactions = [
+  { userId: "user1", amount: 500, status: "completed" },
+  { userId: "user2", amount: null, status: "completed" },
+  { userId: "user4", amount: 2000, status: "pending" },
+  { userId: "user3", amount: 1200, status: "completed" },
+];
+
+// Process all transactions
+transactions.forEach(processUserTransaction);
+// Output:
+// Invalid transaction amount
+// User is not active
+// Transaction failed due to low amount
+// Transaction processed successfully
+```
 
 ## Contributing
 Contributions are welcome! Feel free to open issues or submit pull requests.
