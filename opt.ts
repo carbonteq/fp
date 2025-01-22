@@ -48,6 +48,20 @@ class Option<T> {
 
     return Promise.resolve(curr) as Promise<Curr>;
   }
+
+  async toPromise<Curr = Awaited<T>>(): Promise<Option<Curr>> {
+    const curr = this.val;
+
+    let inner: Curr;
+    if (isPromise(curr)) {
+      const awaited = await curr;
+      inner = awaited as Curr;
+    } else {
+      inner = curr as unknown as Curr;
+    }
+
+    return new Option(inner);
+  }
 }
 
 const print = console.debug;
@@ -92,3 +106,6 @@ print(await c);
 print(await c.awaitable());
 print(await d);
 print(await d.awaitable());
+
+print(b_asq.toPromise());
+print(await b_asq.toPromise());
