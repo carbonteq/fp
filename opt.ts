@@ -1,4 +1,5 @@
 import { isPromise } from "node:util/types";
+import { setTimeout } from "node:timers/promises";
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -39,6 +40,14 @@ class Option<T> {
     }
     return new Option(transformed);
   }
+
+  awaitable<Curr = Awaited<T>>(): Promise<Curr> {
+    const curr = this.val;
+
+    if (isPromise(curr)) return curr as Promise<Curr>;
+
+    return Promise.resolve(curr) as Promise<Curr>;
+  }
 }
 
 const print = console.debug;
@@ -46,8 +55,8 @@ const print = console.debug;
 const sq = (n: number) => `sq: ${n}`;
 const asq = async (n: number) => `asq: ${n}`;
 
-const strToNum = (s: string) => 42;
-const strToNumAsync = async (s: string) => 42;
+const strToNum = (s: string) => s.length;
+const strToNumAsync = async (s: string) => s.length;
 
 const gen = async (n: number) => n;
 
@@ -72,3 +81,14 @@ await b_asq.val;
 
 print("b_sq", b_sq);
 print("b_asq", b_asq);
+
+print(a_asq.awaitable());
+
+const waitSecs = (secs: number) =>
+  setTimeout(secs * 1000, `after waiting ${secs} secs`);
+const c = new Option(42);
+const d = new Option(waitSecs(2));
+print(await c);
+print(await c.awaitable());
+print(await d);
+print(await d.awaitable());
