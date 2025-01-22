@@ -23,12 +23,19 @@ yarn add @carbonteq/fp
 ```sh
 bun add @carbonteq/fp
 ```
+# Table of Contents
+- [Usage](#usage)
+- [Without using the `fp` library](#without-using-the-fp-library)
+- [Option](#option-handling-optional-values)
+- [Result](#result-handling-success-and-failure)
+- [Cheatsheet](#cheatsheet)
+- [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
 
 # Usage
 
 To demonstrate the utility of `fp`, let us consider a use case where we need to retrieve a user's email and address.
 
-### Example: Without using the `fp` library
+### Without using the `fp` library
 ```typescript
 function getUserEmail(user: { email?: string }): string | null {
   return user.email ? user.email : null;
@@ -58,7 +65,7 @@ Now imagine if we had more complex use cases that involved more than two optiona
 ## Option: Handling Optional Values
 The `Option` type represents a value that might or might not be present. It eliminates the need for manual checks for `null` or `undefined`.
 
-### Example: Using the `Option` type
+### Using the `Option` type
 ```typescript
 import { Option, matchOpt } from "@carbonteq/fp";
 
@@ -93,7 +100,7 @@ The `Result` type represents a value that can be either a success (`Ok`) or a fa
 
 Let us consider a use case where we need to divide two numbers and then double the result if it is even.
 
-### Example: Without `Result`
+### Without `Result`
 ```typescript
 function divide(a: number, b: number): number | string {
   return b === 0 ? "Division by zero" : a / b;
@@ -118,7 +125,7 @@ else {
 }
 ```
 
-### Example: With `Result`
+### With `Result`
 ```typescript
 import { Result, matchRes } from "@carbonteq/fp";
 
@@ -146,54 +153,101 @@ matchRes(result, {
 
 ## Cheatsheet
 
-### Functions
-
 #### `map`
 Transforms the value inside `Option` or `Result`.
+
+For `Option`, the code looks like this:
 ```typescript
-Some(2).map(x => x * 2); // Some(4)
-Ok(2).map(x => x + 3);   // Ok(5)
+import { Option} from "@carbonteq/fp";
+const someValue: Option<number> = Option.Some(5);
+const res1 = someValue.map((x) => x * 2); // Transform the value
+console.log(res1.unwrap()); // Output: 10
+
+const noneValue: Option<number> = Option.None;
+const res2 = noneValue.map((x) => x * 2); // Do nothing if None
+console.log(res2.safeUnwrap()); // Output: null
+```
+
+For `Result`, the code looks like this:
+```typescript
+import { Result} from "@carbonteq/fp";
+const resultValue: Result<number, string> = Result.Ok(5);
+const res = resultValue.map((x) => x * 2); // Transform the value
+console.log(res.unwrap()); // Output: 10
+
+const errorValue: Result<number, string> = Result.Err("Some Error");
+const err = errorValue.map((x) => x * 2); // Do nothing if Err
+console.log(err.unwrapErr()); // Output: Some Error
 ```
 
 #### `flatMap`
-Chains computations that return `Option` or `Result`.
+`flatMap` is used to chain operations where each step returns an Option or Result. It avoids nested structures like `Option<Option<T>>` or `Result<Result<T, E>, E>` by "flattening" them into a single level.
+Consider the following example:
 ```typescript
-Some(2).flatMap(x => (x > 1 ? Some(x * 2) : None)); // Some(4)
-Ok(2).flatMap(x => Ok(x * 3));                      // Ok(6)
+import { Option} from "@carbonteq/fp";
+
+const optOne: Option<number> = Option.Some(5);
+const optTwo: Option<number> = Option.Some(10);
+const optThree: Option<number> = Option.Some(15);
+
+const optResult = optOne
+        .map(() => optTwo)
+            .map( () => optThree); // This will return Option<Option<number>>
 ```
+And we would need to unwrap the result two times to get the final value.
+```typescript
+const finalValue = optResult.unwrap().unwrap(); // Output: 15
+```
+
+This is where `flatMap` comes in. It allows us to chain the operations without nesting the Option types.
+```typescript
+import { Option} from "@carbonteq/fp";
+
+const optOne: Option<number> = Option.Some(5);
+const optTwo: Option<number> = Option.Some(10);
+const optThree: Option<number> = Option.Some(15);
+
+const optResult = optOne
+        .flatMap(() => optTwo)
+            .flatMap(() => optThree); // This will return Option<number>
+
+console.log(optResult.unwrap()); // Output: 15
+```
+The same holds true for `Result`.
 
 #### `zip`
-Combines two `Option` or `Result` values into a single pair if both are present/Ok.
+Creates a tuple `[T, U]` where the second value `U` is _derived_ from the first value `T` using a function `f`.
+For example, suppose we want to pair a number `T` with its square `U`.
 ```typescript
-Some(2).zip(Some(3)); // Some([2, 3])
-Ok(2).zip(Ok(3));     // Ok([2, 3])
+import { Result} from "@carbonteq/fp";
+
+const result: Result<number, Error> = Result.Ok(5);
+// Use zip to derive a pair
+const derivedPair = result.zip((val) => val * val);
+console.log(derivedPair.unwrap()); // Output: [5, 25]
+
 ```
+Here `derivedPair` is a `Result<[number, number], Error>`. Note that `T` = `5` and `U` = `25`.
 
 #### `flatZip`
-Combines two values and flattens the result.
+Combines the current `Result<T, E>` with another `Result<U, E2>` provided by a function. Unlike zip, which pairs a value with a derived one, flatZip works with **two independent Result values** and combines their contents into a tuple `[T, U]`. It ensures both results are Ok to proceed; otherwise, it propagates the first encountered Err.
 ```typescript
-Some(2).flatZip(Some(3)); // Some([2, 3])
-```
+import { Result } from "@carbonteq/fp";
 
-#### `mapErr`
-Transforms the error in a `Result`.
-```typescript
-Err("error").mapErr(err => `Custom: ${err}`); // Err("Custom: error")
+const resOne: Result<number, Error> = Result.Ok(5);
+const resTwo: Result<number, Error> = Result.Ok(10);
+const combined = resOne.flatZip(() => resTwo); // Combine resOne and resTwo into [5, 10]
+console.log(combined.unwrap()); // Output: [5, 10]
 ```
+## Comparison of `map`, `flatMap`, `zip`, and `flatZip`
 
-#### `tap`
-Runs a side effect without altering the value.
-```typescript
-Some(2).tap(x => console.log(x)); // Logs: 2
-Ok(2).tap(x => console.log(x));   // Logs: 2
-```
-
----
-
-## Installation
-```bash
-npm install @carbonteq/fp
-```
+| **Method**            | **`map`**                                                         | **`flatMap`**                                                                                | **`zip`**                                                                                    | **`flatZip`**                                                           |   |
+| --------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | - |
+| **Purpose**           | Transforms the value inside an `Ok` without changing the context. | Chains dependent computations where each computation returns a `Result`.                     | Combines the current value with another derived value into a tuple `[T, U]`.                 | Combines two independent `Result` values into a tuple `[T, U]`.         |   |
+| **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` to transform the current value into another `Result`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.             | A function `(val: T) => Result<U, E2>` that returns another `Result`.   |   |
+| **Output**            | `Result<U, E>`                                                    | `Result<U, E>`                                                                            | `Result<[T, U], E>`                                                                        | `Result<[T, U], E>`.                                                    |   |
+| **Error Propagation** | Propagates `Err` if the `Result` is `Err`.                        | Propagates the first `Err` encountered in the chain.                                         | Propagates `Err` if the current `Result` or derived value is `Err`.                          | Propagates the first `Err` encountered between the two `Result` values. |   |
+| **Use Case**          | When you want to transform a value inside `Ok`.                   | When the next computation depends on the current value and returns a `Result`.               | When you want to pair the current value with a derived one. | When you want to combine two independent `Result` values into a tuple.  |   |
 
 ---
 
