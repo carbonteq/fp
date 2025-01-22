@@ -9,11 +9,29 @@ type MapperReturn<Curr, Next> = Curr extends Promise<unknown>
   ? Option<Promise<Awaited<Next>>>
   : Option<Next>;
 
-type ABC = MapperReturn<Promise<number>, string>;
-type ABC2 = MapperReturn<number, string>;
-
+const NONE_VAL = Symbol.for("None");
 class Option<T> {
-  constructor(readonly val: T) {}
+  private constructor(readonly val: T) {}
+
+  static readonly None: Option<never> = new Option(NONE_VAL) as Option<never>;
+
+  static Some<Inner>(val: Inner): Option<Inner> {
+    return new Option(val);
+  }
+
+  isSome(): this is Option<T> {
+    return this.val !== NONE_VAL;
+  }
+
+  isNone(): this is Option<never> {
+    return this.val === NONE_VAL;
+  }
+
+  safeUnwrap(): T | null {
+    if (this.val !== NONE_VAL) return this.val;
+
+    return null;
+  }
 
   map<U, Curr = Awaited<T>>(mapper: (val: Curr) => U): MapperReturn<T, U>;
   map<U, Curr = Awaited<T>>(
@@ -22,6 +40,10 @@ class Option<T> {
   map<U, Curr = Awaited<T>>(
     mapper: Mapper<NoInfer<Curr>, U> | AsyncMapper<NoInfer<Curr>, U>,
   ) {
+    if (this.isNone()) {
+      return Option.None;
+    }
+
     const curr = this.val;
 
     if (isPromise(curr)) {
@@ -74,8 +96,8 @@ const strToNumAsync = async (s: string) => s.length;
 
 const gen = async (n: number) => n;
 
-const a = new Option(3);
-const b = new Option(gen(3));
+const a = Option.Some(3);
+const b = Option.Some(gen(3));
 
 print("a", a);
 print("b", b);
@@ -100,12 +122,22 @@ print(a_asq.awaitable());
 
 const waitSecs = (secs: number) =>
   setTimeout(secs * 1000, `after waiting ${secs} secs`);
-const c = new Option(42);
-const d = new Option(waitSecs(2));
+const c = Option.Some(42);
+const d = Option.Some(waitSecs(2));
 print(await c);
 print(await c.awaitable());
 print(await d);
 print(await d.awaitable());
+print("async safe unwrap:", d.safeUnwrap());
+print("async safe unwrap:", await d.safeUnwrap());
 
 print(b_asq.toPromise());
 print(await b_asq.toPromise());
+
+const noComputation: Option<string> = Option.None;
+const empty = noComputation.map(strToNumAsync).map(sq);
+
+print(empty);
+print(await empty);
+print(await empty.toPromise());
+print(empty.safeUnwrap());
