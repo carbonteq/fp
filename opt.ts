@@ -84,6 +84,22 @@ class Option<T> {
 
     return new Option(inner);
   }
+
+  async then(onFullfilled, onRejected) {
+    this.awaitable().then(onFullfilled, onRejected);
+    // this.toPromise().then(onFullfilled, onRejected);
+
+    // if (isPromise(this.val)) {
+    //   try {
+    //     const r = (await this.val) as Awaited<T>;
+    //     onFullfilled(r);
+    //   } catch (err) {
+    //     onRejected?.(err);
+    //   }
+    // } else {
+    //   onFullfilled(this.val);
+    // }
+  }
 }
 
 const print = console.debug;
@@ -132,12 +148,12 @@ print("async safe unwrap:", d.safeUnwrap());
 print("async safe unwrap:", await d.safeUnwrap());
 
 print(b_asq.toPromise());
-print(await b_asq.toPromise());
+print(await b_asq);
 
-const noComputation: Option<string> = Option.None;
-const empty = noComputation.map(strToNumAsync).map(sq);
-
-print(empty);
-print(await empty);
-print(await empty.toPromise());
-print(empty.safeUnwrap());
+// const noComputation: Option<string> = Option.None;
+// const empty = noComputation.map(strToNumAsync).map(sq);
+//
+// print(empty);
+// print(await empty);
+// print(await empty.toPromise());
+// print(empty.safeUnwrap());
