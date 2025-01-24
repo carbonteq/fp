@@ -33,42 +33,23 @@ class Option<T> {
     return null;
   }
 
-  map<U, Curr = Awaited<T>>(mapper: (val: Curr) => U): MapperReturn<T, U>;
+  map<U, Curr = Awaited<T>>(mapper: (val: Curr) => U): Option<U>;
   map<U, Curr = Awaited<T>>(
     mapper: (val: Curr) => Promise<U>,
   ): Option<Promise<U>>;
   map<U, Curr = Awaited<T>>(
     mapper: Mapper<NoInfer<Curr>, U> | AsyncMapper<NoInfer<Curr>, U>,
   ) {
-    if (this.isNone()) {
-      return Option.None;
-    }
+    if (this.isNone()) return Option.None;
 
     const curr = this.val;
-
     if (isPromise(curr)) {
       const p = curr as Promise<Curr>;
-      const newPromise = new Promise<U>((resolve, reject) => {
-        const t = p.then(mapper, reject) as Promise<U>;
-        resolve(t);
-      });
-      const opt = new Option(newPromise);
-      return opt;
+      return new Option(p.then(mapper));
     }
 
     const transformed = mapper(curr as unknown as Curr);
-    if (isPromise(transformed)) {
-      return new Option<Promise<U>>(transformed);
-    }
     return new Option(transformed);
-  }
-
-  awaitable<Curr = Awaited<T>>(): Promise<Curr> {
-    const curr = this.val;
-
-    if (isPromise(curr)) return curr as Promise<Curr>;
-
-    return Promise.resolve(curr) as Promise<Curr>;
   }
 
   async toPromise<Curr = Awaited<T>>(): Promise<Option<Curr>> {
@@ -85,20 +66,18 @@ class Option<T> {
     return new Option(inner);
   }
 
-  async then(onFullfilled, onRejected) {
-    this.awaitable().then(onFullfilled, onRejected);
-    // this.toPromise().then(onFullfilled, onRejected);
+  static fromPromise<U>(o: Promise<Option<U>>): Option<Promise<U>> {
+    const p = new Promise<U>((resolve, reject) =>
+      o.then((innerOpt) => resolve(innerOpt.val), reject),
+    );
 
-    // if (isPromise(this.val)) {
-    //   try {
-    //     const r = (await this.val) as Awaited<T>;
-    //     onFullfilled(r);
-    //   } catch (err) {
-    //     onRejected?.(err);
-    //   }
-    // } else {
-    //   onFullfilled(this.val);
-    // }
+    return new Option(p);
+  }
+
+  toString(): string {
+    if (this.isNone()) return "Option::None";
+
+    return `Option::Some(${this.val})`;
   }
 }
 
@@ -118,6 +97,9 @@ const b = Option.Some(gen(3));
 print("a", a);
 print("b", b);
 
+const awaitedB = await b;
+print("awaited b", awaitedB);
+
 const a_sq = a.map(sq);
 print("a_sq", a_sq);
 const a_asq = a.map(asq).map(strToNum);
@@ -125,7 +107,7 @@ print("a_asq", a_asq);
 
 const b_sq = b.map(sq).map(strToNumAsync).map(sq);
 print("b_sq", b_sq);
-const b_asq = b.map(asq).map(sq).map(asq);
+const b_asq = await b.map(asq).map(sq).map(asq).toPromise();
 print("b_asq", b_asq);
 
 await b_sq.val;
@@ -134,26 +116,26 @@ await b_asq.val;
 print("b_sq", b_sq);
 print("b_asq", b_asq);
 
-print(a_asq.awaitable());
-
 const waitSecs = (secs: number) =>
   setTimeout(secs * 1000, `after waiting ${secs} secs`);
 const c = Option.Some(42);
 const d = Option.Some(waitSecs(2));
-print(await c);
-print(await c.awaitable());
-print(await d);
-print(await d.awaitable());
+// print(await c);
+print(await c.toPromise());
+// print(await d);
+print(await d.toPromise());
 print("async safe unwrap:", d.safeUnwrap());
 print("async safe unwrap:", await d.safeUnwrap());
 
 print(b_asq.toPromise());
-print(await b_asq);
+print(await b_asq.toPromise());
 
-// const noComputation: Option<string> = Option.None;
-// const empty = noComputation.map(strToNumAsync).map(sq);
-//
-// print(empty);
-// print(await empty);
-// print(await empty.toPromise());
-// print(empty.safeUnwrap());
+const nonGeneratingPromise: Promise<Option<number>> = Promise.resolve(
+  Option.None,
+);
+const noComp = Option.fromPromise(nonGeneratingPromise).map((v) => {
+  console.log("Shouldn't log");
+
+  return v.toString();
+});
+print(noComp);
