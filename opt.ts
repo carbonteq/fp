@@ -3,20 +3,34 @@ import { setTimeout } from "node:timers/promises";
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
+type FlatMapper<T, U> = (val: T) => Option<U>;
+type AsyncFlatMapper<T, U> = (val: T) => Promise<Option<U>>;
+
 type MapperArg<T, U> = Mapper<T, U> | AsyncMapper<T, U>;
 
 type MapperReturn<Curr, Next> = Curr extends Promise<unknown>
   ? Option<Promise<Awaited<Next>>>
   : Option<Next>;
 
+type OptionCtx = { promiseNoneSlot: boolean };
+
 const NONE_VAL = Symbol.for("None");
 class Option<T> {
-  private constructor(readonly val: T) {}
+  readonly #ctx: OptionCtx;
 
-  static readonly None: Option<never> = new Option(NONE_VAL) as Option<never>;
+  private constructor(
+    private val: T,
+    ctx: OptionCtx,
+  ) {
+    this.#ctx = ctx;
+  }
+
+  static readonly None: Option<never> = new Option(NONE_VAL, {
+    promiseNoneSlot: true,
+  }) as Option<never>;
 
   static Some<Inner>(val: Inner): Option<Inner> {
-    return new Option(val);
+    return new Option(val, { promiseNoneSlot: false });
   }
 
   isSome(): this is Option<T> {
@@ -24,7 +38,10 @@ class Option<T> {
   }
 
   isNone(): this is Option<never> {
-    return this.val === NONE_VAL;
+    return (
+      this.val === NONE_VAL ||
+      (isPromise(this.val) && this.#ctx.promiseNoneSlot)
+    );
   }
 
   safeUnwrap(): T | null {
@@ -42,14 +59,61 @@ class Option<T> {
   ) {
     if (this.isNone()) return Option.None;
 
+    const ctx = this.#ctx;
+
     const curr = this.val;
     if (isPromise(curr)) {
+      // this promise may return an option, but we'll treat the returned value as the inner type, and won't force flatMap semantics
+      // it's up to the caller to choose the correct mapper
       const p = curr as Promise<Curr>;
-      return new Option(p.then(mapper));
+      const safetlyMapped = p.then((v) =>
+        v === NONE_VAL ? NONE_VAL : mapper(v),
+      ) as Promise<U>;
+      return new Option(safetlyMapped, ctx);
     }
 
     const transformed = mapper(curr as unknown as Curr);
-    return new Option(transformed);
+    return new Option(transformed, ctx);
+  }
+
+  flatMap<U, Curr = Awaited<T>>(mapper: (val: Curr) => Option<U>): Option<U>;
+  flatMap<U, Curr = Awaited<T>>(
+    mapper: (val: Curr) => Promise<Option<U>>,
+  ): Option<Promise<U>>;
+  flatMap<U, Curr = Awaited<T>>(
+    mapper: FlatMapper<NoInfer<Curr>, U> | AsyncFlatMapper<NoInfer<Curr>, U>,
+  ): Option<U> | Option<Promise<U>> {
+    if (this.isNone()) return Option.None;
+
+    const ctx = this.#ctx;
+    const curr = this.val;
+    if (isPromise(curr)) {
+      const p = curr as Promise<Curr>;
+      const castedNone = NONE_VAL as unknown as Promise<U>;
+      const newP = new Promise<U>((resolve, reject) => {
+        p.then((curr) => {
+          if (curr === NONE_VAL) {
+            // ensure that Option transitions to a NONE slot and doesn't enqueue any more operations
+            ctx.promiseNoneSlot = true;
+            resolve(castedNone);
+          } else {
+            const r = mapper(curr);
+            if (isPromise(r)) {
+              r.then((innerOpt) => resolve(innerOpt.val), reject);
+            } else {
+              resolve(r.val);
+            }
+          }
+        });
+      });
+      return new Option(newP, ctx);
+    }
+
+    const mapped = mapper(curr as unknown as Curr);
+    if (isPromise(mapped)) {
+      return Option.fromPromise(mapped);
+    }
+    return mapped;
   }
 
   async toPromise<Curr = Awaited<T>>(): Promise<Option<Curr>> {
@@ -63,15 +127,22 @@ class Option<T> {
       inner = curr as unknown as Curr;
     }
 
-    return new Option(inner);
+    return new Option(inner, this.#ctx);
   }
 
   static fromPromise<U>(o: Promise<Option<U>>): Option<Promise<U>> {
+    // while this may look okay, it doesn't take care of cases where the promise returns None
+    // should treat it as flatMap on Unit Option
+    const ctx: OptionCtx = { promiseNoneSlot: false };
     const p = new Promise<U>((resolve, reject) =>
-      o.then((innerOpt) => resolve(innerOpt.val), reject),
+      o.then((innerOpt) => {
+        // only changes if this new opt returned none
+        ctx.promiseNoneSlot ||= innerOpt.#ctx.promiseNoneSlot;
+        resolve(innerOpt.val);
+      }, reject),
     );
 
-    return new Option(p);
+    return new Option(p, ctx);
   }
 
   toString(): string {
@@ -91,51 +162,37 @@ const strToNumAsync = async (s: string) => s.length;
 
 const gen = async (n: number) => n;
 
-const a = Option.Some(3);
-const b = Option.Some(gen(3));
+// const nonGeneratingPromise: Promise<Option<number>> = Promise.resolve(
+//   Option.None,
+// );
+// const noComp = Option.fromPromise(nonGeneratingPromise).map((v) => {
+//   console.log("Shouldn't log");
+//
+//   return v.toString();
+// });
+// print(noComp);
 
-print("a", a);
-print("b", b);
+const leadsToNone = async (_: number): Promise<Option<number>> => {
+  print("leading to none");
+  return Option.None;
+};
+const shouldntLogFlatMap = async (n: number): Promise<Option<number>> => {
+  console.debug("logged flatMap after none");
 
-const awaitedB = await b;
-print("awaited b", awaitedB);
+  return Option.Some(n * 2);
+};
 
-const a_sq = a.map(sq);
-print("a_sq", a_sq);
-const a_asq = a.map(asq).map(strToNum);
-print("a_asq", a_asq);
+const o = Option.Some(3)
+  .map(sq)
+  .flatMap(leadsToNone)
+  .flatMap(shouldntLogFlatMap)
+  .map((v) => {
+    print(v);
+    console.debug("logged map after none");
 
-const b_sq = b.map(sq).map(strToNumAsync).map(sq);
-print("b_sq", b_sq);
-const b_asq = await b.map(asq).map(sq).map(asq).toPromise();
-print("b_asq", b_asq);
+    return v * 2;
+  });
 
-await b_sq.val;
-await b_asq.val;
-
-print("b_sq", b_sq);
-print("b_asq", b_asq);
-
-const waitSecs = (secs: number) =>
-  setTimeout(secs * 1000, `after waiting ${secs} secs`);
-const c = Option.Some(42);
-const d = Option.Some(waitSecs(2));
-// print(await c);
-print(await c.toPromise());
-// print(await d);
-print(await d.toPromise());
-print("async safe unwrap:", d.safeUnwrap());
-print("async safe unwrap:", await d.safeUnwrap());
-
-print(b_asq.toPromise());
-print(await b_asq.toPromise());
-
-const nonGeneratingPromise: Promise<Option<number>> = Promise.resolve(
-  Option.None,
-);
-const noComp = Option.fromPromise(nonGeneratingPromise).map((v) => {
-  console.log("Shouldn't log");
-
-  return v.toString();
-});
-print(noComp);
+await setTimeout(1000);
+print(o.isNone());
+console.debug(await o.toPromise());
