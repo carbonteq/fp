@@ -3,9 +3,6 @@
 ## Description
 `fp` is a lightweight TypeScript library designed to simplify functional programming by providing essential types like `Option` and `Result`. It helps developers handle errors, manage optional values, and write expressive, composable code.
 
-## But why fp?
-In JavaScript and TypeScript, dealing with `null`, `undefined`, and errors can lead to verbose, error-prone code. `fp` introduces functional paradigms that make handling these cases cleaner and more reliable. By leveraging `fp`, you can reduce boilerplate, improve readability, and create more maintainable applications.
-
 ## Installation
 
 ```sh
@@ -23,24 +20,14 @@ yarn add @carbonteq/fp
 ```sh
 bun add @carbonteq/fp
 ```
-# Table of Contents
-- [Usage](#usage)
-  - [Without using the `fp` library](#without-using-the-fp-library)
-  - [Option](#option-handling-optional-values)
-  - [Result](#result-handling-success-and-failure)
-- [Cheatsheet](#cheatsheet)
-  - [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
-- [Build Your First Pipeline](#build-your-first-pipeline)
-  - [Synchronous Pipeline](#synchronous-pipeline)
-  - [Asynchronous Pipeline](#asynchronous-pipeline)
-
-# Usage
+# But why fp?
+In JavaScript and TypeScript, dealing with `null`, `undefined`, and errors can lead to verbose, error-prone code. `fp` introduces functional paradigms that make handling these cases cleaner and more reliable. By leveraging `fp`, you can reduce boilerplate, improve readability, and create more maintainable applications.
 
 To demonstrate the utility of `fp`, let us consider a use case where we need to retrieve a user's email and address.
 
 ### Without using the `fp` library
 ```typescript
-function getUserEmail(user: { email?: string }): string | null {
+function getUserByEmail(user: { email?: string }): string | null {
   return user.email ? user.email : null;
 }
 
@@ -48,7 +35,7 @@ function getUserAdress(user: { email?: string }): string | null {
   return user.email ? "Some Address" : null;
 }
 
-const email = getUserEmail({email: "test@test.com"});
+const email = getUserByEmail({email: "test@test.com"});
 if (email) {
   const address = getUserAdress(email);
   if (address) {
@@ -65,91 +52,77 @@ else {
 ```
 Now imagine if we had more complex use cases that involved more than two optional values. We would have to nest if statements and handle errors manually. This is where `fp` comes in.
 
-## Option: Handling Optional Values
-The `Option` type represents a value that might or might not be present. It eliminates the need for manual checks for `null` or `undefined`.
+### With using the `fp` library
 
-### Using the `Option` type
 ```typescript
 import { Option, matchOpt } from "@carbonteq/fp";
 
-function getUserEmail(user: { email?: string }): Option<string> {
+function getUserByEmail(user: { email?: string }): Option<string> {
   return user.email ? Option.Some(user.email) : Option.None;
 }
 
-function getUserAdress(user: { email?: string }): Option<string> {
-    return user.email ? Option.Some("Some Address") : Option.None;
+function getUserAddress(user: { email?: string }): Option<string> {
+  return user.email ? Option.Some("Some Address") : Option.None;
 }
 
-const emailOption = getUserEmail({email: "test@test.com"})
-        .flatMap(email => getUserAdress({email})
-            .map(address => ({email, address}))
-        );
+const res = getUserByEmail({ email: "test@test.com" })
+            .flatZip((email) => getUserAddress({ email })) 
 
-matchOpt(emailOption, {
-    Some: ({email, address}) => {
-        console.log(`User ${email} has address: ${address}`);
-    },
-    None: () => {
-        console.error("User or Adress not found");
-    }
+matchOpt(res, {
+  Some: (res) => {
+    console.log(`User ${res[0]} has address: ${res[1]}`);
+  },
+  None: () => {
+    console.error("User or Address not found");
+  }
 });
-    
 // Output: User test@test.com has address: Some Address
 
 ```
+# Table of Contents
+- [Usage](#usage)
+  - [The `Result` type](#the-result-type)
+  - [The `Option` type](#the-option-type)
+  - [Cheatsheet](#cheatsheet)
+    - [map](#map)
+    - [flatMap](#flatmap)
+    - [zip](#zip)
+    - [flatZip](#flatzip)
+    - [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
+    - [Some Other Useful Functions](#some-other-useful-functions)
+      - [mapErr](#maperr)
+      - [mapOr](#mapor)
+      - [tap](#tap)
+      - [unwrap](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+      - [safeUnwrapErr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+      - [unwrapOr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+      - [unwrapOrElse](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+      - [safeUnwrap](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+      - [unwrapErr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+- [Build Your First Pipeline](#build-your-first-pipeline)
+  - [Synchronous Pipeline](#synchronous-pipeline)
+  - [Asynchronous Pipeline](#asynchronous-pipeline)
 
-## Result: Handling Success and Failure
-The `Result` type represents a value that can be either a success (`Ok`) or a failure (`Err`). It simplifies error handling by making success and failure explicit.
+# Usage
 
-Let us consider a use case where we need to divide two numbers and then double the result if it is even.
+## The `Result` type
+`Result` represents a value that can be either a success (`Ok`) or a failure (`Err`). It simplifies error handling by making success and failure explicit.
 
-### Without `Result`
 ```typescript
-function divide(a: number, b: number): number | string {
-  return b === 0 ? "Division by zero" : a / b;
-}
+import { Result } from "@carbonteq/fp";
 
-function doubleEvenNumbers(a: number): number | string {
-  return a % 2 !== 0 ? "Number is not even" : a * 2;
-}
-
-const result = divide(10, 0);
-if (typeof result === "number") {
-  const doubled = doubleEvenNumbers(result);
-  if (typeof doubled === "number") {
-    console.log(result, doubled);
-  }
-  else {
-    console.error(doubled);
-  }
-}
-else {
-  console.error(result);
-}
+const res1: Result<number, string> = Result.Ok(5); // Contains the value 5
+const res2: Result<number, string> = Result.Err("Some Error"); // Contains the error "Some Error"
 ```
 
-### With `Result`
+## The `Option` type
+The `Option` type represents a value that might or might not be present. It eliminates the need for manual checks for `null` or `undefined`.
+
 ```typescript
-import { Result, matchRes } from "@carbonteq/fp";
+import { Option } from "@carbonteq/fp";
 
-function divide(a: number, b: number): Result<number, string> {
-  return b === 0 ? Result.Err("Division by zero") : Result.Ok(a / b);
-}
-
-function doubleEvenNumbers(a: number): Result<number, string> {
-    return a % 2 === 0 ? Result.Ok(a * 2) : Result.Err("Number is not even");
-}
-
-
-const result = divide(10, 2)
-    .flatMap(value => doubleEvenNumbers(value)
-    .map(double => ({value, double}))
-);
-
-matchRes(result, {
-    Ok: (val) => console.log(`Value: ${val.value}, Double: ${val.double}`),
-    Err: (err) => console.error(err)
-});
+const opt1: Option<number> = Option.Some(5); // Contains the value 5
+const opt2: Option<number> = Option.None; // Contains no value (None)
 ```
 
 ---
@@ -157,244 +130,449 @@ matchRes(result, {
 ## Cheatsheet
 
 #### `map`
-Transforms the value inside `Option` or `Result`.
+Transforms the `Some` or `Ok` value inside `Option` or `Result`.
 
-For `Option`, the code looks like this:
+Let's say we want to apply a 10% bonus to the account balance of a user.
+
 ```typescript
-import { Option} from "@carbonteq/fp";
-const someValue: Option<number> = Option.Some(5);
-const res1 = someValue.map((x) => x * 2); // Transform the value
-console.log(res1.unwrap()); // Output: 10
+import { Option } from "@carbonteq/fp";
 
-const noneValue: Option<number> = Option.None;
-const res2 = noneValue.map((x) => x * 2); // Do nothing if None
-console.log(res2.safeUnwrap()); // Output: null
-```
+async function fetchUserBalanceFromDatabase(userId: string): Promise<Option<number>> {
+    // Simulate fetching balance from a database
+    await Promise.resolve(userId);
+    return Option.Some(100);
+}
 
-For `Result`, the code looks like this:
-```typescript
-import { Result} from "@carbonteq/fp";
-const resultValue: Result<number, string> = Result.Ok(5);
-const res = resultValue.map((x) => x * 2); // Transform the value
-console.log(res.unwrap()); // Output: 10
+async function applyBonus() {
+    const userId = "user123"; // Example user ID
+    const balanceOption = (await fetchUserBalanceFromDatabase(userId))
+                          .map((balance) => balance * 1.1); // Apply a 10% bonus if balance exists
+    return balanceOption;
+}
 
-const errorValue: Result<number, string> = Result.Err("Some Error");
-const err = errorValue.map((x) => x * 2); // Do nothing if Err
-console.log(err.unwrapErr()); // Output: Some Error
+console.log(await applyBonus()); // Output: Some(110)
 ```
 
 #### `flatMap`
-`flatMap` is used to chain operations where each step returns an Option or Result. It avoids nested structures like `Option<Option<T>>` or `Result<Result<T, E>, E>` by "flattening" them into a single level.
-Consider the following example:
+`flatMap` is used to chain operations where each step returns an `Option` or `Result`. It avoids nested structures like `Option<Option<T>>` or `Result<Result<T, E>, E>` by "flattening" them into a single level.
+
+Let's say we want to validate user input and then save it to a database:
+
 ```typescript
-import { Option} from "@carbonteq/fp";
+import {Result} from "@carbonteq/fp";
 
-const optOne: Option<number> = Option.Some(5);
-const optTwo: Option<number> = Option.Some(10);
-const optThree: Option<number> = Option.Some(15);
+// Function to validate user input
+const validateUserData = (name: string, age: number): Result<{ name: string; age: number }, Error> => {
+  if (name.trim() === "") {
+    return Result.Err(new Error("Name cannot be empty"));
+  }
+  if (age < 0 || age > 120) {
+    return Result.Err(new Error("Age must be between 0 and 120"));
+  }
+  return Result.Ok({ name, age });
+};
 
-const optResult = optOne
-        .map(() => optTwo)
-            .map( () => optThree); // This will return Option<Option<number>>
+// Simulated asynchronous task to save user data to a "database"
+const saveUserData = async (user: { name: string; age: number }): Promise<Result<string, Error>> => {
+    // Simulate saving to database
+    await Promise.resolve(user);
+    return Result.Ok(`User ${user.name} saved successfully!`);
+};
+
+// Chaining validation and save using `flatMap`
+const processUser = async (name: string, age: number): Promise<Result<string, Error>> => {
+  const validationResult = await validateUserData(name, age)
+                          .flatMap(async (user) => await saveUserData(user)); 
+  return validationResult;
+};
+
+console.log(await processUser("Alice", 30)); // Output: Result.Ok("User Alice saved successfully!")
+
+/* validationResult is of type Result<string, Error> instead of Result<Result<string, Error>, Error> (which is what would have happened if we used map instead of flatMap) */
+
 ```
-And we would need to unwrap the result two times to get the final value.
-```typescript
-const finalValue = optResult.unwrap().unwrap(); // Output: 15
-```
-
-This is where `flatMap` comes in. It allows us to chain the operations without nesting the Option types.
-```typescript
-import { Option} from "@carbonteq/fp";
-
-const optOne: Option<number> = Option.Some(5);
-const optTwo: Option<number> = Option.Some(10);
-const optThree: Option<number> = Option.Some(15);
-
-const optResult = optOne
-        .flatMap(() => optTwo)
-            .flatMap(() => optThree); // This will return Option<number>
-
-console.log(optResult.unwrap()); // Output: 15
-```
-The same holds true for `Result`.
 
 #### `zip`
 Creates a tuple `[T, U]` where the second value `U` is _derived_ from the first value `T` using a function `f`.
-For example, suppose we want to pair a number `T` with its square `U`.
+For example, suppose we want to pair the product's original price `T` and discounted price `U`.
 ```typescript
 import { Result} from "@carbonteq/fp";
 
-const result: Result<number, Error> = Result.Ok(5);
-// Use zip to derive a pair
-const derivedPair = result.zip((val) => val * val);
-console.log(derivedPair.unwrap()); // Output: [5, 25]
+async function fetchProductPrice(productId: string): Promise<Result<number, Error>> {
+    // Simulate fetching price from a database
+    await Promise.resolve(productId);
+    return Result.Ok(100);
+}
+
+async function applyDiscount(productId: string): Promise<Result<[number, number], Error>> {
+    const originalPrice = (await fetchProductPrice(productId))
+                          .zip((price) => price * 0.9)
+    return originalPrice; //originalPrice is of type Result<[number, number], Error>
+}
+
+console.log(await applyDiscount("123")); // Output: Result.Ok([100, 90])
 
 ```
-Here `derivedPair` is a `Result<[number, number], Error>`. Note that `T` = `5` and `U` = `25`.
+Here `derivedPair` is a `Result<[number, number], Error>`. Note that `T` = `100` and `U` = `90`.
 
 #### `flatZip`
-Combines the current `Result<T, E>` with another `Result<U, E2>` provided by a function. Unlike zip, which pairs a value with a derived one, flatZip works with **two independent Result values** and combines their contents into a tuple `[T, U]`. It ensures both results are Ok to proceed; otherwise, it propagates the first encountered Err.
-```typescript
-import { Result } from "@carbonteq/fp";
+Combines the current `Result<T, E>` with another `Result<U, E2>`, or the current `Option<T>` with another `Option<U>`. Unlike zip, which pairs a value with a derived one, flatZip works with **two independent Result/Option values** and combines their contents into a tuple `[T, U]`. It ensures the Result/Option values are Ok/Some to proceed; otherwise, it propagates the first encountered Err/None.
 
-const resOne: Result<number, Error> = Result.Ok(5);
-const resTwo: Result<number, Error> = Result.Ok(10);
-const combined = resOne.flatZip(() => resTwo); // Combine resOne and resTwo into [5, 10]
-console.log(combined.unwrap()); // Output: [5, 10]
+Lets say we want to combine the product price and product stock into a tuple `[number, number]`.
+```typescript
+import { Option } from "@carbonteq/fp";
+
+// Simulated function to fetch product price
+async function fetchProductPrice(productId: string): Promise<Option<number>> {
+  // Simulate fetching price from a database
+  await Promise.resolve(productId);
+  return Option.Some(100);
+}
+
+// Simulated function to fetch product stock
+async function fetchProductStock(productId: string): Promise<Option<number>> {
+  // Simulate fetching stock from a database
+  await Promise.resolve(productId);
+  return Option.Some(50);
+}
+
+// Function to combine price and stock using flatZip
+async function fetchProductDetails(productId: string): Promise<Option<[number, number]>> {
+  const productDetails = await (await fetchProductPrice(productId))
+                        .flatZip(() => fetchProductStock(productId));
+  return productDetails; // Option<[number, number]>
+}
+
+console.log(await fetchProductDetails("123")); // Output: Option.Some([100, 50])
 ```
 ## Comparison of `map`, `flatMap`, `zip`, and `flatZip`
 
 | **Method**            | **`map`**                                                         | **`flatMap`**                                                                                | **`zip`**                                                                                    | **`flatZip`**                                                           |   |
 | --------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | - |
-| **Purpose**           | Transforms the value inside an `Ok`. | Chains dependent computations where each computation returns a `Result`.                     | Combines the current value with another derived value into a tuple `[T, U]`.                 | Combines two independent `Result` values into a tuple `[T, U]`.         |
-| **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` to transform the current value into another `Result`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.             | A function `(val: T) => Result<U, E2>` that returns another `Result`.   |
-| **Output**            | `Result<U, E>`                                                    | `Result<U, E>`                                                                            | `Result<[T, U], E>`                                                                        | `Result<[T, U], E>`.                                                    |
-| **Error Propagation** | Propagates `Err` if the `Result` is `Err`.                        | Propagates the first `Err` encountered in the chain.                                         | Propagates `Err` if the current `Result` or derived value is `Err`.                          | Propagates the first `Err` encountered between the two `Result` values. |
-| **Use Case**          | When you want to transform a value inside `Ok`.                   | When the next computation depends on the current value and returns a `Result`.               | When you want to pair the current value with a derived one. | When you want to combine two independent `Result` values into a tuple.  |
+| **Purpose**           | Transforms the value inside an `Ok` or `Some`. | Chains dependent computations where each computation returns a `Result` or `Option`.                     | Combines the current value with another derived value into a tuple `[T, U]`.                 | Combines two independent `Result` or `Option` values into a tuple `[T, U]`.         |
+| **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` to transform the current value into another `Result` or `Option`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.             | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` that returns another `Result` or `Option`.   |
+| **Output**            | `Result<U, E>`, `Option<U>`                                                    | `Result<U, E>`, `Option<U>`                                                                            | `Result<[T, U], E>`, `Option<[T, U]>`                                                                        | `Result<[T, U], E>`, `Option<[T, U]>`.                                                    |
+| **Error Propagation** | Propagates `Err`/`None` if the `Result`/`Option` is `Err`/`None`.                        | Propagates the first `Err`/`None` encountered in the chain.                                         | Propagates `Err`/`None` if the current `Result`/`Option` or derived value is `Err`/`None`.                          | Propagates the first `Err`/`None` encountered between the two `Result`/`Option` values. |
+| **Use Case**          | When you want to transform a value inside `Ok`/`Some`.                   | When the next computation depends on the current value and returns a `Result`/`Option`.               | When you want to pair the current value with a derived one. | When you want to combine two independent `Result`/`Option` values into a tuple.  |
 
 ---
 
+### Some Other Useful Functions
+
+#### `mapErr`
+Transforms the `Err` value inside `Result`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+// Simulated function to divide two numbers
+function divideNumbers(a: number, b: number): Result<number, Error> {
+  if (b === 0) {
+    return Result.Err(new Error("Division by zero"));
+  }
+  return Result.Ok(a / b);
+}
+
+// A safe divide function that returns a Result with a string error message if the division by zero occurs, instead of throwing an exception
+function safeDivide(a: number, b: number): Result<number, string> {
+  const res = divideNumbers(a, b)
+              .mapErr((err) => `Operation failed: ${err.message}`);
+  return res;
+}
+
+// Example usage
+console.log(safeDivide(10, 2)); // Result.Ok(5)
+console.log(safeDivide(10, 0)); // Result.Err("Operation failed: Division by zero")
+```
+#### `mapOr`
+Checks if the `Option` or `Result` is `Some` or `Ok`, and if so, applies the function to the value inside. If the `Option` or `Result` is `None` or `Err`, it returns the default value.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+// Simulated function to find a user by id
+async function findUserById(id: number): Promise<Option<number>> {
+  // Simulate a database call that either returns a user or null
+  await Promise.resolve(id);
+  if (id === 0) {
+    return Option.None;
+  }
+  return Option.Some(id);
+}
+
+// A safe function that returns a string error message if the user is not found, instead of throwing an exception
+async function safeFindUserById(id: number): Promise<Option<string>> {
+  const res = (await findUserById(id))
+              .mapOr(`User not found`, (res) => `User: ${res}`);
+  return res;
+}
+
+// Example usage
+console.log(await safeFindUserById(10)); // Some(User: 10)
+console.log(await safeFindUserById(0)); // Some(User not found)
+
+```
+
+#### `tap`
+
+`tap` is used to perform side effects on the `Result`/`Option` value without altering its contents. It is useful for logging, auditing, debugging complex chains of operations etc.
+```typescript
+import { Result } from "@carbonteq/fp";
+
+// Simulated database functions
+async function findUserById(userId: number): Promise<Result<Record<string, number>, string>> {
+  // Simulate a database lookup
+  await Promise.resolve(userId);
+  if (userId === 0) {
+    return Result.Err('User not found');
+  }
+  return Result.Ok({ id: userId, balance: 100 });
+}
+
+function updateBalance(user: Record<string, number>, amount: number): Result<Record<string, number>, string> {
+  if (user.balance < amount) {
+    return Result.Err('Insufficient funds');
+  }
+  return Result.Ok({ ...user, balance: user.balance - amount });
+}
+
+// Process withdrawal with logging
+const res = (await findUserById(1))
+  .tap(user => console.log(`[Audit] User found: ${user.id}`))
+  .flatMap(user => updateBalance(user, 10)
+    .tap(updated => console.log(`[Transaction] New balance: $${updated.balance}`))
+    .mapErr(error => console.error(`[Alert] Transaction failed: ${error}`))
+  );
+
+console.log(res); // Result.Ok({ id: 1, balance: 90 })
+```
+#### `unwrap`, `safeUnwrapErr`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
+
+These functions are used to extract the value from a `Result`. Note that **only `unwrap` and `safeUnwrap` are available for `Option`**.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+function divideNumbers(a: number, b: number): Result<number, Error> {
+  if (b === 0) {
+    return Result.Err(new Error("Division by zero"));
+  }
+  return Result.Ok(a / b);
+}
+
+// Example usage of each function
+let result = divideNumbers(10, 2);
+console.log(result.unwrap()); // unwrap: 5 (Extracts the value from Result.Ok, throwing an error if it's Err.)
+console.log(result.safeUnwrapErr()); // safeUnwrapErr: null (returns error if Err, null if Ok)
+
+result = divideNumbers(10, 0);
+console.log(result.unwrapOr(0)); // unwrapOr: 0 (Returns the contained value if Ok, or a default value if Err)
+console.log(result.unwrapOrElse(() => 0)); // unwrapOrElse: 0 (Similar to unwrapOr, but the default value is generated by a function.)
+console.log(result.safeUnwrap()); // safeUnwrap: null (Safely unwraps the value, returning null if it's an Err instead of throwing an error.)
+
+const errorResult = Result.Err(new Error("Something went wrong"));
+console.log(errorResult.unwrapErr()); // unwrapErr: Error: Something went wrong (Extracts the error from Result.Err, throwing an error if it's Ok)
+
+```
+
 ## Build Your First Pipeline
 
-The pipeline will use the concepts explained above, such as `Option` and `Result`, to handle optional values and errors in a clean and functional way.
-
-Let's say we're working on a financial application that processes transactions. We need to check if the transaction has a valid amount, if the user is active, and if the transaction is successful. Our goal is to process these transactions and ensure that we handle any missing or invalid values gracefully.
-
-### Problem
-
-We have a list of transactions, each with the following properties:
-- `amount`: The amount of money in the transaction (it could be `null` or `undefined`).
-- `userId`: The user associated with the transaction.
-- `status`: The status of the transaction, which could be `"pending"`, `"completed"`, or `"failed"`.
-
-Our task is to:
-1. Check if the `amount` is present and valid.
-2. Ensure the user is active.
-3. Process the transaction if the status is `"completed"`.
-
-### Solution Using `Option` and `Result`
-
-Let's walk through how we can achieve this using `Option` for handling optional values and `Result` for error handling.
+Let's build a pipeline for processing an e-commerce order. This example demonstrates handling user input validation, inventory checks, and order processing.
 
 #### Synchronous Pipeline
 
 ```typescript
-import { Option, Result, matchOpt, matchRes } from "@carbonteq/fp";
+import { Result, matchRes } from "@carbonteq/fp";
 
-// Simulate an API call to check if the user is active
-function getUserStatus(userId: string): Result<boolean, string> {
-  const activeUsers = ["user1", "user2", "user3"];
-  return activeUsers.includes(userId)
-    ? Result.Ok(true)
-    : Result.Err("User is not active");
+interface Order {
+  productId: string;
+  quantity: number;
+  userId: string;
 }
 
-// Validate if the transaction amount is valid
-function validateAmount(amount: number | null | undefined): Option<number> {
-  return amount && amount > 0 ? Option.Some(amount) : Option.None;
+interface ProcessedOrder {
+  orderId: string;
+  total: number;
+  status: 'confirmed' | 'failed';
+  order: Order;
 }
 
-// Simulate a payment gateway processing the transaction
-function processTransaction(amount: number): Result<string, string> {
-  return amount > 1000
-    ? Result.Ok("Transaction processed successfully")
-    : Result.Err("Transaction failed due to low amount");
+// Validate order input
+function validateOrder(order: Order): Result<Order, string> {
+  if (!order.productId) return Result.Err("Product ID is required");
+  if (order.quantity <= 0) return Result.Err("Quantity must be positive");
+  if (!order.userId) return Result.Err("User ID is required");
+  return Result.Ok(order);
 }
 
-// Our pipeline: process each transaction and handle errors using Option and Result
-function processUserTransaction(transaction: { userId: string; amount: number | null | undefined; status: string }) {
-  const amountOption = validateAmount(transaction.amount)
-        .map((amount) => getUserStatus(transaction.userId)
-            .flatMap(() => transaction.status === "completed" ? processTransaction(amount) : Result.Err("User is not active"))
-    )
-
-  // Match the Option to handle valid and invalid amounts
-  matchOpt(amountOption, {
-    Some: (res) => {
-        matchRes(res, {
-            Ok: (value) => console.log(value),
-            Err: (error) => console.error(error)
-        });
-    },
-    None: () => console.error("Invalid transaction amount")
-  });
+// Check product availability
+function checkInventory(order: Order): Result<Order, string> {
+  const availableStock = 100; // Simulated stock
+  return order.quantity <= availableStock
+    ? Result.Ok(order)
+    : Result.Err(`Insufficient stock. Available: ${availableStock}`);
 }
 
-// Example transactions
-const transactions = [
-  { userId: "user1", amount: 500, status: "completed" },
-  { userId: "user2", amount: null, status: "completed" },
-  { userId: "user4", amount: 2000, status: "pending" },
-  { userId: "user3", amount: 1200, status: "completed" },
-];
+// Calculate order total
+function calculateTotal(order: Order): Result<number, string> {
+  const price = 29.99; // Simulated price
+  return Result.Ok(order.quantity * price);
+}
 
-// Process all transactions
-transactions.forEach(processUserTransaction);
+// Process the order
+function processOrder(order: Order): Result<ProcessedOrder, string> {
+  return validateOrder(order)
+    .flatMap((validOrder) => checkInventory(validOrder))
+    .flatZip((checkedOrder) => calculateTotal(checkedOrder))
+    .map(([order, total]) => ({
+      orderId: `ORD-${Date.now()}`,
+      total: total,
+      status: 'confirmed' as const,
+      order: order
+    }))
+    .mapErr(error => `Order processing failed: ${error}`);
+}
+
+// Usage
+const order: Order = {
+  productId: "PROD-123",
+  quantity: 2,
+  userId: "USER-456"
+};
+
+const result = processOrder(order);
+
+matchRes(result, {
+  Ok: (processedOrder) => {
+    console.log(`Order confirmed! Order ID: ${processedOrder.orderId}`);
+    console.log(`Total: $${processedOrder.total.toFixed(2)}`);
+    console.log(`Order: ${JSON.stringify(processedOrder.order)}`);
+  },
+  Err: (error) => {
+    console.error(`Error: ${error}`);
+  }
+});
+
 // Output:
-// Invalid transaction amount
-// User is not active
-// Transaction failed due to low amount
-// Transaction processed successfully
+// Order confirmed! Order ID: ORD-1716888600000
+// Total: $59.98
+// Order: {"productId":"PROD-123","quantity":2,"userId":"USER-456"}
+  
 ```
 
 #### Asynchronous Pipeline
 
+Let's build an asynchronous pipeline for a user registration system that includes credentials verification and profile setup.
+
 ```typescript
-import { Option, Result, matchOpt, matchRes } from "@carbonteq/fp";
+import { Result, matchRes } from "@carbonteq/fp";
 
-// Simulate an API call to check if the user is active
-async function getUserStatus(userId: string): Promise<Result<boolean, string>> {
-  const activeUsers = ["user1", "user2", "user3"];
-  return activeUsers.includes(userId)
-    ? Result.Ok(true)
-    : Result.Err("User is not active");
+interface UserInput {
+  email: string;
+  password: string;
+  name: string;
 }
 
-// Validate if the transaction amount is valid
-async function validateAmount(amount: number | null | undefined): Promise<Option<number>> {
-  return amount && amount > 0 ? Option.Some(amount) : Option.None;
+interface UserProfile {
+  userId: string;
+  email: string;
+  name: string;
+  verificationStatus: 'pending' | 'verified';
 }
 
-// Simulate a payment gateway processing the transaction
-async function processTransaction(amount: number): Promise<Result<string, string>> {
-  return amount > 1000
-    ? Result.Ok("Transaction processed successfully")
-    : Result.Err("Transaction failed due to low amount");
+// Validate email format
+async function validateEmail(email: string): Promise<Result<string, string>> {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email)
+    ? Result.Ok(email)
+    : Result.Err("Invalid email format");
 }
 
-// Our pipeline: process each transaction and handle errors using Option and Result
-async function processUserTransaction(transaction: { userId: string; amount: number | null | undefined; status: string }) {
-  const amountOption = await validateAmount(transaction.amount)
+// Check if email is already registered
+async function checkEmailAvailability(email: string): Promise<Result<string, string>> {
+  // Simulate database check
+  await Promise.resolve(email);
+  const registeredEmails = ["existing@example.com"];
+  return !registeredEmails.includes(email)
+    ? Result.Ok(email)
+    : Result.Err("Email already registered");
+}
 
-  // Match the Option to handle valid and invalid amounts
-  matchOpt(amountOption, {
-    Some: async (opt) => {
-        const res = await (await getUserStatus(transaction.userId))
-            .flatMap(async () => transaction.status === "completed" ? await processTransaction(opt) : Result.Err("User is not active"))
-        matchRes(res, {
-            Ok: (value) => console.log(value),
-            Err: (error) => console.error(error)
-        });
+// Validate password strength
+async function validatePassword(password: string): Promise<Result<string, string>> {
+  return password.length >= 8
+    ? Result.Ok(password)
+    : Result.Err("Password must be at least 8 characters");
+}
+
+// Create user profile
+async function createUserProfile(input: UserInput): Promise<Result<UserProfile, string>> {
+  const userProfile: UserProfile = {
+    userId: `USER-${Date.now()}`,
+    email: input.email,
+    name: input.name,
+    verificationStatus: 'pending'
+  };
+  return Result.Ok(userProfile);
+}
+
+// Send verification email
+async function sendVerificationEmail(profile: UserProfile): Promise<Result<UserProfile, string>> {
+  // Simulate email sending and verification
+  await Promise.resolve(profile);
+  console.log(`Verification email sent to ${profile.email}`);
+  return Result.Ok(profile);
+}
+
+// Main registration pipeline
+async function registerUser(input: UserInput): Promise<Result<UserProfile, string>> {
+
+  const res = await (await validateEmail(input.email)) // if email is valid, then move forward in chain, otherwise return Err
+    .flatMap(async () => (await validatePassword(input.password)) // if password is valid, then move forward in chain, otherwise return Err
+      .flatMap(async () => (await checkEmailAvailability(input.email)) // if email is not registered, then move forward in chain, otherwise return Err
+        .flatMap(async () => (await createUserProfile({ // if user profile is created, then move forward in chain, otherwise return Err
+          email: input.email,
+          password: input.password,
+          name: input.name
+        }))
+          .flatMap(async (profile) => await sendVerificationEmail(profile)) // finally send verification email
+        )
+      )
+    )
+
+  return res;
+}
+
+// Usage
+async function main() {
+  const userInput: UserInput = {
+    email: "newuser@example.com",
+    password: "securepass123",
+    name: "John Doe"
+  };
+
+  const result = await registerUser(userInput);
+
+  matchRes(result, {
+    Ok: (profile) => {
+      console.log(`Email: ${profile.email}`);
+      console.log("Registration successful!");
+      console.log(`User ID: ${profile.userId}`);
+      console.log(`Verification Status: ${profile.verificationStatus}`);
     },
-    None: () => console.error("Invalid transaction amount")
+    Err: (error) => {
+      console.error(`Registration failed: ${error}`);
+    }
   });
 }
 
-// Example transactions
-const transactions = [
-  { userId: "user1", amount: 500, status: "completed" },
-  { userId: "user2", amount: null, status: "completed" },
-  { userId: "user4", amount: 2000, status: "pending" },
-  { userId: "user3", amount: 1200, status: "completed" },
-];
-
-// Process all transactions
-transactions.forEach(processUserTransaction);
+main();
 // Output:
-// Invalid transaction amount
-// User is not active
-// Transaction failed due to low amount
-// Transaction processed successfully
+// Verification email sent to newuser@example.com
+// Email: newuser@example.com
+// Registration successful!
+// User ID: USER-1737921964102
+// Verification Status: pending
 ```
 
 ## Contributing
