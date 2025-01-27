@@ -339,10 +339,9 @@ function updateBalance(user: Record<string, number>, amount: number): Result<Rec
 // Process withdrawal with logging
 const res = (await findUserById(1))
   .tap(user => console.log(`[Audit] User found: ${user.id}`))
-  .flatMap(user => updateBalance(user, 10)
-    .tap(updated => console.log(`[Transaction] New balance: $${updated.balance}`))
-    .mapErr(error => console.error(`[Alert] Transaction failed: ${error}`))
-  );
+  .flatMap(user => updateBalance(user, 10))
+  .tap(updated => console.log(`[Transaction] New balance: $${updated.balance}`))
+  .mapErr(error => console.error(`[Alert] Transaction failed: ${error}`));
 
 console.log(res); // Result.Ok({ id: 1, balance: 90 })
 ```
