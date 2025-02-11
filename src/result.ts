@@ -1,5 +1,6 @@
 import { isPromise } from "node:util/types";
 import { UNIT } from "./unit.js";
+import assert from "node:assert";
 
 export class UnwrappedErrWithOk extends Error {
   constructor(r: Result<unknown, unknown>) {
@@ -17,8 +18,8 @@ export type UnitResult<E = never> = Result<UNIT, E>;
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
-type ResMapper<T, U, E> = (val: T) => Result<U, E>;
-type AsyncResMapper<T, U, E> = (val: T) => Promise<Result<U, E>>;
+type FlatMapper<T, U, E> = (val: T) => Result<U, E>;
+type AsyncFlatMapper<T, U, E> = (val: T) => Promise<Result<U, E>>;
 
 type OkOrErr = "ok" | "err";
 const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
@@ -44,40 +45,40 @@ export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
   CombinedResultErr<T>
 >;
 
-type InnerMapMapper<T, U> = T extends Array<infer Inner>
-  ? (val: Inner) => U
-  : never;
-
-type InnerMapReturn<T, E, U> = T extends Array<unknown>
-  ? Result<Array<U>, E>
-  : never;
-
 /** Sentinel value */
 const Sentinel = Symbol.for("ResultSentinel");
 type Sentinel = typeof Sentinel;
 
+type ResultCtx<E> = { errSlot: E | Sentinel };
+
 export class Result<T, E> {
-  static readonly UNIT_RESULT: UnitResult = new Result(UNIT, null as never);
+  static readonly UNIT_RESULT = new Result(UNIT, {
+    errSlot: Sentinel,
+  }) as UnitResult;
+
+  #ctx: ResultCtx<E>;
 
   protected constructor(
     private readonly val: T | Sentinel,
-    private readonly error: E | Sentinel,
-  ) {}
+    ctx: ResultCtx<E>,
+  ) {
+    this.#ctx = ctx;
+  }
 
   static Ok<T, E = never>(val: T): Result<T, E> {
-    return new Result(val, Sentinel) as Result<T, E>;
+    return new Result(val, { errSlot: Sentinel }) as Result<T, E>;
   }
 
   static Err<E, T = never>(err: E): Result<T, E> {
-    return new Result(Sentinel, err) as Result<T, E>;
+    return new Result(Sentinel as T, { errSlot: err });
   }
 
   isOk(): this is Result<T, never> {
-    return this.val !== Sentinel;
+    return this.#ctx.errSlot === Sentinel;
   }
 
   isErr(): this is Result<never, E> {
-    return this.error !== Sentinel;
+    return this.#ctx.errSlot !== Sentinel;
   }
 
   isUnit(): this is Result<UNIT, never> {
@@ -85,51 +86,42 @@ export class Result<T, E> {
   }
 
   toString(): string {
-    if (this.val !== Sentinel) {
-      return `Result::Ok<${this.val}>`;
+    if (this.isOk()) {
+      return `Result::Ok<${String(this.val)}>`;
     }
 
-    return `Result::Err<${this.error as E}>`;
+    return `Result::Err<${String(this.#ctx.errSlot)}>`;
   }
 
+  // TODO: need to recheck for pending cases
   unwrap(): T {
-    if (this.val === Sentinel) {
-      if (this.error instanceof Error) throw this.error;
+    if (this.isErr()) {
+      const err = this.#ctx.errSlot;
+
+      if (err instanceof Error) throw err;
 
       throw new UnwrappedOkWithErr(this);
     }
 
-    return this.val;
+    return this.val as T;
   }
 
   unwrapOr(def: T): T {
-    if (this.val === Sentinel) return def;
+    if (this.isErr()) return def;
 
-    return this.val;
+    return this.val as T;
   }
 
   unwrapOrElse(def: () => T): T;
   unwrapOrElse(def: () => Promise<T>): Promise<T>;
   unwrapOrElse(def: () => T | Promise<T>): T | Promise<T> {
-    if (this.val === Sentinel) return def();
+    if (this.isErr()) return def();
 
-    return this.val;
+    return this.val as T;
   }
 
   safeUnwrap(): T | null {
     return this.val === Sentinel ? null : this.val;
-  }
-
-  unwrapErr(): E {
-    if (this.isOk()) {
-      throw new UnwrappedErrWithOk(this);
-    }
-
-    return this.error as E;
-  }
-
-  safeUnwrapErr(): E | null {
-    return this.error === Sentinel ? null : this.error;
   }
 
   /**
@@ -143,53 +135,76 @@ export class Result<T, E> {
    * const result1 = r.map(mapper) // Result containing 64 as the ok value
    * const result2 = r2.map(mapper) // mapper won't be applied, as r2 was in error state
    */
-  map<U>(fn: (val: T) => Promise<U>): Promise<Result<U, E>>;
-  map<U>(fn: (val: T) => U): Result<U, E>;
-  map<U>(
-    fn: Mapper<T, U> | AsyncMapper<T, U>,
-  ): Result<U, E> | Promise<Result<U, E>> {
-    if (this.val === Sentinel) return Result.Err(this.error) as Result<U, E>;
+  map<In, U>(
+    this: Result<Promise<In>, E>,
+    fn: (val: In) => U,
+  ): Result<Promise<U>, E>;
+  map<In, U>(
+    this: Result<In, E>,
+    fn: (val: In) => Promise<U>,
+  ): Result<Promise<U>, E>;
+  map<In, U>(this: Result<In, E>, fn: (val: In) => U): Result<U, E>;
+  map<U, In = Awaited<T>>(
+    fn: Mapper<In, U> | AsyncMapper<In, U>,
+  ): Result<Promise<U>, E> | Result<U, E> {
+    // No computation if in Err track
+    // if (this.isErr() || this.val === Sentinel)
+    if (this.isErr()) return Result.Err(this.#ctx.errSlot) as Result<U, E>;
+    assert(this.val !== Sentinel, "cannot be Sentinel at this point");
 
-    const r = fn(this.val);
+    const curr = this.val; // should not be sentinel, only promise or proper value
+    const ctx = this.#ctx;
 
-    if (isPromise(r)) {
-      return r.then((val) => Result.Ok(val) as Result<U, E>);
+    if (isPromise(curr)) {
+      const p = curr as Promise<In | Sentinel>;
+      const out = p.then((v) => {
+        if (v === Sentinel) {
+          // this can only be possible in two cases: started with error, or fMap got us there
+          // in either case, no need to change ctx
+          return Sentinel;
+        }
+
+        const mapped = fn(v);
+        return mapped;
+      }) as Promise<U>;
+
+      return new Result(out, ctx);
     }
 
-    return Result.Ok(r) as Result<U, E>;
+    //@ts-expect-error
+    const next = fn(curr);
+
+    return new Result(next, ctx) as Result<U, E>;
   }
 
   /** Same as map, but for the error value instead of the Ok value */
   mapErr<U>(fn: Mapper<E, U>): Result<T, U> {
-    if (this.error !== Sentinel) {
-      const mappedErr = fn(this.error);
-
-      return Result.Err(mappedErr);
+    if (this.isErr()) {
+      // Easy case
+      const mappedErr = fn(this.#ctx.errSlot as E);
+      return Result.Err(mappedErr); // no need to retain context anymore
     }
 
-    return Result.Ok(this.val as T);
-  }
+    const curr = this.val;
+    const newCtx: ResultCtx<U> = { errSlot: Sentinel };
+    const ctx = this.#ctx;
+    if (isPromise(curr)) {
+      // Can eventually lead to Err state
+      const p = curr.then((v) => {
+        // Could have fallen into this state by now
+        if (ctx.errSlot !== Sentinel) {
+          const mappedErr = fn(ctx.errSlot);
+          newCtx.errSlot = mappedErr;
+        }
 
-  mapOr<U>(default_: U, fn: Mapper<T, U>): U {
-    if (this.val === Sentinel) return default_;
+        return v;
+      });
 
-    return fn(this.val);
-  }
+      return new Result(p, newCtx) as Result<T, U>;
+    }
 
-  mapOrAsync<U>(default_: U, fn: AsyncMapper<T, U>): Promise<U> {
-    if (this.val === Sentinel) return Promise.resolve(default_);
-
-    return fn(this.val);
-  }
-
-  /** For combining two results. For the lazy eval version, see {@link flatZip} and {@link zipAsync} */
-  and<U, E2>(r: Result<U, E2>): Result<[T, U], E | E2> {
-    if (this.isErr()) return this;
-
-    // return r.map(v => [this.val, v] as [T, U])
-    if (r.isErr()) return r;
-
-    return Result.Ok([this.val, r.val] as [T, U]);
+    // we don't need to propagate the previous ctx, as closure will ensure the changes there are reflected in newCtx
+    return new Result(this.val, newCtx);
   }
 
   /**
@@ -206,38 +221,59 @@ export class Result<T, E> {
    * const result1 = r.map(mapper) // Type is Result<Result<number, InvalidNumStringError>, SomeError>
    * const result2 = r.flatMap(mapper) // Type is Result<number, SomeError | InvalidNumStringError>
    */
-  flatMap<U, E2>(
-    fn: (val: T) => Promise<Result<U, E | E2>>,
-  ): Promise<Result<U, E | E2>>;
-  flatMap<U, E2>(fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
-  flatMap<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
-    if (this.val !== Sentinel) return fn(this.val);
+  flatMap<U, E2, In = Awaited<T>>(
+    this: Result<Promise<In>, E>,
+    fn: (val: NoInfer<In>) => Result<U, E | E2>,
+  ): Result<Promise<U>, E | E2>;
+  flatMap<U, E2, In = Awaited<T>>(
+    this: Result<In, E>,
+    fn: (val: NoInfer<In>) => Promise<Result<U, E | E2>>,
+  ): Result<Promise<U>, E | E2>;
+  flatMap<U, E2>(this: Result<T, E>, fn: (val: T) => U): Result<U, E | E2>;
+  flatMap<U, E2, In = Awaited<T>>(
+    fn: FlatMapper<In, U, E | E2> | AsyncFlatMapper<In, U, E | E2>,
+  ) {
+    if (this.isErr()) return Result.Err(this.#ctx.errSlot);
 
-    return Result.Err(this.error);
-  }
+    assert(this.val !== Sentinel, "cannot be Sentinel at this point");
 
-  /**
-   * Also known as `andThen`, `fmap` or `flatMap`
-   * Like Result.map but used in cases where the mapper func returns a Result instead of a containable value
-   * @example
-   * const r: Result<string, SomeError> = Result.Ok("42")
-   * const mapper = (d: string) => {
-   *   const n = Number.parseInt(d)
-   *   if(Number.isNumber(n) && !Number.isNaN(n)) return Result.Ok(n)
-   *
-   *   return Result.Err(new InvalidNumStringError(d))
-   * }
-   * const result1 = r.map(mapper) // Type is Result<Result<number, InvalidNumStringError>, SomeError>
-   * const result2 = r.bind(mapper) // Type is Result<number, SomeError | InvalidNumStringError>
-   */
-  bind<U, E2>(
-    fn: (val: T) => Promise<Result<U, E | E2>>,
-  ): Promise<Result<U, E | E2>>;
-  bind<U, E2>(fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
-  bind<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
-    if (this.val !== Sentinel) return fn(this.val);
+    const curr = this.val as unknown as Promise<In> | In;
+    const ctx = this.#ctx as ResultCtx<E | E2>;
 
-    return Result.Err(this.error);
+    if (isPromise(curr)) {
+      const p = curr;
+      const newP = p.then(async (v) => {
+        if (v === Sentinel) return Sentinel;
+
+        const next = fn(v);
+
+        if (isPromise(next)) {
+          const nextRes = await next;
+          ctx.errSlot = nextRes.#ctx.errSlot;
+
+          return nextRes.val;
+        }
+
+        ctx.errSlot = next.#ctx.errSlot;
+        return next.val;
+      }) as Promise<U>;
+      return new Result(newP, ctx);
+    }
+
+    const next = fn(curr);
+    if (isPromise(next)) {
+      return new Result(
+        next.then((v) => {
+          ctx.errSlot = v.#ctx.errSlot;
+          return v.val;
+        }),
+        ctx,
+      );
+    }
+
+    ctx.errSlot = next.#ctx.errSlot;
+
+    return new Result(next.val, ctx);
   }
 
   /**
@@ -246,47 +282,77 @@ export class Result<T, E> {
    * const r: Result<string, SomeError> = Result.Ok('42')
    * const binderOk = (d: string) => Result.Ok<number, SomeOtherError>(0909)
    * const binderErr = (d: string) => Result.Err<number, SomeOtherError>(new SomeOtherError())
+   * const binderErrAsync = async (d: string) => Result.Err<number, SomeOtherError>(new SomeOtherError())
    *
    * const res1 = r.zipErr(binderOk) // Result<string, SomeError | SomeOtherError> - Value: Result.Ok('42') - No change in Ok type
    * const res2 = r.zipErr(binderErr) // Result<string, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
+   * const res3 = r.zipErr(binderErrAsync) // Result<Promise<string>, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
    */
   zipErr<E2>(
+    this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<unknown, E2>>,
-  ): Promise<Result<T, E | E2>>;
-  zipErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
+  ): Result<Promise<T>, E | E2>;
   zipErr<E2>(
-    fn: ResMapper<T, unknown, E | E2> | AsyncResMapper<T, unknown, E | E2>,
+    this: Result<T, E>,
+    fn: (val: T) => Promise<Result<unknown, E2>>,
+  ): Result<Promise<T>, E | E2>;
+  zipErr<E2>(
+    this: Result<T, E>,
+    fn: (val: T) => Result<unknown, E2>,
+  ): Result<T, E | E2>;
+  zipErr<E2, In = Awaited<T>>(
+    fn: FlatMapper<In, unknown, E | E2> | AsyncFlatMapper<In, unknown, E | E2>,
   ) {
-    if (this.val === Sentinel) return Result.Err(this.error);
+    if (this.isErr()) {
+      // Already in error state, zip should not compute as there's no T
+      return Result.Err(this.#ctx.errSlot);
+    }
+    assert(this.val !== Sentinel, "cannot be Sentinel at this point");
 
-    const r = fn(this.val);
+    const curr = this.val as Promise<In> | In;
+    const ctx = this.#ctx;
+    const newCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
+    if (isPromise(curr)) {
+      // Only branch that can led to a non-Ok state in the future
+      const newP = curr.then((v) => {
+        // Check if returned value is Sentinel
+        if (v === Sentinel) {
+          // fallen into error slot
+          newCtx.errSlot = ctx.errSlot;
+          return Sentinel as In;
+        }
 
+        const r = fn(v);
+        return Result.zipErrHelper(v, r, newCtx);
+      });
+
+      return new Result(newP, newCtx);
+    }
+
+    // There is no computation in the chain, so let's resolve it directly with the value
+    const r = fn(curr);
+    const newP = Result.zipErrHelper(curr, r, newCtx);
+    return new Result(newP, newCtx);
+  }
+
+  private static zipErrHelper<In, E>(
+    v: In,
+    r: Result<unknown, E> | Promise<Result<unknown, E>>,
+    newCtx: ResultCtx<E>,
+  ): In | Promise<In> {
     if (isPromise(r)) {
-      return r.then((result) => result.map((_) => this.val));
+      const finalPromise = r.then((newResult) => {
+        if (newResult.#ctx.errSlot !== Sentinel)
+          newCtx.errSlot = newResult.#ctx.errSlot;
+
+        return v;
+      });
+      return finalPromise;
     }
 
-    return r.map((_) => this.val);
-  }
+    if (r.#ctx.errSlot !== Sentinel) newCtx.errSlot = r.#ctx.errSlot;
 
-  /** For running infallible side-effects on the contained value. Up to the programmer to ensure the underlying function doesn't fail */
-  tap(fn: (val: T) => void): Result<T, E> {
-    if (this.val !== Sentinel) {
-      fn(this.val);
-    }
-
-    return this;
-  }
-
-  /**
-   * Async version of {@link tap}
-   * @see {@link tap}
-   */
-  async tapAsync(fn: (val: T) => Promise<void>): Promise<Result<T, E>> {
-    if (this.val !== Sentinel) {
-      await fn(this.val);
-    }
-
-    return this;
+    return v;
   }
 
   zip<U>(fn: (val: T) => Promise<U>): Promise<Result<[T, U], E>>;
@@ -301,42 +367,13 @@ export class Result<T, E> {
 
     return Result.Ok([this.val, r]) as Result<[T, U], E>;
   }
-  // zip<U>(fn: (val: T) => Promise<U>): Promise<Result<AppendToTuple<T, U>, E>>;
-  // zip<U>(fn: (val: T) => U): Result<AppendToTuple<T, U>, E>;
-  // zip<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
-  // 	if (this.val === Sentinel) return Result.Err(this.error);
-  //
-  // 	type Tup = AppendToTuple<T, U>;
-  // 	const isTup = isTuple(this.val);
-  //
-  // 	const r = fn(this.val);
-  // 	if (isPromise(r)) {
-  // 		return r.then((u) => {
-  // 			const tuple: Tuple<Tup> = setAsTuple(
-  // 				//@ts-expect-error
-  // 				isTup ? [...this.val, u] : [this.val, u],
-  // 			);
-  //
-  // 			//@ts-expect-error
-  // 			return Result.Ok(tuple) as Result<AppendToTuple<T, U>, E>;
-  // 		});
-  // 	}
-  //
-  // 	const tuple: Tuple<Tup> = setAsTuple(
-  // 		//@ts-expect-error
-  // 		isTup ? [...this.val, r] : [this.val, r],
-  // 	);
-  //
-  // 	//@ts-expect-error
-  // 	return Result.Ok(tuple) as Result<AppendToTuple<T, U>, E>;
-  // }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
   flatZip<U, E2>(
     fn: (val: T) => Promise<Result<U, E2>>,
   ): Promise<Result<[T, U], E | E2>>;
   flatZip<U, E2>(fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
-  flatZip<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
+  flatZip<U, E2>(fn: FlatMapper<T, U, E | E2> | AsyncFlatMapper<T, U, E | E2>) {
     if (this.val === Sentinel) return Result.Err(this.error);
 
     const r = fn(this.val);
@@ -346,202 +383,20 @@ export class Result<T, E> {
 
     return r.map((u) => [this.val, u]);
   }
-  // flatZip<U, E2>(
-  // 	fn: (val: T) => Promise<Result<U, E2>>,
-  // ): Promise<Result<AppendToTuple<T, U>, E | E2>>;
-  // flatZip<U, E2>(
-  // 	fn: (val: T) => Result<U, E2>,
-  // ): Result<AppendToTuple<T, U>, E | E2>;
-  // flatZip<U, E2>(fn: ResMapper<T, U, E | E2> | AsyncResMapper<T, U, E | E2>) {
-  // 	if (this.val === Sentinel) return Result.Err(this.error);
-  //
-  // 	type Tup = AppendToTuple<T, U>;
-  // 	const isTup = isTuple(this.val);
-  //
-  // 	const r = fn(this.val);
-  // 	if (isPromise(r)) {
-  // 		return r.then((other) =>
-  // 			other.map((u) => (isTup ? [...this.val, u] : [this.val, u]) as Tup),
-  // 		);
-  // 	}
-  //
-  // 	return r.map((u) => (isTup ? [...this.val, u] : [this.val, u]) as Tup);
-  // }
 
-  //#region General combo functions
-  /** Type guard specifying all array results as Ok/Err */
-  static all<T, E extends Error>(
-    c: "ok",
-    seq: Result<T, E>[],
-  ): seq is Result<T, never>[];
-  static all<T, E extends Error>(
-    c: "err",
-    seq: Result<T, E>[],
-  ): seq is Result<never, E>[];
-  static all<T, E extends Error>(c: OkOrErr, seq: Result<T, E>[]): boolean {
-    const pred = preds[Number(c === "ok")];
-
-    for (const el of seq) {
-      if (!pred(el)) return false;
-    }
-
-    return true;
-  }
-
-  /** Whether any of the underlying results are Ok or Err */
-  static any<T, E extends Error>(c: OkOrErr, seq: Result<T, E>[]): boolean {
-    const pred = preds[Number(c === "ok")];
-
-    for (const el of seq) {
-      if (pred(el)) return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * `Result.sequence(Result<T1, E1>, Result<T2, E2>, ...)` will return `Result<[T1, T2, ...], E1 | E2 | ...>`
-   * @example
-   * const r1 = Result.Ok<string, string>("abc")
-   * const r2 = Result.Ok<number, Error>(123)
-   * const r = Result.sequence(r1, r2) // r will be of type Result<[string, number], string | Error>
-   */
-  static sequence<T extends Result<unknown, unknown>[]>(
-    ...results: T
-  ): Result<CombinedResultOk<T>, CombinedResultErr<T>> {
-    const vals = [] as CombinedResultOk<T>;
-
-    for (const r of results) {
-      if (r.isErr()) return r;
-
-      vals.push(r.unwrap());
-    }
-
-    return Result.Ok(vals) as Result<CombinedResultOk<T>, CombinedResultErr<T>>;
-  }
-
-  /** Convert a Result of a Promise to the Promise of a Result */
-  static async lift<T, E extends Error>(
-    r: Result<Promise<T>, E>,
-  ): Promise<Result<T, E>> {
-    if (r.isErr()) return Promise.resolve(Result.Err(r.error as E));
-
-    return (r.val as Promise<T>).then((v) => Result.Ok(v));
-  }
   //#endregion
 
-  // static innerMap<T, U, E>(
-  // 	r: Result<Array<T>, E>,
-  // 	mapper: (val: T) => U,
-  // ): Result<Array<U>, E> {
-  // 	return r.map((inner) => inner.map(mapper));
-  // }
-  // innerMap<Inner, U>(
-  // 	this: Result<Array<Inner>, E>,
-  // 	mapper: (val: T) => U,
-  // ): Result<Array<U>, E>;
-  // innerMap<U>(this: Result<unknown, E>, mapper: (val: T) => U): never;
-  // innerMap<U>(this: Result<unknown, E>, mapper: (val: T) => U) {
-  // 	if (this.val === Sentinel) return this;
-  //
-  // 	if (Array.isArray(this.val)) {
-  // 		return Result.Ok(this.val.map(mapper));
-  // 	}
-  //
-  // 	throw new Error("Can only be called for Result<Array<T>, E>");
-  // }
-
-  innerMap<U>(mapper: InnerMapMapper<T, U>): InnerMapReturn<T, E, U> {
-    type RetType = InnerMapReturn<T, E, U>;
-
-    // @ts-expect-error
-    if (this.val === Sentinel) return this;
+  innerMap<In, E, Out>(
+    this: Result<Array<In>, E>,
+    mapper: (val: NoInfer<In>) => Out,
+  ): Result<Array<Out>, E> {
+    if (this.isErr()) return this;
 
     if (Array.isArray(this.val)) {
-      return Result.Ok(this.val.map(mapper)) as RetType;
+      return new Result(this.val.map(mapper), this.#ctx);
     }
 
     throw new Error("Can only be called for Result<Array<T>, E>");
-  }
-
-  // @ts-expect-error
-  pipe<U>(fn: (val: T) => U): Result<U, E>;
-  pipe<U, V>(fn: (val: T) => U, fn2: (val: U) => V): Result<V, E>;
-  pipe<U, V, W>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-  ): Result<W, E>;
-  pipe<U, V, W, X>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-  ): Result<X, E>;
-  pipe<U, V, W, X, Y>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-  ): Result<Y, E>;
-  pipe<U, V, W, X, Y, Z>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-  ): Result<Z, E>;
-  pipe<U, V, W, X, Y, Z, A>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-  ): Result<A, E>;
-  pipe<U, V, W, X, Y, Z, A, B>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-    fn8: (val: A) => B,
-  ): Result<B, E>;
-  pipe<U, V, W, X, Y, Z, A, B, C>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-    fn8: (val: A) => B,
-    fn9: (val: B) => C,
-  ): Result<C, E>;
-  pipe<U, V, W, X, Y, Z, A, B, C, D>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-    fn8: (val: A) => B,
-    fn9: (val: B) => C,
-    fn10: (val: C) => D,
-  ): Result<D, E>;
-  pipe(...fns: Mapper<unknown, unknown>[]) {
-    let res = this;
-    for (const fn of fns) {
-      // @ts-expect-error
-      res = res.map(fn);
-    }
-    return res;
   }
 }
 
