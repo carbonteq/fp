@@ -265,15 +265,37 @@ export class Result<T, E> {
    * const result1 = r.map(mapper) // Type is Result<Result<number, InvalidNumStringError>, SomeError>
    * const result2 = r.flatMap(mapper) // Type is Result<number, SomeError | InvalidNumStringError>
    */
-  flatMap<U, E2, In = Awaited<T>>(
-    this: Result<Promise<In>, E>,
-    fn: (val: NoInfer<In>) => Result<U, E | E2>,
+
+  flatMap<T, U, E2>(
+    this: Result<Promise<T>, E>,
+    fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
+  ): never;
+  flatMap<T, U, E2>(
+    this: Result<Promise<T>, E>,
+    fn: (val: T) => Promise<Result<Promise<U>, E2>>,
   ): Result<Promise<U>, E | E2>;
-  flatMap<U, E2, In = Awaited<T>>(
-    this: Result<In, E>,
-    fn: (val: NoInfer<In>) => Promise<Result<U, E | E2>>,
+  flatMap<T, U, E2>(
+    this: Result<Promise<T>, E>,
+    fn: (val: T) => Promise<Result<U, E2>>,
   ): Result<Promise<U>, E | E2>;
-  flatMap<U, E2>(
+  flatMap<T, U, E2>(
+    this: Result<Promise<T>, E>,
+    fn: (val: T) => Result<U, E | E2>,
+  ): Result<Promise<U>, E | E2>;
+
+  flatMap<T, U, E2>(
+    this: Result<T, E>,
+    fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E | E2>>,
+  ): never;
+  flatMap<T, U, E2>(
+    this: Result<T, E>,
+    fn: (val: T) => Promise<Result<Promise<U>, E | E2>>,
+  ): Result<Promise<U>, E | E2>;
+  flatMap<T, U, E2>(
+    this: Result<T, E>,
+    fn: (val: T) => Promise<Result<U, E | E2>>,
+  ): Result<Promise<U>, E | E2>;
+  flatMap<T, U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Result<U, E2>,
   ): Result<U, E | E2>;
@@ -308,11 +330,12 @@ export class Result<T, E> {
     }
 
     const next = fn(curr);
+    console.debug(next);
     if (isPromise(next)) {
       return new Result(
-        next.then((v) => {
-          ctx.errSlot = v.#ctx.errSlot;
-          return v.val;
+        next.then((nextRes) => {
+          ctx.errSlot = nextRes.#ctx.errSlot;
+          return nextRes.val;
         }),
         ctx,
       );
