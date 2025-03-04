@@ -141,27 +141,36 @@ export class Result<T, E> {
   //   return this.val as T;
   // }
 
-  unwrapErr(this: Result<Promise<T>, E>): Promise<E>;
-  unwrapErr(this: Result<T, E>): E;
+  unwrapErr<T, E>(this: Result<Promise<T>, E>): Promise<E>;
+  unwrapErr<T, E>(this: Result<T, E>): E;
   unwrapErr() {
     const errSlot = this.#ctx.errSlot;
 
-    if (errSlot === Sentinel) {
-      throw new UnwrappedErrWithOk(this);
+    if (errSlot !== Sentinel) {
+      return errSlot;
     }
+
+    // Either we are in okay result, or haven't gotten to error state yet
+    // Only way to get to error state is if val is promise at this point
 
     const curr = this.val;
     if (isPromise(curr)) {
       return new Promise((resolve, reject) => {
         curr.then((v) => {
-          if (v !== Sentinel) reject(new UnwrappedErrWithOk(this));
+          if (v !== Sentinel) {
+            // Is okay
+            reject(new UnwrappedErrWithOk(this));
+          }
 
           resolve(this.#ctx.errSlot);
         }, reject);
       });
     }
 
-    return this.#ctx.errSlot as E;
+    // val is not promise, which means val must contain a valid value, add sanity check
+    assert(curr !== Sentinel, "value must not be Sentinel at this point");
+
+    throw new UnwrappedErrWithOk(this);
   }
 
   safeUnwrap(): T | null {
