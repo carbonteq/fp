@@ -566,7 +566,7 @@ export class Result<T, E> {
       return new Result(newP, ctx);
     }
 
-    if (uP.#ctx.errSlot) {
+    if (uP.#ctx.errSlot !== Sentinel) {
       ctx.errSlot = uP.#ctx.errSlot;
 
       return new Result(Sentinel, ctx);
