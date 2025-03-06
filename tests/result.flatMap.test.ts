@@ -561,7 +561,7 @@ describe("flatMap behavior", () => {
   });
 
   it("should short-circuit correctly applying Result<T, E> on Result<T, E>", (t) => {
-    /** @type {*} */
+    const r = Result.Err(new DummyError());
     const mockerA = t.mock.fn(errResIt);
     const mockerB = t.mock.fn(doubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);

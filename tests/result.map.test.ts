@@ -130,7 +130,7 @@ describe("map behavior", () => {
     const mapped = r.map(mockerA).map(mockerB);
 
     assert.ok(mapped.isErr());
-    assert.throws(() => mapped.unwrapErr(), DummyError);
+    assert.throws(() => mapped.unwrap(), DummyError);
     assert.strictEqual(mockerA.mock.callCount(), 0);
     assert.strictEqual(mockerB.mock.callCount(), 0);
   });
