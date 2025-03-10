@@ -134,4 +134,33 @@ describe("map behavior", () => {
     assert.strictEqual(mockerA.mock.callCount(), 0);
     assert.strictEqual(mockerB.mock.callCount(), 0);
   });
+
+  describe("permutations", () => {
+    it("P1", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleIt);
+      const mockerB = t.mock.fn(asyncDoubleIt);
+
+      const mapped = await r.map(mockerA).map(mockerB).toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 8);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+    });
+    it("P2", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleIt);
+      const mockerB = t.mock.fn(asyncDoubleIt);
+
+      const mapped = await r.map(mockerB).map(mockerA).toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 8);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+    });
+  });
 });

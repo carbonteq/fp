@@ -607,4 +607,535 @@ describe("flatMap behavior", () => {
       assert.strictEqual(mockerB.mock.callCount(), 1);
     });
   });
+
+  describe("permutations", () => {
+    it("P1", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerA)
+        .flatMap(mockerB)
+        .flatMap(mockerC)
+        .flatMap(mockerD)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P2", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerA)
+        .flatMap(mockerB)
+        .flatMap(mockerD)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P3", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .flatMap(mockerB)
+        .flatMap(mockerD)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P4", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P5", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerA)
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P6", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerA)
+        .flatMap(mockerD)
+        .flatMap(mockerC)
+        .flatMap(mockerB)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P7", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerB)
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .flatMap(mockerD)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P8", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerB)
+        .flatMap(mockerA)
+        .flatMap(mockerD)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P9", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerB)
+        .flatMap(mockerC)
+        .flatMap(mockerA)
+        .flatMap(mockerD)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P10", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerB)
+        .flatMap(mockerC)
+        .flatMap(mockerD)
+        .flatMap(mockerA)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P11", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerB)
+        .flatMap(mockerD)
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P12", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerB)
+        .flatMap(mockerD)
+        .flatMap(mockerC)
+        .flatMap(mockerA)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P13", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerC)
+        .flatMap(mockerA)
+        .flatMap(mockerB)
+        .flatMap(mockerD)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P14", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerC)
+        .flatMap(mockerA)
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P15", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerC)
+        .flatMap(mockerB)
+        .flatMap(mockerA)
+        .flatMap(mockerD)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P16", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerC)
+        .flatMap(mockerB)
+        .flatMap(mockerD)
+        .flatMap(mockerA)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P17", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerC)
+        .flatMap(mockerD)
+        .flatMap(mockerA)
+        .flatMap(mockerB)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P18", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerC)
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .flatMap(mockerA)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P19", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerD)
+        .flatMap(mockerA)
+        .flatMap(mockerB)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P20", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerD)
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .flatMap(mockerB)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P21", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P22", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .flatMap(mockerC)
+        .flatMap(mockerA)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P23", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerD)
+        .flatMap(mockerC)
+        .flatMap(mockerA)
+        .flatMap(mockerB)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+    it("P24", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleResIt);
+      const mockerB = t.mock.fn(asyncDoubleResIt);
+      const mockerC = t.mock.fn(doubleResPromiseIt);
+      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+
+      const mapped = await r
+        .flatMap(mockerD)
+        .flatMap(mockerB)
+        .flatMap(mockerA)
+        .flatMap(mockerC)
+        .toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.strictEqual(mapped.unwrap(), 32);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+      assert.strictEqual(mockerC.mock.callCount(), 1);
+      assert.strictEqual(mockerD.mock.callCount(), 1);
+    });
+  });
 });

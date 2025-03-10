@@ -148,4 +148,39 @@ describe("zip behavior", () => {
     assert.strictEqual(mockerA.mock.callCount(), 0);
     assert.strictEqual(mockerB.mock.callCount(), 0);
   });
+
+  describe("permutations", () => {
+    it("P1", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(doubleIt);
+      const mockerB = t.mock.fn(tupleAsyncDoubleIt);
+
+      const mapped = await r.zip(mockerA).zip(mockerB).toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.deepStrictEqual(mapped.unwrap(), [
+        [2, 4],
+        [4, 8],
+      ]);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+    });
+    it("P2", async (t) => {
+      const r = Result.Ok(2);
+
+      const mockerA = t.mock.fn(tupleDoubleIt);
+      const mockerB = t.mock.fn(asyncDoubleIt);
+
+      const mapped = await r.zip(mockerB).zip(mockerA).toPromise();
+
+      assert.ok(mapped.isOk());
+      assert.deepStrictEqual(mapped.unwrap(), [
+        [2, 4],
+        [4, 8],
+      ]);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+    });
+  });
 });
