@@ -62,7 +62,7 @@ const tupleAsyncDoubleResPromiseIt = async (
   return Result.Ok(Promise.resolve(recursivelyTransform(value, doubleIt)));
 };
 
-describe("flatZip behavior", () => {
+describe("Result.flatZip behavior", () => {
   it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async (t) => {
     const r = Result.Ok(Promise.resolve(2));
     const mockedDouble = t.mock.fn(tupleAsyncDoubleResPromiseIt);

@@ -27,7 +27,7 @@ const asyncDoubleResPromiseIt = async (n: number) =>
 const asyncErrResPromiseIt = async (_n: number) =>
   Result.Err(Promise.resolve(new DummyError()));
 
-describe("flatMap behavior", () => {
+describe("Result.flatMap behavior", () => {
   it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async (t) => {
     const r = Result.Ok(Promise.resolve(2));
     const mockedDouble = t.mock.fn(asyncDoubleResPromiseIt);

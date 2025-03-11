@@ -12,7 +12,7 @@ const doubleIt = (n: number) => n * 2;
 
 const asyncDoubleIt = async (n: number) => n * 2;
 
-describe("map behavior", () => {
+describe("Result.map behavior", () => {
   it("should transform an Ok value that is a Promise asynchronously", async (t) => {
     const r = Result.Ok(Promise.resolve(2));
     const mockerA = t.mock.fn(asyncDoubleIt);

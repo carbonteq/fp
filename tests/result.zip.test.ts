@@ -14,7 +14,7 @@ const tupleDoubleIt = (n: [number, number]) => n.map(doubleIt);
 const asyncDoubleIt = async (n: number) => n * 2;
 const tupleAsyncDoubleIt = async (n: [number, number]) => n.map(doubleIt);
 
-describe("zip behavior", () => {
+describe("Result.zip behavior", () => {
   it("should transform an Ok value that is a Promise asynchronously", async (t) => {
     const r = Result.Ok(Promise.resolve(2));
     const mockerA = t.mock.fn(asyncDoubleIt);
