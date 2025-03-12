@@ -665,6 +665,40 @@ describe("Result.flatZip behavior", () => {
       assert.strictEqual(mockerA.mock.callCount(), 1);
       assert.strictEqual(mockerB.mock.callCount(), 1);
     });
+
+    it("two chained branches of computation from Promise should not affect parent or each other", async (t) => {
+      const r = Result.Ok(Promise.resolve(2));
+      const mockerA = t.mock.fn(tupleDoubleResIt);
+      const mockerB = t.mock.fn(errResIt);
+      const r1 = await r.flatZip(mockerA).toPromise();
+      const r2 = await r.flatZip(mockerB).toPromise();
+
+      assert.ok(r.isOk());
+      assert.ok(r1.isOk());
+      assert.ok(r2.isErr());
+      assert.strictEqual(await r.unwrap(), 2);
+      assert.deepStrictEqual(r1.unwrap(), [2, 4]);
+      assert.throws(() => r2.unwrap(), DummyError);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+    });
+
+    it("two chained branches of computation from Promise should not affect parent or each other (async)", async (t) => {
+      const r = Result.Ok(Promise.resolve(2));
+      const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
+      const mockerB = t.mock.fn(asyncErrResIt);
+      const r1 = await r.flatZip(mockerA).toPromise();
+      const r2 = await r.flatZip(mockerB).toPromise();
+
+      assert.ok(r.isOk());
+      assert.ok(r1.isOk());
+      assert.ok(r2.isErr());
+      assert.strictEqual(await r.unwrap(), 2);
+      assert.deepStrictEqual(r1.unwrap(), [2, 4]);
+      assert.throws(() => r2.unwrap(), DummyError);
+      assert.strictEqual(mockerA.mock.callCount(), 1);
+      assert.strictEqual(mockerB.mock.callCount(), 1);
+    });
   });
 
   describe("permutations", () => {
