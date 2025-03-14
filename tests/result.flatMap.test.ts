@@ -12,19 +12,25 @@ class DummyError extends Error {
 const doubleIt = (n: number) => n * 2;
 
 const doubleResIt = (n: number) => Result.Ok(doubleIt(n));
-const errResIt = (_n: number) => Result.Err(new DummyError());
+const errResIt = (_n: number): Result<number, DummyError> =>
+  Result.Err(new DummyError());
 
 const asyncDoubleResIt = async (n: number) => Result.Ok(doubleIt(n));
-const asyncErrResIt = async (_n: number) => Result.Err(new DummyError());
+const asyncErrResIt = async (_n: number): Promise<Result<number, DummyError>> =>
+  Result.Err(new DummyError());
 
 const doubleResPromiseIt = (n: number) =>
   Result.Ok(Promise.resolve(doubleIt(n)));
-const errResPromiseIt = (_n: number) =>
+const errResPromiseIt = (
+  _n: number,
+): Result<Promise<number>, Promise<DummyError>> =>
   Result.Err(Promise.resolve(new DummyError()));
 
 const asyncDoubleResPromiseIt = async (n: number) =>
   Result.Ok(Promise.resolve(doubleIt(n)));
-const asyncErrResPromiseIt = async (_n: number) =>
+const asyncErrResPromiseIt = async (
+  _n: number,
+): Promise<Result<Promise<number>, Promise<DummyError>>> =>
   Result.Err(Promise.resolve(new DummyError()));
 
 describe("Result.flatMap behavior", () => {
