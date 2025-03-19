@@ -221,6 +221,10 @@ export class Option<T> {
 
   flatZip<U, Curr>(
     this: Option<Promise<Curr>>,
+    fn: (val: Curr) => Promise<Option<U>>,
+  ): Option<Promise<[Curr, U]>>;
+  flatZip<U, Curr>(
+    this: Option<Promise<Curr>>,
     fn: (val: Curr) => Option<U>,
   ): Option<Promise<[Curr, U]>>;
   flatZip<U, Curr>(
@@ -249,9 +253,10 @@ export class Option<T> {
         }
 
         const next = await fn(v);
-        const nn = next.map((inner) => [curr, inner] as [Curr, U]);
-
-        return nn;
+        if (next.isNone()) {
+          return NONE_VAL;
+        }
+        return [v, next.val] as [Curr, U];
       }) as Promise<[Curr, U]>;
 
       return new Option(p, ctx);
@@ -261,7 +266,12 @@ export class Option<T> {
     const c = curr as unknown as Curr;
     const u = fn(c);
     if (isPromise(u)) {
-      const p = u.then((uu) => uu.map((inner) => [c, inner] as [Curr, U]));
+      const p = u.then((uu) => {
+        if (uu.isNone()) {
+          return NONE_VAL;
+        }
+        return [c, uu.val] as [Curr, U];
+      });
       return new Option(p, ctx);
     }
 
