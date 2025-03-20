@@ -513,14 +513,14 @@ export class Result<T, E> {
     return v;
   }
 
-  zip<U>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Promise<U>,
-  ): Result<Promise<[T, U]>, E>;
-  zip<U>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => U,
-  ): Result<Promise<[T, U]>, E>;
+  zip<U, In = Awaited<T>>(
+    this: Result<T, E>,
+    fn: (val: In) => Promise<U>,
+  ): Result<Promise<[In, U]>, E>;
+  zip<U, In = Awaited<T>>(
+    this: Result<T, E>,
+    fn: (val: In) => U,
+  ): Result<Promise<[In, U]>, E>;
   zip<U>(
     this: Result<T, E>,
     fn: (val: T) => Promise<U>,
