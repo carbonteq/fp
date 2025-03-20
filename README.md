@@ -96,6 +96,8 @@ matchOpt(res, {
       - [mapErr](#maperr)
       - [mapOr](#mapor)
       - [tap](#tap)
+      - [all](#all)
+      - [validate](#validate)
       - [unwrap](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
       - [safeUnwrapErr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
       - [unwrapOr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
