@@ -42,11 +42,26 @@ type CombinedResultOk<T extends Result<unknown, unknown>[]> = {
 type CombinedResultErr<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["err"];
 }[number];
+type CombinedErrs<T extends Result<unknown, unknown>[]> = {
+  [K in keyof T]: UnwrapResult<T[K]>["err"];
+};
 
 export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
   CombinedResultOk<T>,
   CombinedResultErr<T>
 >;
+
+type UnwrapPromises<T extends Result<unknown, unknown>[]> = {
+  [K in keyof T]: Awaited<UnwrapResult<T[K]>["ok"]>;
+};
+
+type IsPromise<T> = T extends Promise<unknown> ? true : false;
+
+type HasPromise<T extends readonly Result<unknown, unknown>[]> = true extends {
+  [K in keyof T]: IsPromise<T[K] extends Result<infer U, unknown> ? U : never>;
+}[number]
+  ? true
+  : false;
 
 /** Sentinel value */
 const Sentinel = Symbol.for("ResultSentinel");
@@ -265,6 +280,31 @@ export class Result<T, E> {
 
     // we don't need to propagate the previous ctx, as closure will ensure the changes there are reflected in newCtx
     return new Result(this.#val, newCtx);
+  }
+
+  mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (val: E) => E2): Result<T2, E2>;
+  mapBoth<T2, E2, In = Awaited<T2>>(
+    fnOk: (val: In) => T2,
+    fnErr: (val: E) => E2,
+  ): Result<Promise<In>, E2>;
+  mapBoth<T2, E2, In = Awaited<T2>>(
+    this: Result<Promise<In>, E>,
+    fnOk: (val: In) => Promise<T2>,
+    fnErr: (val: E) => E2,
+  ): Result<Promise<In>, E2>;
+  mapBoth<E2, In = Awaited<T>>(
+    fnOk: (val: T) => In | Promise<In>,
+    fnErr: (val: E) => E2,
+  ): Result<Promise<In>, E> | Result<In, E> | Result<T, E2> {
+    if (this.isErr()) {
+      return this.mapErr(fnErr);
+    }
+
+    if (isPromise(this.#val)) {
+      return this.map(fnOk as AsyncMapper<T, In>);
+    }
+
+    return this.map(fnOk as Mapper<T, In>);
   }
 
   /**
@@ -658,5 +698,149 @@ export class Result<T, E> {
     const v = await this.#val;
 
     return new Result(v, this.#ctx);
+  }
+
+  validate<VE extends unknown[]>(
+    this: Result<T, E>,
+    validators: { [K in keyof VE]: (val: T) => Result<unknown, VE[K]> },
+  ): Result<T, E | VE[number][]>;
+  validate<VE extends unknown[]>(
+    this: Result<T, E>,
+    validators: {
+      [K in keyof VE]: (val: T) => Promise<Result<unknown, VE[K]>>;
+    },
+  ): Result<Promise<T>, E | VE[number][]>;
+  validate<VE extends unknown[], In = Awaited<T>>(
+    this: Result<T, E> | Result<Promise<T>, E>,
+    validators: {
+      [K in keyof VE]: (
+        val: In,
+      ) => Promise<Result<unknown, VE[K]>> | Result<unknown, VE[K]>;
+    },
+  ): Result<Promise<T>, E | VE[number][]>;
+  validate<VE extends unknown[]>(
+    this: Result<T, E> | Result<Promise<T>, E>,
+    validators: {
+      [K in keyof VE]: (
+        val: T,
+      ) => Promise<Result<unknown, VE[K]>> | Result<unknown, VE[K]>;
+    },
+  ):
+    | Result<T, E>
+    | Result<T, E | VE[number][]>
+    | Result<Promise<T>, E | VE[number][]> {
+    if (this.isErr()) return this as Result<T, E[]>;
+
+    const currVal = this.#val;
+    const currCtx = this.#ctx;
+    const mutableCtx = { errSlot: Sentinel } as ResultCtx<E>;
+
+    if (isPromise(currVal)) {
+      return new Result(
+        currVal.then(async (c) => {
+          if (currCtx.errSlot !== Sentinel) {
+            mutableCtx.errSlot = currCtx.errSlot as E;
+            return Sentinel;
+          }
+
+          const results = validators.map((v) => v(currVal as T));
+          return Promise.all(results).then((resolved) =>
+            Result.validateHelper(resolved, mutableCtx, c),
+          );
+        }),
+        mutableCtx,
+      ) as Result<Promise<T>, E[]>;
+    }
+
+    const results = validators.map((v) => v(currVal as T));
+
+    if (results.some(isPromise)) {
+      return new Result(
+        Promise.all(results).then((resolved) =>
+          Result.validateHelper(resolved, mutableCtx, currVal),
+        ),
+        mutableCtx,
+      ) as Result<Promise<T>, E[]>;
+    }
+
+    const values = (
+      results as (
+        | Result<unknown, unknown>
+        | Result<Promise<unknown>, unknown>
+      )[]
+    ).map((r) => r.#val);
+
+    if (values.some(isPromise)) {
+      return new Result(
+        Result.validateHelper(
+          results as Result<unknown, E>[],
+          mutableCtx,
+          currVal,
+        ),
+        mutableCtx,
+      ) as Result<Promise<T>, E>;
+    }
+
+    const combinedRes = Result.all(...(results as Result<unknown, E>[]));
+
+    return combinedRes.isErr() ? combinedRes : this;
+  }
+
+  private static validateHelper<T, E>(
+    results: Result<unknown, E>[],
+    currCtx: ResultCtx<E>,
+    currVal: T,
+  ) {
+    const combinedRes = this.all(...results);
+
+    if (isPromise(combinedRes)) {
+      return (combinedRes as Promise<Result<T, unknown[]>>).then((cRes) => {
+        if (cRes.isErr()) {
+          currCtx.errSlot = cRes.#ctx.errSlot as E;
+          return Sentinel;
+        }
+        return currVal;
+      }) as Promise<T>;
+    }
+
+    if (combinedRes.isErr()) {
+      currCtx.errSlot = combinedRes.#ctx.errSlot as E;
+      return Sentinel;
+    }
+    return currVal;
+  }
+
+  static all<T extends Result<unknown, unknown>[]>(
+    ...results: T
+  ): HasPromise<T> extends true
+    ? Result<Promise<UnwrapPromises<T>>, CombinedResultErr<T>[]>
+    : Result<CombinedResultOk<T>, CombinedResultErr<T>[]>;
+  static all<T extends Result<unknown, unknown>[]>(...results: T) {
+    const vals = results.map((r) => r.#val);
+
+    const mutableCtx = { errSlot: Sentinel } as ResultCtx<unknown>;
+
+    if (vals.some(isPromise)) {
+      return new Result(
+        Promise.all(vals).then((v) => {
+          if (results.some((r) => r.isErr())) {
+            mutableCtx.errSlot = results
+              .filter((r) => r.isErr())
+              .map((r) => r.#ctx.errSlot);
+            return Sentinel;
+          }
+          return v;
+        }),
+        mutableCtx,
+      );
+    }
+
+    if (results.some((r) => r.isErr())) {
+      return Result.Err(
+        results.filter((r) => r.isErr()).map((r) => r.#ctx.errSlot),
+      ) as Result<CombinedResultOk<T>, CombinedResultErr<T>[]>;
+    }
+
+    return Result.Ok(vals) as Result<CombinedResultOk<T>, CombinedErrs<T>>;
   }
 }
