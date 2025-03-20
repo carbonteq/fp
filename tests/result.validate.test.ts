@@ -1,6 +1,6 @@
-import { Result } from "@/result.js";
-import assert from "assert";
+import assert from "node:assert";
 import { describe, it } from "node:test";
+import { Result } from "@/result.js";
 
 const validateOk = (_n: number): Result<string, string> => Result.Ok("Success");
 const validatePromiseOk = (_n: number): Promise<Result<string, string>> =>
