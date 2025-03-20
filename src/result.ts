@@ -1,6 +1,6 @@
+import assert from "node:assert";
 import { isPromise } from "node:util/types";
 import { UNIT } from "./unit.js";
-import assert from "node:assert";
 
 export class UnwrappedErrWithOk extends Error {
   constructor(r: Result<unknown, unknown>) {
@@ -791,7 +791,7 @@ export class Result<T, E> {
     currCtx: ResultCtx<E>,
     currVal: T,
   ) {
-    const combinedRes = this.all(...results);
+    const combinedRes = Result.all(...results);
 
     if (isPromise(combinedRes)) {
       return (combinedRes as Promise<Result<T, unknown[]>>).then((cRes) => {
