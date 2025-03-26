@@ -563,6 +563,14 @@ export class Result<T, E> {
   }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
+  flatZip<U, E2, In = Awaited<T>>(
+    this: Result<T, E>,
+    fn: (val: In) => Result<U, E2>,
+  ): Result<Promise<[In, U]>, E | E2>;
+  flatZip<U, E2, In = Awaited<T>>(
+    this: Result<T, E>,
+    fn: (val: In) => Promise<Result<U, E2>>,
+  ): Result<Promise<[In, U]>, E | E2>;
   flatZip<U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
