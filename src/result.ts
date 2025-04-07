@@ -158,8 +158,8 @@ export class Result<T, E> {
   //   return this.val as T;
   // }
 
-  unwrapErr<T, E>(this: Result<Promise<T>, E>): Promise<E>;
   unwrapErr<T, E>(this: Result<T, E>): E;
+  unwrapErr<T, E>(this: Result<Promise<T>, E>): Promise<E>;
   unwrapErr() {
     const errSlot = this.#ctx.errSlot;
 
@@ -513,20 +513,20 @@ export class Result<T, E> {
     return v;
   }
 
-  zip<U, In = Awaited<T>>(
+  zip<T, U, In = Awaited<T>>(
     this: Result<T, E>,
     fn: (val: In) => Promise<U>,
   ): Result<Promise<[In, U]>, E>;
-  zip<U, In = Awaited<T>>(
+  zip<T, U, In = Awaited<T>>(
     this: Result<T, E>,
     fn: (val: In) => U,
   ): Result<Promise<[In, U]>, E>;
-  zip<U>(
+  zip<T, U>(
     this: Result<T, E>,
     fn: (val: T) => Promise<U>,
   ): Result<Promise<[T, U]>, E>;
-  zip<U>(this: Result<T, E>, fn: (val: T) => U): Result<[T, U], E>;
-  zip<U, In = Awaited<T>>(fn: Mapper<In, U> | AsyncMapper<In, U>) {
+  zip<T, U>(this: Result<T, E>, fn: (val: T) => U): Result<[T, U], E>;
+  zip<T, U, In = Awaited<T>>(fn: Mapper<In, U> | AsyncMapper<In, U>) {
     if (this.isErr()) return Result.Err(this.#ctx.errSlot);
 
     const curr = this.#val as Promise<In> | In;
@@ -563,53 +563,43 @@ export class Result<T, E> {
   }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
-  flatZip<U, E2, In = Awaited<T>>(
-    this: Result<T, E>,
-    fn: (val: In) => Result<U, E2>,
-  ): Result<Promise<[In, U]>, E | E2>;
-  flatZip<U, E2, In = Awaited<T>>(
-    this: Result<T, E>,
-    fn: (val: In) => Promise<Result<U, E2>>,
-  ): Result<Promise<[In, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
   ): never;
-
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<Promise<U>, E2>>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<U, E2>>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Result<Promise<U>, E2>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Result<U, E2>,
   ): Result<Promise<[T, U]>, E | E2>;
-
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
   ): never;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Promise<Result<Promise<U>, E2>>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Promise<Result<U, E2>>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Result<Promise<U>, E2>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<U, E2>(
+  flatZip<T, U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Result<U, E2>,
   ): Result<[T, U], E | E2>;
