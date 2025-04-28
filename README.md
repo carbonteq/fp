@@ -68,7 +68,9 @@ function getUserAddress(user: { email?: string }): Option<string> {
   return user.email ? Option.Some("Some Address") : Option.None;
 }
 
-const res = getUserByEmail({ email: "test@test.com" }).flatZip((email) => getUserAddress({ email }));
+const res = getUserByEmail({ email: "test@test.com" }).flatZip((email) =>
+  getUserAddress({ email }),
+);
 
 matchOpt(res, {
   Some: (res) => {
@@ -94,8 +96,7 @@ matchOpt(res, {
     - [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
     - [Some Other Useful Functions](#some-other-useful-functions)
       - [mapErr](#maperr)
-      - [mapOr](#mapor)
-      - [tap](#tap)
+      - [mapOr](#mapor) <!-- - [tap](#tap) -->
       - [all](#all)
       - [validate](#validate)
       - [unwrap](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
@@ -145,7 +146,9 @@ Let's say we want to apply a 10% bonus to the account balance of a user.
 ```typescript
 import { Option } from "@carbonteq/fp";
 
-async function fetchUserBalanceFromDatabase(userId: string): Promise<Option<number>> {
+async function fetchUserBalanceFromDatabase(
+  userId: string,
+): Promise<Option<number>> {
   // Simulate fetching balance from a database
   await Promise.resolve(userId);
   return Option.Some(100);
@@ -173,7 +176,10 @@ Let's say we want to validate user input and then save it to a database:
 import { Result } from "@carbonteq/fp";
 
 // Function to validate user input
-const validateUserData = (name: string, age: number): Result<{ name: string; age: number }, Error> => {
+const validateUserData = (
+  name: string,
+  age: number,
+): Result<{ name: string; age: number }, Error> => {
   if (name.trim() === "") {
     return Result.Err(new Error("Name cannot be empty"));
   }
@@ -184,15 +190,23 @@ const validateUserData = (name: string, age: number): Result<{ name: string; age
 };
 
 // Simulated asynchronous task to save user data to a "database"
-const saveUserData = async (user: { name: string; age: number }): Promise<Result<string, Error>> => {
+const saveUserData = async (user: {
+  name: string;
+  age: number;
+}): Promise<Result<string, Error>> => {
   // Simulate saving to database
   await Promise.resolve(user);
   return Result.Ok(`User ${user.name} saved successfully!`);
 };
 
 // Chaining validation and save using `flatMap`
-const processUser = async (name: string, age: number): Promise<Result<string, Error>> => {
-  const validationResult = await validateUserData(name, age).flatMap(saveUserData).toPromise();
+const processUser = async (
+  name: string,
+  age: number,
+): Promise<Result<string, Error>> => {
+  const validationResult = await validateUserData(name, age)
+    .flatMap(saveUserData)
+    .toPromise();
   return validationResult;
 };
 
@@ -209,13 +223,17 @@ For example, suppose we want to pair the product's original price `T` and discou
 ```typescript
 import { Result } from "@carbonteq/fp";
 
-async function fetchProductPrice(productId: string): Promise<Result<number, Error>> {
+async function fetchProductPrice(
+  productId: string,
+): Promise<Result<number, Error>> {
   // Simulate fetching price from a database
   await Promise.resolve(productId);
   return Result.Ok(100);
 }
 
-async function applyDiscount(productId: string): Promise<Result<[number, number], Error>> {
+async function applyDiscount(
+  productId: string,
+): Promise<Result<[number, number], Error>> {
   const originalPrice = await Result.Ok(productId)
     .flatMap(fetchProductPrice)
     .zip((price) => price * 0.9)
@@ -252,8 +270,13 @@ async function fetchProductStock(productId: string): Promise<Option<number>> {
 }
 
 // Function to combine price and stock using flatZip
-async function fetchProductDetails(productId: string): Promise<Option<[number, number]>> {
-  const productDetails = await Option.Some(productId).flatMap(fetchProductPrice).flatZip(fetchProductStock).toPromise();
+async function fetchProductDetails(
+  productId: string,
+): Promise<Option<[number, number]>> {
+  const productDetails = await Option.Some(productId)
+    .flatMap(fetchProductPrice)
+    .flatZip(fetchProductStock)
+    .toPromise();
   return productDetails; // Option<[number, number]>
 }
 
@@ -262,8 +285,8 @@ console.log(await fetchProductDetails("123")); // Output: Option.Some([100, 50])
 
 ## Comparison of `map`, `flatMap`, `zip`, and `flatZip`
 
-| **Method**            | **`map`**                                                         | **`flatMap`**                                                                                                                       | **`zip`**                                                                                  | **`flatZip`**                                                                                                |     |
-| --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | --- |
+| **Method**            | **`map`**                                                         | **`flatMap`**                                                                                                                       | **`zip`**                                                                                  | **`flatZip`**                                                                                                |
+| --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | **Purpose**           | Transforms the value inside an `Ok` or `Some`.                    | Chains dependent computations where each computation returns a `Result` or `Option`.                                                | Combines the current value with another derived value into a tuple `[T, U]`.               | Combines two independent `Result` or `Option` values into a tuple `[T, U]`.                                  |
 | **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` to transform the current value into another `Result` or `Option`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.           | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` that returns another `Result` or `Option`. |
 | **Output**            | `Result<U, E>`, `Option<U>`                                       | `Result<U, E>`, `Option<U>`                                                                                                         | `Result<[T, U], E>`, `Option<[T, U]>`                                                      | `Result<[T, U], E>`, `Option<[T, U]>`.                                                                       |
@@ -291,7 +314,9 @@ function divideNumbers(a: number, b: number): Result<number, Error> {
 
 // A safe divide function that returns a Result with a string error message if the division by zero occurs, instead of throwing an exception
 function safeDivide(a: number, b: number): Result<number, string> {
-  const res = divideNumbers(a, b).mapErr((err) => `Operation failed: ${err.message}`);
+  const res = divideNumbers(a, b).mapErr(
+    (err) => `Operation failed: ${err.message}`,
+  );
   return res;
 }
 
@@ -319,7 +344,10 @@ async function findUserById(id: number): Promise<Option<number>> {
 
 // A safe function that returns a string error message if the user is not found, instead of throwing an exception
 async function safeFindUserById(id: number): Promise<Option<string>> {
-  const res = (await findUserById(id)).mapOr(`User not found`, (res) => `User: ${res}`);
+  const res = (await findUserById(id)).mapOr(
+    `User not found`,
+    (res) => `User: ${res}`,
+  );
   return res;
 }
 
@@ -328,7 +356,7 @@ console.log(await safeFindUserById(10)); // Some(User: 10)
 console.log(await safeFindUserById(0)); // Some(User not found)
 ```
 
-#### `tap`
+<!-- #### `tap`
 
 `tap` is used to perform side effects on the `Result`/`Option` value without altering its contents. It is useful for logging, auditing, debugging complex chains of operations etc.
 
@@ -360,38 +388,158 @@ const res = (await findUserById(1))
   .mapErr((error) => console.error(`[Alert] Transaction failed: ${error}`));
 
 console.log(res); // Result.Ok({ id: 1, balance: 90 })
-```
+``` -->
 
 #### `all`
 
 `all` is used to combine an array of Results. If any errors exist they are accumulated, else the values are accumulated.
 
 ```typescript
-const combinedOk = Result.all(Result.Ok(1), Result.Ok(2), Result.Ok(3), Result.Ok(4));
-console.log(combinedOk.unwrap()); // [1, 2, 3, 4]
-const combinedErr = Result.all(Result.Err(1), Result.Err(2), Result.Err(3), Result.Err(4));
-console.log(combinedErr.unwrapErr()); // [1, 2, 3, 4]
+import { Result, matchRes } from "@carbonteq/fp";
+
+async function fetchUser(userId: string) {
+  return Result.Ok({
+    userId,
+    userName: "Functional Programmer",
+    createdAt: "2025-01-01",
+  });
+}
+
+async function fetchPosts(userId: string) {
+  if (userId === "TRIAL_USER") {
+    return Result.Err("User has no posts!");
+  }
+  return Result.Ok([
+    { postId: "1", likes: 12, replies: 3, createdAt: "2025-01-01", userId },
+  ]);
+}
+
+async function fetchLikes(userId: string) {
+  return Result.Ok([{ postId: "2", createdAt: "2025-01-01", userId }]);
+}
+
+async function fetchReplies(userId: string) {
+  if (userId === "TRIAL_USER") {
+    return Result.Err("User has no replies!");
+  }
+  return Result.Ok([
+    { postId: "2", data: "Nice post!", createdAt: "2025-01-01", userId },
+  ]);
+}
+
+function generateHash(userId: string) {
+  return Result.Ok(`${userId}_HASH_VALUE`);
+}
+
+async function getUserData(userId: string) {
+  const userData = Result.all(
+    await fetchUser(userId),
+    await fetchPosts(userId),
+    await fetchLikes(userId),
+    await fetchReplies(userId),
+    generateHash(userId),
+  );
+
+  matchRes(userData, {
+    Ok(v) {
+      console.log(v);
+    },
+    Err(e) {
+      console.log(e);
+    },
+  });
+}
+
+await getUserData("USER_ID");
+
+// [
+//   {
+//     userId: 'USER_ID',
+//     userName: 'Functional Programmer',
+//     createdAt: '2025-01-01'
+//   },
+//   [
+//     {
+//       postId: '1',
+//       likes: 12,
+//       replies: 3,
+//       createdAt: '2025-01-01',
+//       userId: 'USER_ID'
+//     }
+//   ],
+//   [ { postId: '2', createdAt: '2025-01-01', userId: 'USER_ID' } ],
+//   [
+//     {
+//       postId: '2',
+//       data: 'Nice post!',
+//       createdAt: '2025-01-01',
+//       userId: 'USER_ID'
+//     }
+//   ],
+//   'USER_ID_HASH_VALUE'
+// ]
+
+await getUserData("TRIAL_USER");
+
+// [ 'User has no posts!', 'User has no replies!' ]
 ```
 
 #### `validate`
 
-Built on top of `all`, `validate` is used to execute an array of validator functions in parallel. If all validations pass, the original value is retained. If any validations fail, the errors are accumulated.
+Built on top of `all`, `validate` is used to execute an array of validator functions in parallel. If all validations pass, the original value is retained. If any validations fail, the errors are accumulated. Both synchronous and asynchronous computations are handled.
 
 ```typescript
 import { Result } from "@carbonteq/fp";
 
-function isPositive(n: number) {
-  return n < 0 ? Result.Err(new Error("Input is negative")) : Result.Ok(true);
+function hasMinimumLength(password: string) {
+  return password.length < 8
+    ? Result.Err(new Error("Password must be at least 8 characters"))
+    : Result.Ok(true);
 }
 
-function isEven(n: number) {
-  return n % 2 !== 0 ? Result.Err(new Error("Input is odd")) : Result.Ok(true);
+function hasSpecialCharacters(password: string) {
+  const specialCharsRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+  return !specialCharsRegex.test(password)
+    ? Result.Err(
+        new Error("Password must contain at least one special character"),
+      )
+    : Result.Ok(true);
 }
 
-const validatedOk = Result.Ok(2).validate([isPositive, isEven]);
-console.log(validatedOk.unwrap()); // 2
-const validatedErr = Result.Ok(-3).validate([isPositive, isEven]);
-console.log(validatedErr.unwrapErr()); // [Error("Input is negative"), Error("Input is odd")]
+// Asynchronous validation function - checks if password is different from previous
+async function isNotSameAsPrevious(password: string) {
+  // Simulate checking against a database of user's previous passwords
+  return new Promise<Result<boolean, Error>>((resolve) => {
+    setTimeout(() => {
+      // For demo purposes, we'll consider "password123!" as the previous password
+      if (password === "password123!") {
+        resolve(
+          Result.Err(
+            new Error("New password cannot be the same as previous password"),
+          ),
+        );
+      } else {
+        resolve(Result.Ok(true));
+      }
+    }, 200); // simulate network delay
+  });
+}
+
+const validatedOk = Result.Ok("password321!").validate([
+  hasMinimumLength,
+  hasSpecialCharacters,
+]);
+console.log(validatedOk.unwrap()); // password321!
+
+const validatedErr = await Result.Ok("pword")
+  .validate([hasMinimumLength, hasSpecialCharacters])
+  .toPromise();
+console.log(validatedErr.unwrapErr()); // [Error: Password must be at least 8 characters, Error: Password must contain at least one special character]
+
+const validatedErrs = await Result.Ok("password123!")
+  .validate([hasMinimumLength, hasSpecialCharacters, isNotSameAsPrevious])
+  .toPromise();
+console.log(validatedErrs.unwrapErr()); // [Error: New password cannot be the same as previous password]
 ```
 
 #### `unwrap`, `safeUnwrapErr`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
@@ -411,11 +559,8 @@ function divideNumbers(a: number, b: number): Result<number, Error> {
 // Example usage of each function
 let result = divideNumbers(10, 2);
 console.log(result.unwrap()); // unwrap: 5 (Extracts the value from Result.Ok, throwing an error if it's Err.)
-console.log(result.safeUnwrapErr()); // safeUnwrapErr: null (returns error if Err, null if Ok)
 
 result = divideNumbers(10, 0);
-console.log(result.unwrapOr(0)); // unwrapOr: 0 (Returns the contained value if Ok, or a default value if Err)
-console.log(result.unwrapOrElse(() => 0)); // unwrapOrElse: 0 (Similar to unwrapOr, but the default value is generated by a function.)
 console.log(result.safeUnwrap()); // safeUnwrap: null (Safely unwraps the value, returning null if it's an Err instead of throwing an error.)
 
 const errorResult = Result.Err(new Error("Something went wrong"));
@@ -455,7 +600,9 @@ function guardOrder(order: Order): Result<Order, string> {
 // Check product availability
 function guardInventoryCheck(order: Order): Result<Order, string> {
   const availableStock = 100; // Simulated stock
-  return order.quantity <= availableStock ? Result.Ok(order) : Result.Err(`Insufficient stock. Available: ${availableStock}`);
+  return order.quantity <= availableStock
+    ? Result.Ok(order)
+    : Result.Err(`Insufficient stock. Available: ${availableStock}`);
 }
 
 // Calculate order total
@@ -509,7 +656,8 @@ matchRes(result, {
 Let's build an asynchronous pipeline for a user registration system that includes credentials verification and profile setup.
 
 ```typescript
-import { Result, matchRes } from "@carbonteq/fp";
+import { matchRes } from "@/match.js";
+import { Result } from "@/result.js";
 
 interface UserInput {
   email: string;
@@ -524,27 +672,37 @@ interface UserProfile {
   verificationStatus: "pending" | "verified";
 }
 
-// Validate email format
-async function guardEmail(email: string): Promise<Result<string, string>> {
+// Validate email format (synchronous)
+function guardEmail(email: string): Result<string, string> {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email) ? Result.Ok(email) : Result.Err("Invalid email format");
+  return emailRegex.test(email)
+    ? Result.Ok(email)
+    : Result.Err("Invalid email format");
 }
 
 // Check if email is already registered
-async function guardEmailAvailability(email: string): Promise<Result<string, string>> {
+async function guardEmailAvailability(
+  email: string,
+): Promise<Result<string, string>> {
   // Simulate database check
   await Promise.resolve(email);
   const registeredEmails = ["existing@example.com"];
-  return !registeredEmails.includes(email) ? Result.Ok(email) : Result.Err("Email already registered");
+  return !registeredEmails.includes(email)
+    ? Result.Ok(email)
+    : Result.Err("Email already registered");
 }
 
-// Validate password strength
-async function guardPassword(password: string): Promise<Result<string, string>> {
-  return password.length >= 8 ? Result.Ok(password) : Result.Err("Password must be at least 8 characters");
+// Validate password strength (synchronous)
+function guardPassword(password: string): Result<string, string> {
+  return password.length >= 8
+    ? Result.Ok(password)
+    : Result.Err("Password must be at least 8 characters");
 }
 
 // Create user profile
-async function createUserProfile(input: UserInput): Promise<Result<UserProfile, string>> {
+async function createUserProfile(
+  input: UserInput,
+): Promise<Result<UserProfile, string>> {
   const userProfile: UserProfile = {
     userId: `USER-${Date.now()}`,
     email: input.email,
@@ -555,7 +713,9 @@ async function createUserProfile(input: UserInput): Promise<Result<UserProfile, 
 }
 
 // Send verification email
-async function sendVerificationEmail(profile: UserProfile): Promise<Result<UserProfile, string>> {
+async function sendVerificationEmail(
+  profile: UserProfile,
+): Promise<Result<UserProfile, string>> {
   // Simulate email sending and verification
   await Promise.resolve(profile);
   console.log(`Verification email sent to ${profile.email}`);
@@ -563,9 +723,16 @@ async function sendVerificationEmail(profile: UserProfile): Promise<Result<UserP
 }
 
 // Main registration pipeline
-async function registerUser(input: UserInput): Promise<Result<UserProfile, string | string[]>> {
+async function registerUser(
+  input: UserInput,
+): Promise<Result<UserProfile, string | string[]>> {
   const res = await Result.Ok(input)
-    .validate([({ email }) => guardEmail(email), ({ email }) => guardEmailAvailability(email), ({ password }) => guardPassword(password)])
+    .validate([
+      // handles both sync and async functions
+      ({ email }) => guardEmail(email),
+      ({ email }) => guardEmailAvailability(email),
+      ({ password }) => guardPassword(password),
+    ])
     .flatMap(createUserProfile)
     .flatMap(sendVerificationEmail)
     .toPromise();
