@@ -397,7 +397,37 @@ console.log(res); // Result.Ok({ id: 1, balance: 90 })
 ```typescript
 import { Result, matchRes } from "@carbonteq/fp";
 
-async function fetchUser(userId: string) {
+type User = {
+  userId: string;
+  userName: string;
+  createdAt: Date | string;
+};
+
+type Post = {
+  postId: string;
+  likes: number;
+  replies: number;
+  createdAt: Date | string;
+  author: User["userId"];
+};
+
+type Like = {
+  likeId: string;
+  postId: Post["postId"];
+  createdAt: Date | string;
+  likedBy: User["userId"];
+};
+
+type Reply = {
+  replyId: string;
+  postId: Post["postId"];
+  createdAt: Date | string;
+  author: User["userId"];
+};
+
+type Hash = string;
+
+async function fetchUser(userId: string): Promise<Result<User, unknown>> {
   return Result.Ok({
     userId,
     userName: "Functional Programmer",
@@ -405,40 +435,62 @@ async function fetchUser(userId: string) {
   });
 }
 
-async function fetchPosts(userId: string) {
+async function fetchPosts(userId: string): Promise<Result<Post[], string>> {
   if (userId === "TRIAL_USER") {
     return Result.Err("User has no posts!");
   }
   return Result.Ok([
-    { postId: "1", likes: 12, replies: 3, createdAt: "2025-01-01", userId },
+    {
+      postId: "1",
+      likes: 12,
+      replies: 3,
+      createdAt: "2025-01-01",
+      author: userId,
+    },
   ]);
 }
 
-async function fetchLikes(userId: string) {
-  return Result.Ok([{ postId: "2", createdAt: "2025-01-01", userId }]);
+async function fetchLikes(userId: string): Promise<Result<Like[], unknown>> {
+  return Result.Ok([
+    { likeId: "3", postId: "2", createdAt: "2025-01-01", likedBy: userId },
+  ]);
 }
 
-async function fetchReplies(userId: string) {
+async function fetchReplies(userId: string): Promise<Result<Reply[], string>> {
   if (userId === "TRIAL_USER") {
     return Result.Err("User has no replies!");
   }
   return Result.Ok([
-    { postId: "2", data: "Nice post!", createdAt: "2025-01-01", userId },
+    {
+      replyId: "1",
+      postId: "2",
+      data: "Nice post!",
+      createdAt: "2025-01-01",
+      author: userId,
+    },
   ]);
 }
 
-function generateHash(userId: string) {
+function generateHash(userId: string): Result<Hash, Error> {
   return Result.Ok(`${userId}_HASH_VALUE`);
 }
 
 async function getUserData(userId: string) {
-  const userData = Result.all(
-    await fetchUser(userId),
-    await fetchPosts(userId),
-    await fetchLikes(userId),
-    await fetchReplies(userId),
-    generateHash(userId),
-  );
+  const userIdRes = Result.Ok(userId);
+
+  const user = userIdRes.flatMap(fetchUser);
+  const posts = userIdRes.flatMap(fetchPosts);
+  const likes = userIdRes.flatMap(fetchLikes);
+  const replies = userIdRes.flatMap(fetchReplies);
+  const hash = userIdRes.flatMap(generateHash);
+
+  const userData = await Result.all(
+    user, // Result<Promise<T>, E>
+    posts, // Result<Promise<T>, E>
+    likes, // Result<Promise<T>, E>
+    replies, // Result<Promise<T>, E>
+    hash, // Result<T, E>
+  ).toPromise();
 
   matchRes(userData, {
     Ok(v) {
@@ -491,13 +543,13 @@ Built on top of `all`, `validate` is used to execute an array of validator funct
 ```typescript
 import { Result } from "@carbonteq/fp";
 
-function hasMinimumLength(password: string) {
+function hasMinimumLength(password: string): Result<boolean, Error> {
   return password.length < 8
     ? Result.Err(new Error("Password must be at least 8 characters"))
     : Result.Ok(true);
 }
 
-function hasSpecialCharacters(password: string) {
+function hasSpecialCharacters(password: string): Result<boolean, Error> {
   const specialCharsRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
   return !specialCharsRegex.test(password)
     ? Result.Err(
@@ -507,7 +559,9 @@ function hasSpecialCharacters(password: string) {
 }
 
 // Asynchronous validation function - checks if password is different from previous
-async function isNotSameAsPrevious(password: string) {
+async function isNotSameAsPrevious(
+  password: string,
+): Promise<Result<boolean, Error>> {
   // Simulate checking against a database of user's previous passwords
   return new Promise<Result<boolean, Error>>((resolve) => {
     setTimeout(() => {
