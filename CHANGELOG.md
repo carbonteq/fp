@@ -1,5 +1,15 @@
 # @carbonteq/fp
 
+## 0.8.0
+
+### Minor Changes
+
+- 13979ad: Rewrite Option and most of Result to be async chainable
+
+### Patch Changes
+
+- 03a96f6: Test publish
+
 ## 0.8.0-alpha.0
 
 ### Minor Changes
