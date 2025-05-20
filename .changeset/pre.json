@@ -1,0 +1,11 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "@carbonteq/fp": "0.7.0"
+  },
+  "changesets": [
+    "forty-olives-design",
+    "lovely-items-switch"
+  ]
+}

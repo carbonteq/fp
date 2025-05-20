@@ -8,6 +8,7 @@ export const matchRes = <T, E, U>(
   if (r.isOk()) {
     return branches.Ok(r.unwrap());
   }
+
   return branches.Err(r.unwrapErr());
 };
 

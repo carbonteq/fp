@@ -1,6 +1,6 @@
 {
   "name": "@carbonteq/fp",
-  "version": "0.7.0",
+  "version": "0.8.0-alpha.1",
   "description": "FP utils",
   "author": "Arslan <rslnkrmt2552@gmail.com>",
   "main": "lib/index.js",
@@ -36,7 +36,8 @@
     "fmt:dry": "biome format src tests",
     "fmt": "biome format src tests --write",
     "tc": "tsc --pretty --noEmit --project tsconfig.build.json",
-    "build": "tsup",
+    "build": "NODE_ENV=production tsup",
+    "bd": "tsup",
     "dev": "tsup --watch",
     "test": "tsx --test tests/*.test.ts",
     "test:dbg": "tsx --inspect-brk --test tests/*.test.ts",
