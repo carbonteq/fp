@@ -15,7 +15,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["/dist"],
+  "files": [
+    "/dist"
+  ],
   "scope": "@carbonteq",
   "repository": {
     "type": "git",
@@ -36,9 +38,9 @@
     "fmt:dry": "biome format src tests",
     "fmt": "biome format src tests --write",
     "tc": "tsc --pretty --noEmit --project tsconfig.build.json",
-    "build": "NODE_ENV=production tsup",
-    "bd": "tsup",
-    "dev": "tsup --watch",
+    "build": "NODE_ENV=production tsdown",
+    "bd": "tsdown",
+    "dev": "tsdown --watch",
     "test": "tsx --test tests/*.test.ts",
     "test:dbg": "tsx --inspect-brk --test tests/*.test.ts",
     "release": "changeset publish",
@@ -53,7 +55,7 @@
     "@types/node": "^20.14.9",
     "changesets": "^1.0.2",
     "jsr": "^0.13.2",
-    "tsup": "^8.3.5",
+    "tsdown": "^0.11.12",
     "tsx": "^4.19.2",
     "typescript": "^5.5.3"
   },
