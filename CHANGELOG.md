@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.8.1
+
+### Patch Changes
+
+- 0ef93f7: Update exports for better bun compatibility and tree-shaking
+
 ## 0.8.0
 
 ### Minor Changes
