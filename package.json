@@ -13,11 +13,29 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.cjs",
       "import": "./dist/index.js"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./result": {
+      "require": "./dist/result.cjs",
+      "import": "./dist/result.js",
+      "types": "./dist/result.d.ts"
+    },
+    "./option": {
+      "require": "./dist/option.cjs",
+      "import": "./dist/option.js",
+      "types": "./dist/option.d.ts"
+    },
+    "./match": {
+      "require": "./dist/match.cjs",
+      "import": "./dist/match.js",
+      "types": "./dist/match.d.ts"
     }
   },
-  "files": [
-    "/dist"
-  ],
+  "files": ["/dist"],
   "scope": "@carbonteq",
   "repository": {
     "type": "git",

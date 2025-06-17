@@ -4,7 +4,12 @@
   "publish": {
     "include": ["src", "README.md", "LICENCE", "package.json", "deno.jsonc"]
   },
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./result": "./src/result.ts",
+    "./option": "./src/option.ts",
+    "./match": "./src/match.ts"
+  },
   "imports": {
     "@/": "./src/"
   }
