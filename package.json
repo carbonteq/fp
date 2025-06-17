@@ -9,11 +9,6 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    "node": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
-    },
     ".": {
       "types": "./dist/index.d.ts",
       "require": "./dist/index.cjs",
@@ -35,9 +30,7 @@
       "types": "./dist/match.d.ts"
     }
   },
-  "files": [
-    "/dist"
-  ],
+  "files": ["/dist"],
   "scope": "@carbonteq",
   "repository": {
     "type": "git",
