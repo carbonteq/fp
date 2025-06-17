@@ -1,6 +1,6 @@
 {
   "name": "@carbonteq/fp",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "FP utils",
   "author": "Arslan <rslnkrmt2552@gmail.com>",
   "main": "lib/index.js",
@@ -30,7 +30,9 @@
       "types": "./dist/match.d.ts"
     }
   },
-  "files": ["/dist"],
+  "files": [
+    "/dist"
+  ],
   "scope": "@carbonteq",
   "repository": {
     "type": "git",

@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.8.2
+
+### Patch Changes
+
+- ef4476f: Remove node specific export to fix bun types
+
 ## 0.8.1
 
 ### Patch Changes
