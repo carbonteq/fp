@@ -1,38 +1,57 @@
 {
   "name": "@carbonteq/fp",
-  "version": "0.8.2",
   "description": "FP utils",
-  "author": "Arslan <rslnkrmt2552@gmail.com>",
-  "main": "lib/index.js",
-  "module": "lib/index.mjs",
-  "types": "lib/index.d.ts",
-  "license": "MIT",
+  "version": "0.8.2",
   "type": "module",
+  "files": ["/dist", "dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.js"
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     },
     "./result": {
-      "require": "./dist/result.cjs",
-      "import": "./dist/result.js",
-      "types": "./dist/result.d.ts"
+      "require": {
+        "types": "./dist/result.d.cts",
+        "default": "./dist/result.cjs"
+      },
+      "import": {
+        "types": "./dist/result.d.ts",
+        "default": "./dist/result.js"
+      }
     },
     "./option": {
-      "require": "./dist/option.cjs",
-      "import": "./dist/option.js",
-      "types": "./dist/option.d.ts"
+      "require": {
+        "types": "./dist/option.d.cts",
+        "default": "./dist/option.cjs"
+      },
+      "import": {
+        "types": "./dist/option.d.ts",
+        "default": "./dist/option.js"
+      }
     },
     "./match": {
-      "require": "./dist/match.cjs",
-      "import": "./dist/match.js",
-      "types": "./dist/match.d.ts"
-    }
+      "require": {
+        "types": "./dist/match.d.cts",
+        "default": "./dist/match.cjs"
+      },
+      "import": {
+        "types": "./dist/match.d.ts",
+        "default": "./dist/match.js"
+      }
+    },
+    "./package.json": "./package.json"
   },
-  "files": [
-    "/dist"
-  ],
+  "author": "Arslan <rslnkrmt2552@gmail.com>",
+  "license": "MIT",
   "scope": "@carbonteq",
   "repository": {
     "type": "git",
@@ -54,30 +73,33 @@
     "fmt": "biome format src tests --write",
     "tc": "tsc --pretty --noEmit --project tsconfig.build.json",
     "build": "NODE_ENV=production tsdown",
-    "bd": "tsdown",
-    "dev": "tsdown --watch",
-    "test": "tsx --test tests/*.test.ts",
-    "test:dbg": "tsx --inspect-brk --test tests/*.test.ts",
+    "bd": "bunup",
+    "dev": "bunup --watch",
+    "test": "bun test",
+    "test:node": "tsx --test tests/*.test.ts",
+    "test:dbg": "bun test --inspect",
     "release": "changeset publish",
     "tag": "changeset tag"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.8.3",
-    "@changesets/cli": "^2.27.7",
-    "@microsoft/api-extractor": "^7.47.11",
-    "@swc/core": "^1.9.2",
-    "@tsconfig/node20": "^20.1.4",
-    "@types/node": "^20.14.9",
+    "@biomejs/biome": "^2.2.7",
+    "@changesets/cli": "^2.29.7",
+    "@microsoft/api-extractor": "^7.53.2",
+    "@swc/core": "^1.13.5",
+    "@tsconfig/node20": "^20.1.6",
+    "@types/node": "^20.19.21",
+    "@typescript/native-preview": "^7.0.0-dev.20251022.1",
+    "bunup": "^0.15.6",
     "changesets": "^1.0.2",
-    "jsr": "^0.13.2",
-    "tsdown": "^0.11.12",
-    "tsx": "^4.19.2",
-    "typescript": "^5.5.3"
+    "jsr": "^0.13.5",
+    "oxlint": "^1.24.0",
+    "oxlint-tsgolint": "^0.2.1",
+    "tsdown": "^0.15.6",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0",
-    "yarn": ">=1.22.0"
+    "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@9.13.1+sha512.5ac37545851c55ec58521b6c285db6f848f93ca70889beb4145f5b40fe234e4ea4faee4dad12ac5c139e494374c65d9c3a6ec9a25954378fa286a250e68d2f20"
+  "trustedDependencies": ["@swc/core", "esbuild"]
 }

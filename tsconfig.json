@@ -1,9 +1,9 @@
 {
   "extends": "@tsconfig/node20/tsconfig.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "moduleResolution": "node16",
-    "module": "Node16",
+    "target": "ESNext",
+    "moduleResolution": "bundler",
+    "module": "ESNext",
     "composite": false,
     "declarationMap": true,
     "forceConsistentCasingInFileNames": true,
@@ -32,6 +32,7 @@
     "jest.config.js",
     "dist",
     "tsup.config.ts",
-    "rollup.config.ts"
+    "rollup.config.ts",
+    "*.config.ts"
   ]
 }

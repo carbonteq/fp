@@ -1,6 +1,6 @@
-import { isPromise } from "node:util/types";
 import { setTimeout } from "node:timers/promises";
-import { Option } from "./dist/index.js";
+import { isPromise } from "node:util/types";
+import { Option } from "./dist/option.js";
 
 const print = console.debug;
 

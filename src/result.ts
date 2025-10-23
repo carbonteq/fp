@@ -841,4 +841,11 @@ export class Result<T, E> {
 
     return Result.Ok(vals) as Result<CombinedResultOk<T>, CombinedErrs<T>>;
   }
+
+  flip(): Result<E, T> {
+    const val = this.#val;
+    const errSlot = this.#ctx.errSlot;
+
+    return new Result(errSlot, { errSlot: val });
+  }
 }
