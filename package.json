@@ -82,18 +82,18 @@
     "tag": "changeset tag"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.7",
+    "@biomejs/biome": "^2.3.0",
     "@changesets/cli": "^2.29.7",
-    "@microsoft/api-extractor": "^7.53.2",
+    "@microsoft/api-extractor": "^7.53.3",
     "@swc/core": "^1.13.5",
     "@tsconfig/node20": "^20.1.6",
     "@types/node": "^20.19.21",
-    "@typescript/native-preview": "^7.0.0-dev.20251022.1",
-    "bunup": "^0.15.6",
+    "@typescript/native-preview": "^7.0.0-dev.20251025.1",
+    "bunup": "^0.15.7",
     "changesets": "^1.0.2",
     "jsr": "^0.13.5",
     "oxlint": "^1.24.0",
-    "oxlint-tsgolint": "^0.2.1",
+    "oxlint-tsgolint": "^0.3.0",
     "tsdown": "^0.15.6",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
