@@ -27,7 +27,7 @@ type AsyncFlatPMapper<T, U, E> = (val: T) => Promise<Result<Promise<U>, E>>;
 type OkOrErr = "ok" | "err";
 const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
 const errPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isErr();
-const preds = [okPred, errPred];
+const _preds = [okPred, errPred];
 
 export type UnwrapResult<T extends Result<unknown, unknown>> = T extends Result<
   infer U,
@@ -349,11 +349,11 @@ export class Result<T, E> {
     this: Result<T, E>,
     fn: (val: T) => Result<U, E2>,
   ): Result<U, E | E2>;
-  flatMap<T, U, E2>(
+  flatMap<T, _U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
   ): never;
-  flatMap<T, U, E2>(
+  flatMap<T, _U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E | E2>>,
   ): never;
@@ -563,7 +563,7 @@ export class Result<T, E> {
   }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
-  flatZip<T, U, E2>(
+  flatZip<T, _U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
   ): never;
@@ -583,7 +583,7 @@ export class Result<T, E> {
     this: Result<Promise<T>, E>,
     fn: (val: T) => Result<U, E2>,
   ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
+  flatZip<T, _U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
   ): never;

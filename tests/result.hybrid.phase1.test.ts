@@ -1,5 +1,9 @@
-import { describe, it, expect } from "bun:test";
-import { HybridResult, UnwrappedErrWithOk, UnwrappedOkWithErr } from "../src/result.hybrid";
+import { describe, expect, it } from "bun:test";
+import {
+  HybridResult,
+  UnwrappedErrWithOk,
+  UnwrappedOkWithErr,
+} from "../src/result.hybrid";
 
 describe("Phase 1 - Core Runtime Scaffolding", () => {
   describe("Basic Construction", () => {
@@ -155,7 +159,7 @@ describe("Phase 1 - Core Runtime Scaffolding", () => {
         () => {
           throw "string error";
         },
-        (err) => `Custom: ${err}`
+        (err) => `Custom: ${err}`,
       );
 
       expect(result.isErr()).toBe(true);

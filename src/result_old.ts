@@ -545,5 +545,5 @@ export class Result<T, E> {
   }
 }
 
-const res = Result.Ok([1, 2, 3]);
-const res2 = Result.Ok(123);
+const _res = Result.Ok([1, 2, 3]);
+const _res2 = Result.Ok(123);

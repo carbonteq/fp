@@ -1,16 +1,15 @@
 import { setTimeout } from "node:timers/promises";
-import { isPromise } from "node:util/types";
 import { Option } from "./dist/option.js";
 
 const print = console.debug;
 
 const sq = (n: number) => `sq: ${n}`;
-const asq = async (n: number) => `asq: ${n}`;
+const _asq = async (n: number) => `asq: ${n}`;
 
-const strToNum = (s: string) => s.length;
-const strToNumAsync = async (s: string) => s.length;
+const _strToNum = (s: string) => s.length;
+const _strToNumAsync = async (s: string) => s.length;
 
-const gen = async (n: number) => n;
+const _gen = async (n: number) => n;
 
 // const nonGeneratingPromise: Promise<Option<number>> = Promise.resolve(
 //   Option.None,
@@ -47,6 +46,6 @@ await setTimeout(1000);
 print(o.isNone());
 console.debug(await o.toPromise());
 
-const abc = o.zip((n) => n + 2);
+const _abc = o.zip((n) => n + 2);
 const rr = o.flatMap(leadsToNone);
-const r3 = rr.zip((n) => n + 2);
+const _r3 = rr.zip((n) => n + 2);

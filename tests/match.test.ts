@@ -1,5 +1,5 @@
-import { describe, it, mock, expect } from "bun:test";
-import { Option, Result, matchOpt, matchRes } from "@/index.js";
+import { describe, expect, it, mock } from "bun:test";
+import { matchOpt, matchRes, Option, Result } from "@/index.js";
 
 describe("match Result", () => {
   it("should run Ok handler on Ok values", () => {
@@ -44,7 +44,6 @@ describe("match Option", () => {
     expect(matched).toBe(33);
     expect(spyFn).toHaveBeenCalledTimes(1);
     expect(spyFn).toHaveBeenCalledWith(33);
-
   });
 
   it("should run None handler on empty Option", () => {

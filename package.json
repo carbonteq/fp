@@ -95,7 +95,7 @@
     "jsr": "^0.13.5",
     "knip": "^5.69.0",
     "oxlint": "^1.28.0",
-    "oxlint-tsgolint": "^0.5.1",
+    "oxlint-tsgolint": "^0.6.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },

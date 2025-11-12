@@ -38,9 +38,9 @@ describe("Result.flatMap behavior", () => {
     const mockedDouble = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    expect(mapped.isOk()).toBeTrue()
-    expect(mapped.safeUnwrap()).toBe(4)
-    expect(mockedDouble).toHaveBeenCalledTimes(1)
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
   it("should apply multiple Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async () => {
@@ -49,10 +49,10 @@ describe("Result.flatMap behavior", () => {
     const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    expect(mapped.isOk()).toBeTrue()
-    expect(mapped.safeUnwrap()).toBe(8)
-    expect(mockerA).toHaveBeenCalledTimes(1)
-    expect(mockerB).toHaveBeenCalledTimes(1)
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
   it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<Promise<T>, E>", async () => {
@@ -61,10 +61,10 @@ describe("Result.flatMap behavior", () => {
     const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    expect(mapped.isErr()).toBeTrue()
-    expect(mapped.safeUnwrap()).toBeNull()
-    expect(mockerA).toHaveBeenCalledTimes(1)
-    expect(mockerB).toHaveBeenCalledTimes(0)
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
   it("should apply Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async () => {
@@ -72,9 +72,9 @@ describe("Result.flatMap behavior", () => {
     const mockedDouble = mock(asyncDoubleResPromiseIt);
     const mapped = r.flatMap(mockedDouble);
 
-    expect(mapped.isErr()).toBeTrue()
-    expect(mapped.safeUnwrap()).toBeNull()
-    expect(mockedDouble).toHaveBeenCalledTimes(0)
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
   });
 
   it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async () => {
@@ -83,10 +83,10 @@ describe("Result.flatMap behavior", () => {
     const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    expect(mapped.isErr()).toBeTrue()
-    expect(mapped.safeUnwrap()).toBeNull()
-    expect(mockerA).toHaveBeenCalledTimes(0)
-    expect(mockerB).toHaveBeenCalledTimes(0)
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
   it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, Promise<E>>", async () => {
@@ -211,7 +211,6 @@ describe("Result.flatMap behavior", () => {
     expect(mapped.isErr()).toBeTrue();
     expect(mapped.safeUnwrap()).toBeNull();
     expect(mockedDouble).toHaveBeenCalledTimes(0);
-
   });
 
   it("should apply multiple Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async () => {
@@ -338,7 +337,6 @@ describe("Result.flatMap behavior", () => {
     expect(mapped.safeUnwrap()).toBeNull();
     expect(mockerA).toHaveBeenCalledTimes(0);
     expect(mockerB).toHaveBeenCalledTimes(0);
-
   });
 
   it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
@@ -557,10 +555,9 @@ describe("Result.flatMap behavior", () => {
 
     expect(mapped).toBeInstanceOf(Result);
     expect(mapped).not.toBeInstanceOf(Promise);
-    expect(mapped.isErr()).toBeTrue()
-    expect(mapped.safeUnwrap()).toBeNull()
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
     expect(mockedDouble).toHaveBeenCalledTimes(0);
-
   });
 
   it("should apply multiple Result<T, E> on Result<T, E> correctly", () => {
@@ -654,8 +651,6 @@ describe("Result.flatMap behavior", () => {
       expect(() => r2.unwrap()).toThrow(DummyError);
       expect(mockerA).toHaveBeenCalledTimes(1);
       expect(mockerB).toHaveBeenCalledTimes(1);
-
-
     });
   });
 
@@ -675,13 +670,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P2", async () => {
       const r = Result.Ok(2);
@@ -698,13 +692,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P3", async () => {
       const r = Result.Ok(2);
@@ -721,13 +714,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P4", async () => {
       const r = Result.Ok(2);
@@ -744,13 +736,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P5", async () => {
       const r = Result.Ok(2);
@@ -767,13 +758,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P6", async () => {
       const r = Result.Ok(2);
@@ -790,13 +780,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P7", async () => {
       const r = Result.Ok(2);
@@ -813,13 +802,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P8", async () => {
       const r = Result.Ok(2);
@@ -836,13 +824,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P9", async () => {
       const r = Result.Ok(2);
@@ -859,13 +846,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P10", async () => {
       const r = Result.Ok(2);
@@ -882,13 +868,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P11", async () => {
       const r = Result.Ok(2);
@@ -905,13 +890,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P12", async () => {
       const r = Result.Ok(2);
@@ -928,13 +912,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P13", async () => {
       const r = Result.Ok(2);
@@ -951,13 +934,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P14", async () => {
       const r = Result.Ok(2);
@@ -974,13 +956,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P15", async () => {
       const r = Result.Ok(2);
@@ -997,13 +978,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P16", async () => {
       const r = Result.Ok(2);
@@ -1020,13 +1000,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P17", async () => {
       const r = Result.Ok(2);
@@ -1043,13 +1022,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P18", async () => {
       const r = Result.Ok(2);
@@ -1066,13 +1044,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P19", async () => {
       const r = Result.Ok(2);
@@ -1089,13 +1066,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P20", async () => {
       const r = Result.Ok(2);
@@ -1112,13 +1088,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P21", async () => {
       const r = Result.Ok(2);
@@ -1135,13 +1110,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P22", async () => {
       const r = Result.Ok(2);
@@ -1158,13 +1132,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P23", async () => {
       const r = Result.Ok(2);
@@ -1181,13 +1154,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
     it("P24", async () => {
       const r = Result.Ok(2);
@@ -1204,13 +1176,12 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(32);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-    expect(mockerD).toHaveBeenCalledTimes(1);
-
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(32);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
   });
 });

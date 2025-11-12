@@ -172,7 +172,7 @@ class Result<T, E> {
     return new Result(next, immutableCtx) as Result<U, E>;
   }
 
-  flatMap<T, U, E2>(
+  flatMap<T, _U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
   ): never;
@@ -188,7 +188,7 @@ class Result<T, E> {
     this: Result<Promise<T>, E>,
     fn: (val: T) => Result<U, E | E2>,
   ): Result<Promise<U>, E | E2>;
-  flatMap<T, U, E2>(
+  flatMap<T, _U, E2>(
     this: Result<T, E>,
     fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E | E2>>,
   ): never;
