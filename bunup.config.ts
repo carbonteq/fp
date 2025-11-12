@@ -3,6 +3,7 @@ import { defineConfig } from "bunup";
 const isProd = process.env.NODE_ENV === "production";
 
 export default defineConfig({
+  sourceBase: "./src",
   entry: ["./src/**/*.ts", "!./src/**/*_old.ts"],
   format: ["cjs", "esm"],
   sourcemap: "linked",

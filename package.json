@@ -2,6 +2,16 @@
   "name": "@carbonteq/fp",
   "description": "FP utils",
   "version": "0.8.2",
+  "author": "Arslan <rslnkrmt2552@gmail.com>",
+  "license": "MIT",
+  "scope": "@carbonteq",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carbonteq/fp"
+  },
+  "bugs": {
+    "url": "https://github.com/carbonteq/fp/issues"
+  },
   "type": "module",
   "files": ["/dist", "dist"],
   "main": "./dist/index.cjs",
@@ -50,16 +60,6 @@
     },
     "./package.json": "./package.json"
   },
-  "author": "Arslan <rslnkrmt2552@gmail.com>",
-  "license": "MIT",
-  "scope": "@carbonteq",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/carbonteq/fp"
-  },
-  "bugs": {
-    "url": "https://github.com/carbonteq/fp/issues"
-  },
   "homepage": "https://github.com/carbonteq/fp#readme",
   "sideEffects": false,
   "publishConfig": {
@@ -72,34 +72,35 @@
     "fmt:dry": "biome format src tests",
     "fmt": "biome format src tests --write",
     "tc": "tsc --pretty --noEmit --project tsconfig.build.json",
-    "build": "NODE_ENV=production tsdown",
-    "bd": "bunup",
+    "build": "NODE_ENV=production bunup",
     "dev": "bunup --watch",
     "test": "bun test",
     "test:node": "tsx --test tests/*.test.ts",
     "test:dbg": "bun test --inspect",
     "release": "changeset publish",
-    "tag": "changeset tag"
+    "tag": "changeset tag",
+    "knip": "knip"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.0",
+    "@biomejs/biome": "^2.3.5",
     "@changesets/cli": "^2.29.7",
-    "@microsoft/api-extractor": "^7.53.3",
-    "@swc/core": "^1.13.5",
+    "@microsoft/api-extractor": "^7.55.0",
+    "@swc/core": "^1.15.1",
     "@tsconfig/node20": "^20.1.6",
-    "@types/node": "^20.19.21",
-    "@typescript/native-preview": "^7.0.0-dev.20251025.1",
-    "bunup": "^0.15.7",
+    "@types/node": "^24.10.1",
+    "@typescript/native-preview": "^7.0.0-dev.20251112.1",
+    "bunup": "^0.15.14",
     "changesets": "^1.0.2",
     "jsr": "^0.13.5",
-    "oxlint": "^1.24.0",
-    "oxlint-tsgolint": "^0.3.0",
-    "tsdown": "^0.15.6",
+    "knip": "^5.69.0",
+    "oxlint": "^1.28.0",
+    "oxlint-tsgolint": "^0.5.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
-  "trustedDependencies": ["@swc/core", "esbuild"]
+  "trustedDependencies": [],
+  "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
 }
