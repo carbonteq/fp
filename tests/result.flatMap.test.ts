@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@/result.js";
 
 class DummyError extends Error {
@@ -34,628 +33,640 @@ const asyncErrResPromiseIt = async (
   Result.Err(Promise.resolve(new DummyError()));
 
 describe("Result.flatMap behavior", () => {
-  it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockedDouble = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue()
+    expect(mapped.safeUnwrap()).toBe(4)
+    expect(mockedDouble).toHaveBeenCalledTimes(1)
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(asyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncDoubleResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue()
+    expect(mapped.safeUnwrap()).toBe(8)
+    expect(mockerA).toHaveBeenCalledTimes(1)
+    expect(mockerB).toHaveBeenCalledTimes(1)
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<Promise<T>, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<Promise<T>, E>", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue()
+    expect(mapped.safeUnwrap()).toBeNull()
+    expect(mockerA).toHaveBeenCalledTimes(1)
+    expect(mockerB).toHaveBeenCalledTimes(0)
   });
 
-  it("should apply Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockedDouble = mock(asyncDoubleResPromiseIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue()
+    expect(mapped.safeUnwrap()).toBeNull()
+    expect(mockedDouble).toHaveBeenCalledTimes(0)
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(asyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncDoubleResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue()
+    expect(mapped.safeUnwrap()).toBeNull()
+    expect(mockerA).toHaveBeenCalledTimes(0)
+    expect(mockerB).toHaveBeenCalledTimes(0)
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, Promise<E>>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, Promise<E>>", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(asyncDoubleResIt);
+    const mockedDouble = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(asyncDoubleResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncDoubleResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<Promise<T>, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<Promise<T>, E>", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(asyncDoubleResIt);
+    const mockedDouble = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply multiple Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply multiple Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(asyncDoubleResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncDoubleResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, Promise<E>>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, Promise<E>>", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(doubleResPromiseIt);
+    const mockedDouble = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply multiple Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(doubleResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(doubleResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<Promise<T>, E>", async (t) => {
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<Promise<T>, E>", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(doubleResPromiseIt);
+    const mockedDouble = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
+
   });
 
-  it("should apply multiple Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply multiple Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(doubleResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(doubleResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, Promise<E>>", async (t) => {
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, Promise<E>>", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<T, E> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply Result<T, E> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(doubleResIt);
+    const mockedDouble = mock(doubleResIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Result<T, E> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply multiple Result<T, E> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(doubleResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(doubleResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<Promise<T>, E>", async (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<Promise<T>, E>", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<T, E> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply Result<T, E> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(doubleResIt);
+    const mockedDouble = mock(doubleResIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply multiple Result<T, E> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply multiple Result<T, E> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(doubleResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(doubleResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<T, Promise<E>>", async (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<T, Promise<E>>", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockedDouble = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(asyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncDoubleResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
+
   });
 
-  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockedDouble = mock(asyncDoubleResPromiseIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped).toBeInstanceOf(Result);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(asyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncDoubleResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(asyncDoubleResPromiseIt);
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(asyncDoubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(asyncDoubleResIt);
+    const mockedDouble = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(asyncDoubleResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncDoubleResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(asyncDoubleResIt);
+    const mockedDouble = mock(asyncDoubleResIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped).toBeInstanceOf(Result);
+    expect(mapped).not.toBeInstanceOf(Promise);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(asyncDoubleResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncDoubleResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(asyncDoubleResIt);
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(asyncDoubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(doubleResPromiseIt);
+    const mockedDouble = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockedDouble).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(doubleResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(doubleResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = await r.flatMap(mockerA).flatMap(mockerB).toPromise();
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(doubleResPromiseIt);
+    const mockedDouble = mock(doubleResPromiseIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(doubleResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(doubleResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(doubleResPromiseIt);
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(doubleResPromiseIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(doubleResIt);
+    const mockedDouble = mock(doubleResIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 4);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(mapped).toBeInstanceOf(Result);
+    expect(mapped).not.toBeInstanceOf(Promise);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(4);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply multiple Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(doubleResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(doubleResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isOk());
-    assert.strictEqual(mapped.unwrap(), 8);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(8);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should apply Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(doubleResIt);
+    const mockedDouble = mock(doubleResIt);
     const mapped = r.flatMap(mockedDouble);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(mapped).toBeInstanceOf(Result);
+    expect(mapped).not.toBeInstanceOf(Promise);
+    expect(mapped.isErr()).toBeTrue()
+    expect(mapped.safeUnwrap()).toBeNull()
+    expect(mockedDouble).toHaveBeenCalledTimes(0);
+
   });
 
-  it("should apply multiple Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply multiple Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(doubleResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(doubleResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(doubleResIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(doubleResIt);
     const mapped = r.flatMap(mockerA).flatMap(mockerB);
 
-    assert.ok(mapped.isErr());
-    assert.strictEqual(mapped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(mapped.isErr()).toBeTrue();
+    expect(mapped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerB).toHaveBeenCalledTimes(0);
   });
 
   describe("branching", () => {
-    it("two chained branches of computation should not affect parent or each other", (t) => {
+    it("two chained branches of computation should not affect parent or each other", () => {
       const r = Result.Ok(2);
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(errResIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(errResIt);
       const r1 = r.flatMap(mockerA);
       const r2 = r.flatMap(mockerB);
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(r.unwrap(), 2);
-      assert.strictEqual(r1.unwrap(), 4);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toBe(4);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation should not affect parent or each other (async)", async (t) => {
+    it("two chained branches of computation should not affect parent or each other (async)", async () => {
       const r = Result.Ok(2);
-      const mockerA = t.mock.fn(asyncDoubleResIt);
-      const mockerB = t.mock.fn(asyncErrResIt);
+      const mockerA = mock(asyncDoubleResIt);
+      const mockerB = mock(asyncErrResIt);
       const r1 = await r.flatMap(mockerA).toPromise();
       const r2 = await r.flatMap(mockerB).toPromise();
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(r.unwrap(), 2);
-      assert.strictEqual(r1.unwrap(), 4);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toBe(4);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation from Promise should not affect parent or each other", async (t) => {
+    it("two chained branches of computation from Promise should not affect parent or each other", async () => {
       const r = Result.Ok(Promise.resolve(2));
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(errResIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(errResIt);
       const r1 = await r.flatMap(mockerA).toPromise();
       const r2 = await r.flatMap(mockerB).toPromise();
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(await r.unwrap(), 2);
-      assert.strictEqual(r1.unwrap(), 4);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(await r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toBe(4);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation from Promise should not affect parent or each other (async)", async (t) => {
+    it("two chained branches of computation from Promise should not affect parent or each other (async)", async () => {
       const r = Result.Ok(Promise.resolve(2));
-      const mockerA = t.mock.fn(asyncDoubleResIt);
-      const mockerB = t.mock.fn(asyncErrResIt);
+      const mockerA = mock(asyncDoubleResIt);
+      const mockerB = mock(asyncErrResIt);
       const r1 = await r.flatMap(mockerA).toPromise();
       const r2 = await r.flatMap(mockerB).toPromise();
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(await r.unwrap(), 2);
-      assert.strictEqual(r1.unwrap(), 4);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(await r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toBe(4);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+
+
     });
   });
 
   describe("permutations", () => {
-    it("P1", async (t) => {
+    it("P1", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerA)
@@ -664,20 +675,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P2", async (t) => {
+    it("P2", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerA)
@@ -686,20 +698,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P3", async (t) => {
+    it("P3", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerA)
@@ -708,20 +721,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P4", async (t) => {
+    it("P4", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerA)
@@ -730,20 +744,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P5", async (t) => {
+    it("P5", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerA)
@@ -752,20 +767,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P6", async (t) => {
+    it("P6", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerA)
@@ -774,20 +790,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P7", async (t) => {
+    it("P7", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerB)
@@ -796,20 +813,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P8", async (t) => {
+    it("P8", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerB)
@@ -818,20 +836,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P9", async (t) => {
+    it("P9", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerB)
@@ -840,20 +859,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P10", async (t) => {
+    it("P10", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerB)
@@ -862,20 +882,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P11", async (t) => {
+    it("P11", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerB)
@@ -884,20 +905,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P12", async (t) => {
+    it("P12", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerB)
@@ -906,20 +928,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P13", async (t) => {
+    it("P13", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerC)
@@ -928,20 +951,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P14", async (t) => {
+    it("P14", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerC)
@@ -950,20 +974,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P15", async (t) => {
+    it("P15", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerC)
@@ -972,20 +997,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P16", async (t) => {
+    it("P16", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerC)
@@ -994,20 +1020,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P17", async (t) => {
+    it("P17", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerC)
@@ -1016,20 +1043,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P18", async (t) => {
+    it("P18", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerC)
@@ -1038,20 +1066,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P19", async (t) => {
+    it("P19", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerD)
@@ -1060,20 +1089,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P20", async (t) => {
+    it("P20", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerD)
@@ -1082,20 +1112,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P21", async (t) => {
+    it("P21", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerD)
@@ -1104,20 +1135,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P22", async (t) => {
+    it("P22", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerD)
@@ -1126,20 +1158,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P23", async (t) => {
+    it("P23", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerD)
@@ -1148,20 +1181,21 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
-    it("P24", async (t) => {
+    it("P24", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(doubleResIt);
-      const mockerB = t.mock.fn(asyncDoubleResIt);
-      const mockerC = t.mock.fn(doubleResPromiseIt);
-      const mockerD = t.mock.fn(asyncDoubleResPromiseIt);
+      const mockerA = mock(doubleResIt);
+      const mockerB = mock(asyncDoubleResIt);
+      const mockerC = mock(doubleResPromiseIt);
+      const mockerD = mock(asyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatMap(mockerD)
@@ -1170,12 +1204,13 @@ describe("Result.flatMap behavior", () => {
         .flatMap(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.strictEqual(mapped.unwrap(), 32);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+    expect(mapped.isOk()).toBeTrue();
+    expect(mapped.unwrap()).toBe(32);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mockerC).toHaveBeenCalledTimes(1);
+    expect(mockerD).toHaveBeenCalledTimes(1);
+
     });
   });
 });

@@ -19,7 +19,6 @@
     "declaration": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
       "@": ["./src"],
       "@/*": ["./src/*"],
@@ -27,12 +26,6 @@
       "@carbonteq/hexapp/*": ["./src/*"]
     }
   },
-  "exclude": [
-    "node_modules",
-    "jest.config.js",
-    "dist",
-    "tsup.config.ts",
-    "rollup.config.ts",
-    "*.config.ts"
-  ]
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
 }
