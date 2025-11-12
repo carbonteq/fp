@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid.js";
 
 class DummyError extends Error {
@@ -17,7 +16,7 @@ describe("Hybrid Result.zip", () => {
     const r = Result.Ok(2);
     const zipped = r.zip(double);
 
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
+    expect(zipped.unwrap()).toEqual([2, 4]);
   });
 
   it("promotes to async when mapper returns a promise", async () => {
@@ -25,8 +24,8 @@ describe("Hybrid Result.zip", () => {
     const zipped = r.zip(asyncDouble);
 
     const value = zipped.unwrap();
-    assert.ok(value instanceof Promise);
-    assert.deepStrictEqual(await value, [2, 4]);
+    expect(value).toBeInstanceOf(Promise);
+    expect(await value).toEqual([2, 4]);
   });
 
   it("propagates Err without invoking mapper", () => {
@@ -34,7 +33,7 @@ describe("Hybrid Result.zip", () => {
     const r = Result.Err(err);
     const zipped = r.zip(double);
 
-    assert.strictEqual(zipped.unwrapErr(), err);
+    expect(zipped.unwrapErr()).toBe(err);
   });
 });
 
@@ -43,7 +42,7 @@ describe("Hybrid Result.flatZip", () => {
     const r = Result.Ok(2);
     const zipped = r.flatZip((n) => Result.Ok(n * 3));
 
-    assert.deepStrictEqual(zipped.unwrap(), [2, 6]);
+    expect(zipped.unwrap()).toEqual([2, 6]);
   });
 
   it("promotes to async when mapper returns async Result", async () => {
@@ -51,15 +50,15 @@ describe("Hybrid Result.flatZip", () => {
     const zipped = r.flatZip(async (n) => Result.Ok(n * 3));
 
     const value = zipped.unwrap();
-    assert.ok(value instanceof Promise);
-    assert.deepStrictEqual(await value, [2, 6]);
+    expect(value).toBeInstanceOf(Promise);
+    expect(await value).toEqual([2, 6]);
   });
 
   it("propagates mapper Err", () => {
     const r = Result.Ok(2);
     const zipped = r.flatZip(() => Result.Err(new DummyError()));
 
-    assert.ok(zipped.isErr());
-    assert.ok(zipped.unwrapErr() instanceof DummyError);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.unwrapErr()).toBeInstanceOf(DummyError);
   });
 });

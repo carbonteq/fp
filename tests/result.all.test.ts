@@ -1,5 +1,4 @@
-import assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { Result } from "@/result.js";
 
 const asyncErrResIt = async (n: number): Promise<Result<number, number>> =>
@@ -15,8 +14,8 @@ describe("Result.all behavior", () => {
 
     const combined = Result.all(r1, r2, r3, r4, r5);
 
-    assert.ok(combined.isOk());
-    assert.deepStrictEqual(combined.unwrap(), [1, 2, 3, 4, 5]);
+    expect(combined.isOk()).toBeTrue();
+    expect(combined.unwrap()).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("should combine all Err values", () => {
@@ -28,8 +27,8 @@ describe("Result.all behavior", () => {
 
     const combined = Result.all(r1, r2, r3, r4, r5);
 
-    assert.ok(combined.isErr());
-    assert.deepStrictEqual(combined.unwrapErr(), [1, 2, 3, 4, 5]);
+    expect(combined.isErr()).toBeTrue();
+    expect(combined.unwrapErr()).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("should return Err values if even one exists", () => {
@@ -41,8 +40,8 @@ describe("Result.all behavior", () => {
 
     const combined = Result.all(r1, r2, r3, r4, r5);
 
-    assert.ok(combined.isErr());
-    assert.deepStrictEqual(combined.unwrapErr(), [5]);
+    expect(combined.isErr()).toBeTrue();
+    expect(combined.unwrapErr()).toEqual([5]);
   });
 
   it("should return Err values if even one exists async", async () => {
@@ -54,8 +53,8 @@ describe("Result.all behavior", () => {
 
     const combined = await Result.all(r1, r2, r3, r4, r5).toPromise();
 
-    assert.ok(combined.isErr());
-    assert.deepStrictEqual(combined.unwrapErr(), [5]);
+    expect(combined.isErr()).toBeTrue();
+    expect(combined.unwrapErr()).toEqual([5]);
   });
 
   it("should combine sync and async values", async () => {
@@ -67,8 +66,8 @@ describe("Result.all behavior", () => {
 
     const combined = await Result.all(r1, r2, r3, r4, r5).toPromise();
 
-    assert.ok(combined.isOk());
-    assert.deepStrictEqual(combined.unwrap(), [1, 2, 3, 4, 5]);
+    expect(combined.isOk()).toBeTrue();
+    expect(combined.unwrap()).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("should combine sync and async errors", async () => {
@@ -80,7 +79,7 @@ describe("Result.all behavior", () => {
 
     const combined = await Result.all(r1, r2, r3, r4, r5).toPromise();
 
-    assert.ok(combined.isErr());
-    assert.deepStrictEqual(combined.unwrapErr(), [1, 2, 3, 4, 5]);
+    expect(combined.isErr()).toBeTrue();
+    expect(combined.unwrapErr()).toEqual([1, 2, 3, 4, 5]);
   });
 });

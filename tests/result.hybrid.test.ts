@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import {
   Result,
   UnwrappedErrWithOk,
@@ -17,25 +16,25 @@ describe("Hybrid Result construction", () => {
   it("creates an Ok result synchronously", () => {
     const r = Result.Ok(42);
 
-    assert.strictEqual(r.unwrap(), 42);
-    assert.strictEqual(r.isOk(), true);
-    assert.strictEqual(r.isErr(), false);
+    expect(r.unwrap()).toBe(42);
+    expect(r.isOk()).toBeTrue();
+    expect(r.isErr()).toBeFalse();
   });
 
   it("creates an Err result synchronously", () => {
     const r = Result.Err(new DummyError());
 
-    assert.throws(() => r.unwrap(), DummyError);
-    assert.strictEqual(r.isOk(), false);
-    assert.strictEqual(r.isErr(), true);
+    expect(() => r.unwrap()).toThrow(DummyError);
+    expect(r.isOk()).toBeFalse();
+    expect(r.isErr()).toBeTrue();
   });
 
   it("wraps async Ok values and exposes them via promises", async () => {
     const r = Result.Ok(Promise.resolve(21));
 
     const asyncValue = r.unwrap();
-    assert.ok(asyncValue instanceof Promise);
-    assert.strictEqual(await asyncValue, 21);
+    expect(asyncValue).toBeInstanceOf(Promise);
+    expect(await asyncValue).toBe(21);
   });
 
   it("wraps async Err values and exposes them via promises", async () => {
@@ -43,9 +42,9 @@ describe("Hybrid Result construction", () => {
     const r = Result.Err(Promise.resolve(err));
 
     const asyncErr = r.unwrapErr();
-    assert.ok(asyncErr instanceof Promise);
-    await assert.rejects(async () => r.unwrap(), DummyError);
-    assert.strictEqual(await asyncErr, err);
+    expect(asyncErr).toBeInstanceOf(Promise);
+    await expect(async () => r.unwrap()).rejects.toThrow(DummyError);
+    expect(await asyncErr).toBe(err);
   });
 });
 
@@ -53,26 +52,26 @@ describe("Hybrid Result unwrapping behaviour", () => {
   it("throws UnwrappedOkWithErr when unwrapping Err synchronously", () => {
     const r = Result.Err("boom");
 
-    assert.throws(() => r.unwrap(), UnwrappedOkWithErr);
+    expect(() => r.unwrap()).toThrow(UnwrappedOkWithErr);
   });
 
   it("throws UnwrappedErrWithOk when unwrapping Ok error synchronously", () => {
     const r = Result.Ok("ok");
 
-    assert.throws(() => r.unwrapErr(), UnwrappedErrWithOk);
+    expect(() => r.unwrapErr()).toThrow(UnwrappedErrWithOk);
   });
 
   it("safeUnwrap returns null for Err", () => {
     const r = Result.Err(new DummyError());
 
-    assert.strictEqual(r.safeUnwrap(), null);
+    expect(r.safeUnwrap()).toBeNull();
   });
 
   it("toPromise resolves to a settled Result", async () => {
     const r = Result.Ok(Promise.resolve(10));
     const settled = await r.toPromise();
 
-    assert.strictEqual(settled.unwrap(), 10);
+    expect(settled.unwrap()).toBe(10);
   });
 
   it("toPromise preserves Err state", async () => {
@@ -80,7 +79,7 @@ describe("Hybrid Result unwrapping behaviour", () => {
     const r = Result.Err(Promise.resolve(err));
     const settled = await r.toPromise();
 
-    assert.strictEqual(settled.unwrapErr(), err);
+    expect(settled.unwrapErr()).toBe(err);
   });
 });
 
@@ -88,14 +87,14 @@ describe("Hybrid Result flip", () => {
   it("flips synchronous values", () => {
     const r = Result.Ok(1).flip();
 
-    assert.strictEqual(r.unwrapErr(), 1);
+    expect(r.unwrapErr()).toBe(1);
   });
 
   it("flips asynchronous values", async () => {
     const r = Result.Ok(Promise.resolve(5)).flip();
 
-    await assert.rejects(async () => r.unwrap(), UnwrappedOkWithErr);
+    expect(async () => r.unwrap()).rejects.toThrow(UnwrappedOkWithErr);
     const errVal = await r.unwrapErr();
-    assert.strictEqual(errVal, 5);
+    expect(errVal).toBe(5);
   });
 });

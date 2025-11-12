@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { afterEach, describe, it } from "node:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid.js";
 
 describe("Hybrid Result error mapper", () => {
@@ -22,7 +21,7 @@ describe("Hybrid Result error mapper", () => {
     });
 
     const err = res.unwrapErr();
-    assert.ok(err instanceof Error);
-    assert.strictEqual(err.message, "boom");
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("boom");
   });
 });

@@ -10,6 +10,7 @@
     "ignoreUnknown": false,
     "includes": [
       "./src/**/*.ts",
+      "./tests/**/*.ts",
       "./*.{json,js,jsonc,ts}",
       "!dist",
       "!node_modules"

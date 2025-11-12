@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@/result.js";
 
 class DummyError extends Error {
@@ -11,14 +10,18 @@ class DummyError extends Error {
 
 const doubleIt = (n: number) => n * 2;
 
-const errResIt = (_n: number) => Result.Err(new DummyError());
+const errResIt = <A>(_n: number): Result<A, DummyError> =>
+  Result.Err(new DummyError());
 
-const asyncErrResIt = async (_n: number) => Result.Err(new DummyError());
+const asyncErrResIt = async <A>(_n: number): Promise<Result<A, DummyError>> =>
+  Result.Err(new DummyError());
 
-const errResPromiseIt = (_n: number) =>
+const errResPromiseIt = <A>(_n: number): Result<A, Promise<DummyError>> =>
   Result.Err(Promise.resolve(new DummyError()));
 
-const asyncErrResPromiseIt = async (_n: number) =>
+const asyncErrResPromiseIt = async <A>(
+  _n: number,
+): Promise<Result<A, Promise<DummyError>>> =>
   Result.Err(Promise.resolve(new DummyError()));
 
 type NestedTuple<T> = T | [NestedTuple<T>, NestedTuple<T>];
@@ -63,20 +66,233 @@ const tupleAsyncDoubleResPromiseIt = async (
 };
 
 describe("Result.flatZip behavior", () => {
-  it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockedDouble = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockerA = mock(tupleAsyncDoubleResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
+      [2, 4],
+      [4, 8],
+    ]);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+  });
+
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<Promise<T>, E>", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should apply Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockedDouble = mock(tupleAsyncDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockedDouble).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
+  });
+
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockerA = mock(tupleAsyncDoubleResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, Promise<E>>", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should apply Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockedDouble = mock(tupleAsyncDoubleResIt);
+    const zipped = await r.flatZip(mockedDouble).toPromise();
+
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
+  });
+
+  it("should apply multiple Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockerA = mock(tupleAsyncDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
+      [2, 4],
+      [4, 8],
+    ]);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+  });
+
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<Promise<T>, E>", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(tupleDoubleResIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should apply Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockedDouble = mock(tupleAsyncDoubleResIt);
+    const zipped = await r.flatZip(mockedDouble).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
+  });
+
+  it("should apply multiple Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockerA = mock(tupleAsyncDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, Promise<E>>", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(tupleDoubleResIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should apply Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockedDouble = mock(tupleDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockedDouble).toPromise();
+
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
+  });
+
+  it("should apply multiple Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockerA = mock(tupleDoubleResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
+      [2, 4],
+      [4, 8],
+    ]);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+  });
+
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<Promise<T>, E>", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should apply Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockedDouble = mock(tupleDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockedDouble).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
+  });
+
+  it("should apply multiple Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockerA = mock(tupleDoubleResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, Promise<E>>", async () => {
+    const r = Result.Err(Promise.resolve(new DummyError()));
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
+    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
+
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+
+  it("should apply Result<T, E> on Result<Promise<T>, E> correctly", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockedDouble = mock(tupleDoubleResIt);
+    const zipped = await r.flatZip(mockedDouble).toPromise();
+
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
+  });
+
+  it("should apply multiple Result<T, E> on Result<Promise<T>, E> correctly", async () => {
+    const r = Result.Ok(Promise.resolve(2));
+    const mockerA = mock(tupleDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
     assert.ok(zipped.isOk());
@@ -88,234 +304,21 @@ describe("Result.flatZip behavior", () => {
     assert.strictEqual(mockerB.mock.callCount(), 1);
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<Promise<T>, E>", async (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<Promise<T>, E>", async () => {
     const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply Result<T, E> on Result<T, Promise<E>> correctly", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockedDouble).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
-  });
-
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, Promise<E>> correctly", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, Promise<E>>", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should apply Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResIt);
-    const zipped = await r.flatZip(mockedDouble).toPromise();
-
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
-  });
-
-  it("should apply multiple Promise<Result<T, E>> on Result<Promise<T>, E> correctly", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
-      [2, 4],
-      [4, 8],
-    ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
-  });
-
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<Promise<T>, E>", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should apply Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResIt);
-    const zipped = await r.flatZip(mockedDouble).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
-  });
-
-  it("should apply multiple Promise<Result<T, E>> on Result<T, Promise<E>> correctly", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, Promise<E>>", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should apply Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(tupleDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockedDouble).toPromise();
-
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
-  });
-
-  it("should apply multiple Result<Promise<T>, E> on Result<Promise<T>, E> correctly", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(tupleDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
-      [2, 4],
-      [4, 8],
-    ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
-  });
-
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<Promise<T>, E>", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should apply Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(tupleDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockedDouble).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
-  });
-
-  it("should apply multiple Result<Promise<T>, E> on Result<T, Promise<E>> correctly", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(tupleDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, Promise<E>>", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should apply Result<T, E> on Result<Promise<T>, E> correctly", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockedDouble = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockedDouble).toPromise();
-
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
-  });
-
-  it("should apply multiple Result<T, E> on Result<Promise<T>, E> correctly", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(tupleDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
-      [2, 4],
-      [4, 8],
-    ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
-  });
-
-  it("should short-circuit correctly applying Result<T, E> on Result<Promise<T>, E>", async (t) => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
-    const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
-
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
-  });
-
-  it("should apply Result<T, E> on Result<T, Promise<E>> correctly", async (t) => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockedDouble = t.mock.fn(tupleDoubleResIt);
+    const mockedDouble = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockedDouble);
 
     assert.ok(zipped.isErr());
@@ -323,381 +326,381 @@ describe("Result.flatZip behavior", () => {
     assert.strictEqual(mockedDouble.mock.callCount(), 0);
   });
 
-  it("should apply multiple Result<T, E> on Result<T, Promise<E>> correctly", async (t) => {
+  it("should apply multiple Result<T, E> on Result<T, Promise<E>> correctly", () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(tupleDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
+    const mockerA = mock(tupleDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockerA).flatZip(mockerB);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<T, Promise<E>>", async (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<T, Promise<E>>", async () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockedDouble = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockerA = mock(tupleAsyncDoubleResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
       [2, 4],
       [4, 8],
     ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockedDouble = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = r.flatZip(mockedDouble);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
   });
 
-  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<Promise<T>, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(tupleAsyncDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockerA = mock(tupleAsyncDoubleResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<Promise<T>, E>> on Result<T, E>", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(asyncErrResPromiseIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+    const mockerA = mock(asyncErrResPromiseIt);
+    const mockerB = mock(tupleAsyncDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResIt);
+    const mockedDouble = mock(tupleAsyncDoubleResIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
+    const mockerA = mock(tupleAsyncDoubleResIt);
+    const mockerB = mock(tupleAsyncDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
       [2, 4],
       [4, 8],
     ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(tupleAsyncDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(tupleAsyncDoubleResIt);
+    const mockedDouble = mock(tupleAsyncDoubleResIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
   });
 
-  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Promise<Result<T, E>> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
+    const mockerA = mock(tupleAsyncDoubleResIt);
+    const mockerB = mock(tupleAsyncDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Promise<Result<T, E>> on Result<T, E>", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(asyncErrResIt);
-    const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
+    const mockerA = mock(asyncErrResIt);
+    const mockerB = mock(tupleAsyncDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(tupleDoubleResPromiseIt);
+    const mockedDouble = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(tupleDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
+    const mockerA = mock(tupleDoubleResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
       [2, 4],
       [4, 8],
     ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(tupleDoubleResPromiseIt);
+    const mockedDouble = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
   });
 
-  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async (t) => {
+  it("should apply multiple Result<Promise<T>, E> on Result<T, E> correctly", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(tupleDoubleResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
+    const mockerA = mock(tupleDoubleResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async (t) => {
+  it("should short-circuit correctly applying Result<Promise<T>, E> on Result<T, E>", async () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(errResPromiseIt);
-    const mockerB = t.mock.fn(tupleDoubleResPromiseIt);
+    const mockerA = mock(errResPromiseIt);
+    const mockerB = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Ok(2);
-    const mockedDouble = t.mock.fn(tupleDoubleResIt);
+    const mockedDouble = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockedDouble);
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [2, 4]);
-    assert.strictEqual(mockedDouble.mock.callCount(), 1);
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([2, 4]);
+    expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
 
-  it("should apply multiple Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply multiple Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(tupleDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
+    const mockerA = mock(tupleDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockerA).flatZip(mockerB);
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
       [2, 4],
       [4, 8],
     ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", () => {
     const r = Result.Ok(2);
-    const mockerA = t.mock.fn(errResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
+    const mockerA = mock(errResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockerA).flatZip(mockerB);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should apply Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Err(new DummyError());
-    const mockedDouble = t.mock.fn(tupleDoubleResIt);
+    const mockedDouble = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockedDouble);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
   });
 
-  it("should apply multiple Result<T, E> on Result<T, E> correctly", (t) => {
+  it("should apply multiple Result<T, E> on Result<T, E> correctly", () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(tupleDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
+    const mockerA = mock(tupleDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockerA).flatZip(mockerB);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", (t) => {
+  it("should short-circuit correctly applying Result<T, E> on Result<T, E>", () => {
     const r = Result.Err(new DummyError());
-    const mockerA = t.mock.fn(tupleDoubleResIt);
-    const mockerB = t.mock.fn(tupleDoubleResIt);
+    const mockerA = mock(tupleDoubleResIt);
+    const mockerB = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockerA).flatZip(mockerB);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockerA.mock.callCount(), 0);
-    assert.strictEqual(mockerB.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
   });
 
   describe("branching", () => {
-    it("two chained branches of computation should not affect parent or each other", (t) => {
+    it("two chained branches of computation should not affect parent or each other", () => {
       const r = Result.Ok(2);
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(errResIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(errResIt);
       const r1 = r.flatZip(mockerA);
       const r2 = r.flatZip(mockerB);
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(r.unwrap(), 2);
-      assert.deepStrictEqual(r1.unwrap(), [2, 4]);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toEqual([2, 4]);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation should not affect parent or each other (async)", async (t) => {
+    it("two chained branches of computation should not affect parent or each other (async)", async () => {
       const r = Result.Ok(2);
-      const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerB = t.mock.fn(asyncErrResIt);
+      const mockerA = mock(tupleAsyncDoubleResIt);
+      const mockerB = mock(asyncErrResIt);
       const r1 = await r.flatZip(mockerA).toPromise();
       const r2 = await r.flatZip(mockerB).toPromise();
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(r.unwrap(), 2);
-      assert.deepStrictEqual(r1.unwrap(), [2, 4]);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toEqual([2, 4]);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation from Promise should not affect parent or each other", async (t) => {
+    it("two chained branches of computation from Promise should not affect parent or each other", async () => {
       const r = Result.Ok(Promise.resolve(2));
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(errResIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(errResIt);
       const r1 = await r.flatZip(mockerA).toPromise();
       const r2 = await r.flatZip(mockerB).toPromise();
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(await r.unwrap(), 2);
-      assert.deepStrictEqual(r1.unwrap(), [2, 4]);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(await r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toEqual([2, 4]);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation from Promise should not affect parent or each other (async)", async (t) => {
+    it("two chained branches of computation from Promise should not affect parent or each other (async)", async () => {
       const r = Result.Ok(Promise.resolve(2));
-      const mockerA = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerB = t.mock.fn(asyncErrResIt);
+      const mockerA = mock(tupleAsyncDoubleResIt);
+      const mockerB = mock(asyncErrResIt);
       const r1 = await r.flatZip(mockerA).toPromise();
       const r2 = await r.flatZip(mockerB).toPromise();
 
-      assert.ok(r.isOk());
-      assert.ok(r1.isOk());
-      assert.ok(r2.isErr());
-      assert.strictEqual(await r.unwrap(), 2);
-      assert.deepStrictEqual(r1.unwrap(), [2, 4]);
-      assert.throws(() => r2.unwrap(), DummyError);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
+      expect(r.isOk()).toBeTrue();
+      expect(r1.isOk()).toBeTrue();
+      expect(r2.isErr()).toBeTrue();
+      expect(await r.unwrap()).toBe(2);
+      expect(r1.unwrap()).toEqual([2, 4]);
+      expect(() => r2.unwrap()).toThrow(DummyError);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -724,13 +727,14 @@ describe("Result.flatZip behavior", () => {
         ],
       ],
     ];
-    it("P1", async (t) => {
+
+    it("P1", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerA)
@@ -739,20 +743,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P2", async (t) => {
+
+    it("P2", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerA)
@@ -761,20 +766,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P3", async (t) => {
+
+    it("P3", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerA)
@@ -783,20 +789,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P4", async (t) => {
+
+    it("P4", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerA)
@@ -805,20 +812,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P5", async (t) => {
+
+    it("P5", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerA)
@@ -827,20 +835,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P6", async (t) => {
+
+    it("P6", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerA)
@@ -849,20 +858,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P7", async (t) => {
+
+    it("P7", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerB)
@@ -871,20 +881,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P8", async (t) => {
+
+    it("P8", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerB)
@@ -893,20 +904,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P9", async (t) => {
+
+    it("P9", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerB)
@@ -915,20 +927,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P10", async (t) => {
+    it("P10", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerB)
@@ -937,20 +949,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P11", async (t) => {
+    it("P11", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerB)
@@ -959,20 +971,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P12", async (t) => {
+    it("P12", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerB)
@@ -981,20 +993,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P13", async (t) => {
+
+    it("P13", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerC)
@@ -1003,20 +1016,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P14", async (t) => {
+
+    it("P14", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerC)
@@ -1025,20 +1039,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P15", async (t) => {
+    it("P15", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerC)
@@ -1047,20 +1061,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerD)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P16", async (t) => {
+    it("P16", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerC)
@@ -1069,20 +1083,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P17", async (t) => {
+    it("P17", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerC)
@@ -1091,20 +1105,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P18", async (t) => {
+
+    it("P18", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerC)
@@ -1113,20 +1128,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P19", async (t) => {
+
+    it("P19", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerD)
@@ -1135,20 +1151,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P20", async (t) => {
+    it("P20", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerD)
@@ -1157,20 +1173,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P21", async (t) => {
+
+    it("P21", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerD)
@@ -1179,20 +1196,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P22", async (t) => {
+    it("P22", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerD)
@@ -1201,20 +1218,20 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerA)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P23", async (t) => {
+    it("P23", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerD)
@@ -1223,20 +1240,21 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerB)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
-    it("P24", async (t) => {
+
+    it("P24", async () => {
       const r = Result.Ok(2);
 
-      const mockerA = t.mock.fn(tupleDoubleResIt);
-      const mockerB = t.mock.fn(tupleAsyncDoubleResIt);
-      const mockerC = t.mock.fn(tupleDoubleResPromiseIt);
-      const mockerD = t.mock.fn(tupleAsyncDoubleResPromiseIt);
+      const mockerA = mock(tupleDoubleResIt);
+      const mockerB = mock(tupleAsyncDoubleResIt);
+      const mockerC = mock(tupleDoubleResPromiseIt);
+      const mockerD = mock(tupleAsyncDoubleResPromiseIt);
 
       const mapped = await r
         .flatZip(mockerD)
@@ -1245,12 +1263,12 @@ describe("Result.flatZip behavior", () => {
         .flatZip(mockerC)
         .toPromise();
 
-      assert.ok(mapped.isOk());
-      assert.deepStrictEqual(mapped.unwrap(), permResult);
-      assert.strictEqual(mockerA.mock.callCount(), 1);
-      assert.strictEqual(mockerB.mock.callCount(), 1);
-      assert.strictEqual(mockerC.mock.callCount(), 1);
-      assert.strictEqual(mockerD.mock.callCount(), 1);
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toEqual(permResult);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+      expect(mockerC).toHaveBeenCalledTimes(1);
+      expect(mockerD).toHaveBeenCalledTimes(1);
     });
   });
 });

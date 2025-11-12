@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid.js";
 
 class DummyError extends Error {
@@ -17,7 +16,7 @@ describe("Hybrid Result.map", () => {
     const r = Result.Ok(2);
     const mapped = r.map(double);
 
-    assert.strictEqual(mapped.unwrap(), 4);
+    expect(mapped.unwrap()).toBe(4);
   });
 
   it("promotes to async when mapper returns a promise", async () => {
@@ -25,8 +24,8 @@ describe("Hybrid Result.map", () => {
     const mapped = r.map(asyncDouble);
 
     const result = mapped.unwrap();
-    assert.ok(result instanceof Promise);
-    assert.strictEqual(await result, 4);
+    expect(result).toBeInstanceOf(Promise);
+    expect(await result).toBe(4);
   });
 
   it("remains async when initial value is async", async () => {
@@ -34,8 +33,8 @@ describe("Hybrid Result.map", () => {
     const mapped = r.map(double);
 
     const result = mapped.unwrap();
-    assert.ok(result instanceof Promise);
-    assert.strictEqual(await result, 6);
+    expect(result).toBeInstanceOf(Promise);
+    expect(await result).toBe(6);
   });
 
   it("propagates Err without invoking mapper", () => {
@@ -44,7 +43,7 @@ describe("Hybrid Result.map", () => {
     const r = Result.Err(err);
     const mapped = r.map(mapper);
 
-    assert.strictEqual(mapped.unwrapErr(), err);
+    expect(mapped.unwrapErr()).toBe(err);
   });
 
   it("captures synchronous exceptions thrown by mapper", () => {
@@ -54,7 +53,7 @@ describe("Hybrid Result.map", () => {
       throw err;
     });
 
-    assert.strictEqual(mapped.unwrapErr(), err);
+    expect(mapped.unwrapErr()).toBe(err);
   });
 
   it("captures rejections from async mapper", async () => {
@@ -65,7 +64,7 @@ describe("Hybrid Result.map", () => {
     });
 
     const asyncResult = mapped.unwrapErr();
-    assert.ok(asyncResult instanceof Promise);
-    assert.strictEqual(await asyncResult, err);
+    expect(asyncResult).toBeInstanceOf(Promise);
+    await expect(asyncResult).resolves.toBe(err);
   });
 });

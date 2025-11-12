@@ -1,5 +1,4 @@
-import * as assert from "node:assert";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid.js";
 
 class DummyError extends Error {
@@ -13,14 +12,14 @@ describe("Hybrid Result.all", () => {
   it("combines synchronous Ok results", () => {
     const combined = Result.all(Result.Ok(1), Result.Ok(2), Result.Ok(3));
 
-    assert.deepStrictEqual(combined.unwrap(), [1, 2, 3]);
+    expect(combined.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("returns Err when any result fails", () => {
     const err = new DummyError();
     const combined = Result.all(Result.Ok(1), Result.Err(err), Result.Ok(3));
 
-    assert.deepStrictEqual(combined.unwrapErr(), [err]);
+    expect(combined.unwrapErr()).toEqual([err]);
   });
 
   it("handles async participants without rejecting", async () => {
@@ -32,15 +31,15 @@ describe("Hybrid Result.all", () => {
     );
 
     const settled = combined.unwrap();
-    assert.ok(settled instanceof Promise);
-    await assert.rejects(async () => settled, (received) => {
-      assert.ok(received instanceof DummyError || Array.isArray(received));
-      return true;
-    });
+    expect(settled).toBeInstanceOf(Promise);
+
+    await expect(async () => {
+      await settled;
+    }).rejects.toThrow();
 
     const aggregated = await combined.toPromise();
-    assert.ok(aggregated.isErr());
-    assert.deepStrictEqual(aggregated.unwrapErr(), [err]);
+    expect(aggregated.isErr()).toBeTrue();
+    expect(aggregated.unwrapErr()).toEqual([err]);
   });
 });
 
@@ -54,13 +53,13 @@ describe("Hybrid Result.validate", () => {
   it("returns original value when all validators pass", () => {
     const res = Result.Ok(10).validate([valueValidator, asyncValidator]);
 
-    assert.strictEqual(res.unwrap(), 10);
+    expect(res.unwrap()).toBe(10);
   });
 
   it("collects validation errors", () => {
     const res = Result.Ok(-5).validate([valueValidator, asyncValidator]);
 
-    assert.ok(res.isErr());
-    assert.deepStrictEqual(res.unwrapErr(), ["invalid"]);
+    expect(res.isErr()).toBeTrue();
+    expect(res.unwrapErr()).toEqual(["invalid"]);
   });
 });
