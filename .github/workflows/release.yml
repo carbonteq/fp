@@ -17,27 +17,24 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
+          bun-version: latest
 
       - name: Install Dependencies
-        run: pnpm install
+        run: bun install
 
       - name: Build
-        run: pnpm build
+        run: bun run build
 
       - name: Create Release PR or Publish Packages
         uses: changesets/action@v1
         id: changesets
         with:
-          title: "🦋 Changeset release"
-          commit: "chore(changeset): release"
-          publish: pnpm tag
+          title: '🦋 Changeset release'
+          commit: 'chore(changeset): release'
+          publish: bun run tag
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,7 +44,7 @@ jobs:
         run: node sync_versions.mjs
       - name: Format deno.jsonc
         if: steps.changesets.outputs.published == 'true'
-        run: pnpm biome format deno.jsonc --write
+        run: bun run fmt
       - name: Commit updated deno.jsonc
         if: steps.changesets.outputs.published == 'true'
         uses: stefanzweifel/git-auto-commit-action@v5
