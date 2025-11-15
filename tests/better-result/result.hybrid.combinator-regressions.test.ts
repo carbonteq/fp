@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { Result } from "@/result.hybrid";
+import { ExperimentalResult as Result } from "@/result.hybrid";
 
 describe("HybridResult combinator regressions", () => {
   afterEach(() => {

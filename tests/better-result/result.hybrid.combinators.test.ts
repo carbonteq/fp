@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { HybridResult } from "@/result.hybrid";
+import { ExperimentalResult as Result } from "@/result.hybrid";
 import { expectSyncValue } from "../testUtils";
 
 describe("Combinators & Helpers", () => {
   describe("map", () => {
     it("should map sync Ok results without promoting to async", () => {
-      const result = HybridResult.Ok(42).map((x) => x * 2);
+      const result = Result.Ok(42).map((x) => x * 2);
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe(84);
@@ -13,7 +13,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should promote to async when mapper returns promise", async () => {
-      const result = HybridResult.Ok(42).map((x) => Promise.resolve(x * 2));
+      const result = Result.Ok(42).map((x) => Promise.resolve(x * 2));
 
       expect(result.toString()).toBe("Result::Promise<...>");
       const unwrapped = await result.unwrap();
@@ -21,7 +21,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle exceptions in mapper", () => {
-      const result = HybridResult.Ok<number, Error>(42).map(() => {
+      const result = Result.Ok<number, Error>(42).map(() => {
         throw new Error("mapper error");
       });
 
@@ -32,16 +32,14 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should propagate Err results without calling mapper", () => {
-      const result = HybridResult.Err<string, number>("error").map(
-        (x) => x * 2,
-      );
+      const result = Result.Err<string, number>("error").map((x) => x * 2);
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe("error");
     });
 
     it("should handle async Err results with map", async () => {
-      const result = HybridResult.Err(Promise.resolve("async error")).map(
+      const result = Result.Err(Promise.resolve("async error")).map(
         (x) => x * 2,
       );
 
@@ -53,33 +51,31 @@ describe("Combinators & Helpers", () => {
 
   describe("flatMap", () => {
     it("should flatMap sync results", () => {
-      const result = HybridResult.Ok(42).flatMap((x) => HybridResult.Ok(x * 2));
+      const result = Result.Ok(42).flatMap((x) => Result.Ok(x * 2));
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe(84);
     });
 
     it("should handle Err results in flatMap", () => {
-      const result = HybridResult.Ok(42).flatMap(() =>
-        HybridResult.Err("flatMap error"),
-      );
+      const result = Result.Ok(42).flatMap(() => Result.Err("flatMap error"));
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe("flatMap error");
     });
 
     it("should chain multiple flatMap operations", () => {
-      const result = HybridResult.Ok(42)
-        .flatMap((x) => HybridResult.Ok(x.toString()))
-        .flatMap((s) => HybridResult.Ok(s.length));
+      const result = Result.Ok(42)
+        .flatMap((x) => Result.Ok(x.toString()))
+        .flatMap((s) => Result.Ok(s.length));
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe(2);
     });
 
     it("should promote to async with async mappers", async () => {
-      const result = HybridResult.Ok(42).flatMap((x) =>
-        Promise.resolve(HybridResult.Ok(x * 2)),
+      const result = Result.Ok(42).flatMap((x) =>
+        Promise.resolve(Result.Ok(x * 2)),
       );
 
       expect(result.toString()).toBe("Result::Promise<...>");
@@ -88,8 +84,8 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should propagate initial Err results", () => {
-      const result = HybridResult.Err("initial error").flatMap((x) =>
-        HybridResult.Ok(x * 2),
+      const result = Result.Err("initial error").flatMap((x) =>
+        Result.Ok(x * 2),
       );
 
       expect(result.isErr()).toBe(true);
@@ -99,23 +95,21 @@ describe("Combinators & Helpers", () => {
 
   describe("zip", () => {
     it("should zip sync Ok results into tuples", () => {
-      const result = HybridResult.Ok(42).zip((x) => x * 2);
+      const result = Result.Ok(42).zip((x) => x * 2);
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toEqual([42, 84]);
     });
 
     it("should handle Err results in zip", () => {
-      const result = HybridResult.Err<string, number>("error").zip(
-        (x) => x * 2,
-      );
+      const result = Result.Err<string, number>("error").zip((x) => x * 2);
 
       expect(result.isErr()).toBe(true);
       expect(expectSyncValue(result.unwrapErr())).toBe("error");
     });
 
     it("should promote to async when mapper returns promise", async () => {
-      const result = HybridResult.Ok(42).zip((x) => Promise.resolve(x * 2));
+      const result = Result.Ok(42).zip((x) => Promise.resolve(x * 2));
 
       expect(result.toString()).toBe("Result::Promise<...>");
       const unwrapped = await result.unwrap();
@@ -123,7 +117,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle exceptions in zip mapper", () => {
-      const result = HybridResult.Ok(42).zip(() => {
+      const result = Result.Ok(42).zip(() => {
         throw new Error("zip error");
       });
 
@@ -134,24 +128,22 @@ describe("Combinators & Helpers", () => {
 
   describe("flatZip", () => {
     it("should flatZip sync results into tuples", () => {
-      const result = HybridResult.Ok(42).flatZip((x) => HybridResult.Ok(x * 2));
+      const result = Result.Ok(42).flatZip((x) => Result.Ok(x * 2));
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toEqual([42, 84]);
     });
 
     it("should handle Err results in flatZip", () => {
-      const result = HybridResult.Ok(42).flatZip(() =>
-        HybridResult.Err("flatZip error"),
-      );
+      const result = Result.Ok(42).flatZip(() => Result.Err("flatZip error"));
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe("flatZip error");
     });
 
     it("should handle initial Err results", () => {
-      const result = HybridResult.Err("initial error").flatZip((x) =>
-        HybridResult.Ok(x * 2),
+      const result = Result.Err("initial error").flatZip((x) =>
+        Result.Ok(x * 2),
       );
 
       expect(result.isErr()).toBe(true);
@@ -159,8 +151,8 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should promote to async with async mappers", async () => {
-      const result = HybridResult.Ok(42).flatZip((x) =>
-        Promise.resolve(HybridResult.Ok(x * 2)),
+      const result = Result.Ok(42).flatZip((x) =>
+        Promise.resolve(Result.Ok(x * 2)),
       );
 
       expect(result.toString()).toBe("Result::Promise<...>");
@@ -171,33 +163,33 @@ describe("Combinators & Helpers", () => {
 
   describe("Result.all", () => {
     it("should combine all sync Ok results", () => {
-      const result1 = HybridResult.Ok(42);
-      const result2 = HybridResult.Ok("hello");
-      const result3 = HybridResult.Ok(true);
+      const result1 = Result.Ok(42);
+      const result2 = Result.Ok("hello");
+      const result3 = Result.Ok(true);
 
-      const combined = HybridResult.all(result1, result2, result3);
+      const combined = Result.all(result1, result2, result3);
 
       expect(combined.isOk()).toBe(true);
       expect(combined.unwrap()).toEqual([42, "hello", true]);
     });
 
     it("should return all errors when any result is Err", () => {
-      const result1 = HybridResult.Ok(42);
-      const result2 = HybridResult.Err("error1");
-      const result3 = HybridResult.Err("error2");
+      const result1 = Result.Ok(42);
+      const result2 = Result.Err("error1");
+      const result3 = Result.Err("error2");
 
-      const combined = HybridResult.all(result1, result2, result3);
+      const combined = Result.all(result1, result2, result3);
 
       expect(combined.isErr()).toBe(true);
       expect(combined.unwrapErr()).toEqual(["error1", "error2"]);
     });
 
     it("should promote to async with async results", async () => {
-      const result1 = HybridResult.Ok(42);
-      const result2 = HybridResult.Ok(Promise.resolve("hello"));
-      const result3 = HybridResult.Ok(true);
+      const result1 = Result.Ok(42);
+      const result2 = Result.Ok(Promise.resolve("hello"));
+      const result3 = Result.Ok(true);
 
-      const combined = HybridResult.all(result1, result2, result3);
+      const combined = Result.all(result1, result2, result3);
 
       expect(combined.toString()).toBe("Result::Promise<...>");
       const unwrapped = await combined.unwrap();
@@ -205,11 +197,11 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle mixed sync/async with errors", async () => {
-      const result1 = HybridResult.Ok(42);
-      const result2 = HybridResult.Err(Promise.resolve("async error"));
-      const result3 = HybridResult.Ok(true);
+      const result1 = Result.Ok(42);
+      const result2 = Result.Err(Promise.resolve("async error"));
+      const result3 = Result.Ok(true);
 
-      const combined = HybridResult.all(result1, result2, result3);
+      const combined = Result.all(result1, result2, result3);
 
       expect(combined.toString()).toBe("Result::Promise<...>");
       const unwrappedErr = await combined.unwrapErr();
@@ -217,7 +209,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle empty array", () => {
-      const combined = HybridResult.all();
+      const combined = Result.all();
 
       expect(combined.isOk()).toBe(true);
       expect(combined.unwrap()).toEqual([]);
@@ -226,10 +218,10 @@ describe("Combinators & Helpers", () => {
 
   describe("validate", () => {
     it("should pass when all validators succeed", () => {
-      const result = HybridResult.Ok(42).validate([
-        (x) => HybridResult.Ok(x > 0),
-        (x) => HybridResult.Ok(x < 100),
-        (x) => HybridResult.Ok(x % 2 === 0),
+      const result = Result.Ok(42).validate([
+        (x) => Result.Ok(x > 0),
+        (x) => Result.Ok(x < 100),
+        (x) => Result.Ok(x % 2 === 0),
       ]);
 
       expect(result.isOk()).toBe(true);
@@ -237,10 +229,10 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should return all validation errors", () => {
-      const result = HybridResult.Ok(42).validate([
-        (x) => HybridResult.Ok(x > 0),
-        (_x) => HybridResult.Err("too big"),
-        (_x) => HybridResult.Err("not odd"),
+      const result = Result.Ok(42).validate([
+        (x) => Result.Ok(x > 0),
+        (_x) => Result.Err("too big"),
+        (_x) => Result.Err("not odd"),
       ]);
 
       expect(result.isErr()).toBe(true);
@@ -248,9 +240,9 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should return early if initial result is Err", () => {
-      const result = HybridResult.Err("initial error").validate([
-        (x) => HybridResult.Ok(x > 0),
-        (_x) => HybridResult.Err("validation error"),
+      const result = Result.Err("initial error").validate([
+        (x) => Result.Ok(x > 0),
+        (_x) => Result.Err("validation error"),
       ]);
 
       expect(result.isErr()).toBe(true);
@@ -258,10 +250,10 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle async validators", async () => {
-      const result = HybridResult.Ok(42).validate([
-        (x) => HybridResult.Ok(x > 0),
-        (x) => Promise.resolve(HybridResult.Ok(x < 100)),
-        (x) => HybridResult.Ok(x % 2 === 0),
+      const result = Result.Ok(42).validate([
+        (x) => Result.Ok(x > 0),
+        (x) => Promise.resolve(Result.Ok(x < 100)),
+        (x) => Result.Ok(x % 2 === 0),
       ]);
 
       expect(result.toString()).toBe("Result::Promise<...>");
@@ -270,9 +262,9 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle async initial result", async () => {
-      const result = HybridResult.Ok(Promise.resolve(42)).validate([
-        (x) => HybridResult.Ok(x > 0),
-        (x) => HybridResult.Ok(x < 100),
+      const result = Result.Ok(Promise.resolve(42)).validate([
+        (x) => Result.Ok(x > 0),
+        (x) => Result.Ok(x < 100),
       ]);
 
       expect(result.toString()).toBe("Result::Promise<...>");
@@ -281,8 +273,8 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle exceptions in validators", () => {
-      const result = HybridResult.Ok(42).validate([
-        (x) => HybridResult.Ok(x > 0),
+      const result = Result.Ok(42).validate([
+        (x) => Result.Ok(x > 0),
         (_x) => {
           throw new Error("validator error");
         },
@@ -295,7 +287,7 @@ describe("Combinators & Helpers", () => {
 
   describe("mapErr", () => {
     it("should map Err values", () => {
-      const result = HybridResult.Err("original error").mapErr(
+      const result = Result.Err("original error").mapErr(
         (err) => `Mapped: ${err}`,
       );
 
@@ -304,14 +296,14 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should propagate Ok values", () => {
-      const result = HybridResult.Ok(42).mapErr((err) => `Mapped: ${err}`);
+      const result = Result.Ok(42).mapErr((err) => `Mapped: ${err}`);
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe(42);
     });
 
     it("should promote to async with async mapper", async () => {
-      const result = HybridResult.Err("original error").mapErr((err) =>
+      const result = Result.Err("original error").mapErr((err) =>
         Promise.resolve(`Mapped: ${err}`),
       );
 
@@ -321,7 +313,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle async Err results", async () => {
-      const result = HybridResult.Err(Promise.resolve("async error")).mapErr(
+      const result = Result.Err(Promise.resolve("async error")).mapErr(
         (err) => `Mapped: ${err}`,
       );
 
@@ -333,7 +325,7 @@ describe("Combinators & Helpers", () => {
 
   describe("mapBoth", () => {
     it("should map both Ok and Err values", () => {
-      const okResult = HybridResult.Ok(42).mapBoth(
+      const okResult = Result.Ok(42).mapBoth(
         (x) => x * 2,
         (err) => `Error: ${err}`,
       );
@@ -341,7 +333,7 @@ describe("Combinators & Helpers", () => {
       expect(okResult.isOk()).toBe(true);
       expect(okResult.unwrap()).toBe(84);
 
-      const errResult = HybridResult.Err("test error").mapBoth(
+      const errResult = Result.Err("test error").mapBoth(
         (x) => x * 2,
         (err) => `Error: ${err}`,
       );
@@ -351,7 +343,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should promote to async with async mappers", async () => {
-      const result = HybridResult.Ok(42).mapBoth(
+      const result = Result.Ok(42).mapBoth(
         (x) => Promise.resolve(x * 2),
         (err) => `Error: ${err}`,
       );
@@ -364,19 +356,19 @@ describe("Combinators & Helpers", () => {
 
   describe("orElse", () => {
     it("should return Ok value when result is Ok", () => {
-      const result = HybridResult.Ok(42).orElse(0);
+      const result = Result.Ok(42).orElse(0);
 
       expect(expectSyncValue(result)).toBe(42);
     });
 
     it("should return default value when result is Err", () => {
-      const result = HybridResult.Err<string, number>("error").orElse(0);
+      const result = Result.Err<string, number>("error").orElse(0);
 
       expect(expectSyncValue(result)).toBe(0);
     });
 
     it("should handle async defaults", async () => {
-      const syncResult = HybridResult.Err<string, number>("error").orElse(
+      const syncResult = Result.Err<string, number>("error").orElse(
         Promise.resolve(100),
       );
 
@@ -385,7 +377,7 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle async results", async () => {
-      const asyncResult = HybridResult.Ok(Promise.resolve(42)).orElse(0);
+      const asyncResult = Result.Ok(Promise.resolve(42)).orElse(0);
 
       expect(asyncResult).toBeInstanceOf(Promise);
       expect(await asyncResult).toBe(42);
@@ -394,16 +386,14 @@ describe("Combinators & Helpers", () => {
 
   describe("andThen", () => {
     it("should work as alias for flatMap", () => {
-      const result = HybridResult.Ok(42).andThen((x) => HybridResult.Ok(x * 2));
+      const result = Result.Ok(42).andThen((x) => Result.Ok(x * 2));
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe(84);
     });
 
     it("should handle Err results", () => {
-      const result = HybridResult.Ok(42).andThen(() =>
-        HybridResult.Err("andThen error"),
-      );
+      const result = Result.Ok(42).andThen(() => Result.Err("andThen error"));
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe("andThen error");
@@ -412,11 +402,11 @@ describe("Combinators & Helpers", () => {
 
   describe("Complex Integration Tests", () => {
     it("should handle complex async/sync chains", async () => {
-      const result = HybridResult.Ok("42")
+      const result = Result.Ok("42")
         .map((x) => parseInt(x, 10))
-        .flatMap((x) => HybridResult.Ok(x * 2))
+        .flatMap((x) => Result.Ok(x * 2))
         .zip((x) => x.toString())
-        .flatMap(([num, str]) => HybridResult.Ok(`${num}-${str}`))
+        .flatMap(([num, str]) => Result.Ok(`${num}-${str}`))
         .mapBoth(
           (val) => val.toUpperCase(),
           (err) => `Error: ${err}`,
@@ -427,16 +417,12 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle complex validation scenarios", async () => {
-      const result = HybridResult.Ok(Promise.resolve({ age: 25, name: "John" }))
+      const result = Result.Ok(Promise.resolve({ age: 25, name: "John" }))
         .validate([
           (person) =>
-            person.age >= 18
-              ? HybridResult.Ok(true)
-              : HybridResult.Err("too young"),
+            person.age >= 18 ? Result.Ok(true) : Result.Err("too young"),
           (person) =>
-            person.name.length > 0
-              ? HybridResult.Ok(true)
-              : HybridResult.Err("empty name"),
+            person.name.length > 0 ? Result.Ok(true) : Result.Err("empty name"),
         ])
         .map((person) => `Validated: ${person.name}, ${person.age}`)
         .mapErr((errors) => `Validation failed: ${errors.join(", ")}`);
@@ -448,13 +434,13 @@ describe("Combinators & Helpers", () => {
 
     it("should handle Result.all with complex mixed results", async () => {
       const results = [
-        HybridResult.Ok(42),
-        HybridResult.Ok(Promise.resolve("hello")),
-        HybridResult.Ok(true).map((x) => !x),
-        HybridResult.Ok({ value: 42 }).zip((obj) => obj.value * 2),
+        Result.Ok(42),
+        Result.Ok(Promise.resolve("hello")),
+        Result.Ok(true).map((x) => !x),
+        Result.Ok({ value: 42 }).zip((obj) => obj.value * 2),
       ];
 
-      const combined = HybridResult.all(...results);
+      const combined = Result.all(...results);
       expect(combined.toString()).toBe("Result::Promise<...>");
 
       const unwrapped = await combined.unwrap();

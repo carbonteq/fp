@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Result } from "@/result.hybrid";
+import { ExperimentalResult as Result } from "@/result.hybrid";
 import { expectSyncValue } from "../testUtils";
 
 class DummyError extends Error {

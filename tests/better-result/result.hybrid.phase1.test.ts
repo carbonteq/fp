@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
-  HybridResult,
+  ExperimentalResult as Result,
   UnwrappedErrWithOk,
   UnwrappedOkWithErr,
 } from "@/result.hybrid";
@@ -8,7 +8,7 @@ import {
 describe("Core Runtime Scaffolding", () => {
   describe("Basic Construction", () => {
     it("should create synchronous Ok results", () => {
-      const result = HybridResult.Ok(42);
+      const result = Result.Ok(42);
 
       expect(result.toString()).toBe("Result::Ok<42>");
       expect(result.isOk()).toBe(true);
@@ -19,7 +19,7 @@ describe("Core Runtime Scaffolding", () => {
 
     it("should create synchronous Err results", () => {
       const error = "something went wrong";
-      const result = HybridResult.Err(error);
+      const result = Result.Err(error);
 
       expect(result.toString()).toBe("Result::Err<something went wrong>");
       expect(result.isOk()).toBe(false);
@@ -30,14 +30,14 @@ describe("Core Runtime Scaffolding", () => {
 
     it("should throw when unwrapping Err results", () => {
       const error = "test error";
-      const result = HybridResult.Err(error);
+      const result = Result.Err(error);
 
       expect(() => result.unwrap()).toThrow(UnwrappedOkWithErr);
       expect(() => result.unwrapErr()).not.toThrow();
     });
 
     it("should throw when unwrappingErr on Ok results", () => {
-      const result = HybridResult.Ok(42);
+      const result = Result.Ok(42);
 
       expect(() => result.unwrapErr()).toThrow(UnwrappedErrWithOk);
       expect(() => result.unwrap()).not.toThrow();
@@ -46,7 +46,7 @@ describe("Core Runtime Scaffolding", () => {
 
   describe("Asynchronous Construction", () => {
     it("should create asynchronous Ok results", async () => {
-      const result = HybridResult.Ok(Promise.resolve(100));
+      const result = Result.Ok(Promise.resolve(100));
 
       expect(result.toString()).toBe("Result::Promise<...>");
       expect(result.isOk()).toBe(false); // Can't determine synchronously
@@ -59,7 +59,7 @@ describe("Core Runtime Scaffolding", () => {
 
     it("should create asynchronous Err results", async () => {
       const error = "async error";
-      const result = HybridResult.Err(Promise.resolve(error));
+      const result = Result.Err(Promise.resolve(error));
 
       expect(result.toString()).toBe("Result::Promise<...>");
       expect(result.isOk()).toBe(false); // Can't determine synchronously
@@ -81,26 +81,26 @@ describe("Core Runtime Scaffolding", () => {
 
   describe("Error Mapping", () => {
     it("should apply global error mapper", () => {
-      HybridResult.setErrorMapper((err) => `Mapped: ${err}`);
+      Result.setErrorMapper((err) => `Mapped: ${err}`);
 
-      const result = HybridResult.Err("original error");
+      const result = Result.Err("original error");
       expect(result.unwrapErr()).toBe("Mapped: original error");
 
-      HybridResult.resetErrorMapper();
+      Result.resetErrorMapper();
     });
 
     it("should reset error mapper", () => {
-      HybridResult.setErrorMapper((err) => `Mapped: ${err}`);
-      HybridResult.resetErrorMapper();
+      Result.setErrorMapper((err) => `Mapped: ${err}`);
+      Result.resetErrorMapper();
 
-      const result = HybridResult.Err("reset error");
+      const result = Result.Err("reset error");
       expect(result.unwrapErr()).toBe("reset error");
     });
   });
 
   describe("Helper Methods", () => {
     it("should handle try() with successful operations", () => {
-      const result = HybridResult.try(() => "success");
+      const result = Result.try(() => "success");
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe("success");
@@ -108,7 +108,7 @@ describe("Core Runtime Scaffolding", () => {
 
     it("should handle try() with thrown errors", () => {
       const error = new Error("operation failed");
-      const result = HybridResult.try(() => {
+      const result = Result.try(() => {
         throw error;
       });
 
@@ -117,7 +117,7 @@ describe("Core Runtime Scaffolding", () => {
     });
 
     it("should handle try() with async operations", async () => {
-      const result = HybridResult.try(() => Promise.resolve("async success"));
+      const result = Result.try(() => Promise.resolve("async success"));
 
       expect(result.toString()).toBe("Result::Promise<...>");
       const unwrapped = await result.unwrap();
@@ -125,7 +125,7 @@ describe("Core Runtime Scaffolding", () => {
     });
 
     it("should handle try() with custom error mapper", () => {
-      const result = HybridResult.try(
+      const result = Result.try(
         () => {
           throw "string error";
         },
@@ -138,7 +138,7 @@ describe("Core Runtime Scaffolding", () => {
 
     it("should handle fromPromise() with resolved promises", async () => {
       const promise = Promise.resolve("promise value");
-      const result = await HybridResult.fromPromise(promise);
+      const result = await Result.fromPromise(promise);
 
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe("promise value");
@@ -147,14 +147,14 @@ describe("Core Runtime Scaffolding", () => {
     it("should handle fromPromise() with rejected promises", async () => {
       const error = new Error("promise rejected");
       const promise = Promise.reject(error);
-      const result = await HybridResult.fromPromise(promise);
+      const result = await Result.fromPromise(promise);
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe(error);
     });
 
     it("should handle toPromise() conversion", async () => {
-      const syncResult = HybridResult.Ok("sync value");
+      const syncResult = Result.Ok("sync value");
       const asyncResult = await syncResult.toPromise();
 
       expect(asyncResult.isOk()).toBe(true);
@@ -164,7 +164,7 @@ describe("Core Runtime Scaffolding", () => {
 
   describe("UNIT_RESULT", () => {
     it("should provide unit result", () => {
-      const unitResult = HybridResult.UNIT_RESULT;
+      const unitResult = Result.UNIT_RESULT;
 
       expect(unitResult.isOk()).toBe(true);
       expect(unitResult.unwrap()).toBeDefined();

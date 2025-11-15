@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
-  Result,
+  ExperimentalResult as Result,
   UnwrappedErrWithOk,
   UnwrappedOkWithErr,
 } from "@/result.hybrid";
