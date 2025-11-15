@@ -29,8 +29,6 @@ type FlatZipInput<T, U, E> =
   | Promise<Result<U, E>>
   | Promise<Result<Promise<U>, E>>;
 
-type NestedTuple<T> = T | [NestedTuple<T>, NestedTuple<T>];
-
 type OkOrErr = "ok" | "err";
 const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
 const errPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isErr();
