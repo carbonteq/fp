@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { ExperimentalResult as Result } from "@/result.hybrid";
+import { ExperimentalResult as Result } from "@/result.experimental";
 import { expectSyncValue } from "../testUtils";
 
 describe("Hybrid Result error mapper", () => {

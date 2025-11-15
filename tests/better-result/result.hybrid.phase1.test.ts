@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import {
-  ExperimentalResult as Result,
-  UnwrappedErrWithOk,
-  UnwrappedOkWithErr,
-} from "@/result.hybrid";
+import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "@/errors";
+import { ExperimentalResult as Result } from "@/result.experimental";
 
 describe("Core Runtime Scaffolding", () => {
   describe("Basic Construction", () => {

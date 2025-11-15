@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ExperimentalResult as Result } from "@/result.hybrid";
+import { ExperimentalResult as Result } from "@/result.experimental";
 
 class DummyError extends Error {
   constructor(message = "dummyErr") {

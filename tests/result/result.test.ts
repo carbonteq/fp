@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { Result, UnwrappedErrWithOk, UnwrappedOkWithErr } from "@/result.js";
+import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "@/errors";
+import { Result } from "@/result.js";
 
 class DummyError extends Error {
   constructor() {

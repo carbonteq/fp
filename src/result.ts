@@ -1,18 +1,19 @@
 import assert from "node:assert";
 import { isPromise } from "node:util/types";
+import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { UNIT } from "./unit.js";
 
-export class UnwrappedErrWithOk extends Error {
-  constructor(r: Result<unknown, unknown>) {
-    super(`Attempted to call unwrapErr on an okay value: <${r}>`);
-  }
-}
+// export class UnwrappedErrWithOk extends Error {
+//   constructor(r: Result<unknown, unknown>) {
+//     super(`Attempted to call unwrapErr on an okay value: <${r}>`);
+//   }
+// }
 
-export class UnwrappedOkWithErr extends Error {
-  constructor(r: Result<unknown, unknown>) {
-    super(`Attempted to call unwrap on an Err value: <${r}>`);
-  }
-}
+// export class UnwrappedOkWithErr extends Error {
+//   constructor(r: Result<unknown, unknown>) {
+//     super(`Attempted to call unwrap on an Err value: <${r}>`);
+//   }
+// }
 
 export type UnitResult<E = never> = Result<UNIT, E>;
 
@@ -28,8 +29,6 @@ type FlatZipInput<T, U, E> =
   | Result<Promise<U>, E>
   | Promise<Result<U, E>>
   | Promise<Result<Promise<U>, E>>;
-
-type NestedTuple<T> = T | [NestedTuple<T>, NestedTuple<T>];
 
 type OkOrErr = "ok" | "err";
 const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
@@ -129,7 +128,7 @@ export class Result<T, E> {
 
       if (err instanceof Error) throw err;
 
-      throw new UnwrappedOkWithErr(this);
+      throw new UnwrappedOkWithErr(this.toString());
     }
 
     if (isPromise(curr)) {
@@ -138,7 +137,7 @@ export class Result<T, E> {
           if (v === Sentinel) {
             let e: Error;
             if (this.#ctx.errSlot instanceof Error) e = this.#ctx.errSlot;
-            else e = new UnwrappedOkWithErr(this);
+            else e = new UnwrappedOkWithErr(this.toString());
 
             reject(e);
           }
@@ -183,7 +182,7 @@ export class Result<T, E> {
         curr.then((v) => {
           if (v !== Sentinel) {
             // Is okay
-            reject(new UnwrappedErrWithOk(this));
+            reject(new UnwrappedErrWithOk(this.toString()));
           }
 
           resolve(this.#ctx.errSlot);
@@ -194,7 +193,7 @@ export class Result<T, E> {
     // val is not promise, which means val must contain a valid value, add sanity check
     assert(curr !== Sentinel, "value must not be Sentinel at this point");
 
-    throw new UnwrappedErrWithOk(this);
+    throw new UnwrappedErrWithOk(this.toString());
   }
 
   safeUnwrap(): T | null {
@@ -371,8 +370,7 @@ export class Result<T, E> {
       | AsyncFlatMapper<In, U, E2>
       | AsyncFlatPMapper<In, U, E2>,
   ) {
-    if (this.isErr())
-      return Result.Err<E | E2>(this.#ctx.errSlot as E | E2);
+    if (this.isErr()) return Result.Err<E | E2>(this.#ctx.errSlot as E | E2);
 
     assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
 
@@ -570,7 +568,11 @@ export class Result<T, E> {
   flatZip<U, E2, In = T>(
     fn: (val: In) => FlatZipInput<In, U, E | E2>,
   ): Result<[In, Awaited<U>] | Promise<[In, Awaited<U>]>, E | E2> {
-    if (this.isErr()) return new Result(Sentinel as unknown as [In, Awaited<U>] | Promise<[In, Awaited<U>]>, { errSlot: this.#ctx.errSlot });
+    if (this.isErr())
+      return new Result(
+        Sentinel as unknown as [In, Awaited<U>] | Promise<[In, Awaited<U>]>,
+        { errSlot: this.#ctx.errSlot },
+      );
 
     const curr = this.#val as Promise<In> | In;
     assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
@@ -588,10 +590,7 @@ export class Result<T, E> {
         const mapped = fn(v);
         return Result.flatZipHelper(mutableCtx, v, mapped);
       });
-      return new Result(
-        newP as Promise<[In, Awaited<U>]>,
-        mutableCtx,
-      );
+      return new Result(newP as Promise<[In, Awaited<U>]>, mutableCtx);
     }
 
     const mapped = fn(curr);

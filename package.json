@@ -38,6 +38,16 @@
         "default": "./dist/result.js"
       }
     },
+    "./result.experimental": {
+      "require": {
+        "types": "./dist/result.experimental.d.cts",
+        "default": "./dist/result.experimental.cjs"
+      },
+      "import": {
+        "types": "./dist/result.experimental.d.ts",
+        "default": "./dist/result.experimental.js"
+      }
+    },
     "./option": {
       "require": {
         "types": "./dist/option.d.cts",
@@ -56,6 +66,16 @@
       "import": {
         "types": "./dist/match.d.ts",
         "default": "./dist/match.js"
+      }
+    },
+    "./errors": {
+      "require": {
+        "types": "./dist/errors.d.cts",
+        "default": "./dist/errors.cjs"
+      },
+      "import": {
+        "types": "./dist/errors.d.ts",
+        "default": "./dist/errors.js"
       }
     },
     "./package.json": "./package.json"
