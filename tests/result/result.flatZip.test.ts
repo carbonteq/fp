@@ -295,13 +295,13 @@ describe("Result.flatZip behavior", () => {
     const mockerB = mock(tupleDoubleResIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    assert.ok(zipped.isOk());
-    assert.deepStrictEqual(zipped.unwrap(), [
+    expect(zipped.isOk()).toBeTrue();
+    expect(zipped.unwrap()).toEqual([
       [2, 4],
       [4, 8],
     ]);
-    assert.strictEqual(mockerA.mock.callCount(), 1);
-    assert.strictEqual(mockerB.mock.callCount(), 1);
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
   it("should short-circuit correctly applying Result<T, E> on Result<Promise<T>, E>", async () => {
@@ -321,9 +321,9 @@ describe("Result.flatZip behavior", () => {
     const mockedDouble = mock(tupleDoubleResIt);
     const zipped = r.flatZip(mockedDouble);
 
-    assert.ok(zipped.isErr());
-    assert.strictEqual(zipped.safeUnwrap(), null);
-    assert.strictEqual(mockedDouble.mock.callCount(), 0);
+    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.safeUnwrap()).toBeNull();
+    expect(mockedDouble).not.toHaveBeenCalled();
   });
 
   it("should apply multiple Result<T, E> on Result<T, Promise<E>> correctly", () => {
