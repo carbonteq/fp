@@ -71,6 +71,13 @@ export class HybridResult<T, E = unknown> {
   }
 
   /**
+   * Helper to safely access the error from a SyncResult.
+   */
+  private static getError<T, E>(result: SyncResult<T, E>): E {
+    return (result as { ok: false; error: E }).error;
+  }
+
+  /**
    * Helper to consistently apply the global error mapper before an optional
    * operation-specific mapper.
    */
@@ -127,7 +134,9 @@ export class HybridResult<T, E = unknown> {
     ): SyncResult<T, InnerErr | ExtraErr> =>
       state.ok
         ? HybridResult.syncOk<T, InnerErr | ExtraErr>(state.value)
-        : HybridResult.syncErr<T, InnerErr | ExtraErr>(state.error);
+        : HybridResult.syncErr<T, InnerErr | ExtraErr>(
+            HybridResult.getError(state),
+          );
 
     const resolveState = (
       state: HybridState<T, InnerErr>,
@@ -183,12 +192,14 @@ export class HybridResult<T, E = unknown> {
     if (result.ok) {
       return `Result::Ok<${String(result.value)}>`;
     }
-    return `Result::Err<${String(result.error)}>`;
+    return `Result::Err<${String(HybridResult.getError(result))}>`;
   }
 
   toString(): string {
     if (!this.isAsyncState()) {
-      return HybridResult.formatSyncResult(this.state.value);
+      return HybridResult.formatSyncResult(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
     }
     return "Result::Promise<...>";
   }
@@ -197,17 +208,18 @@ export class HybridResult<T, E = unknown> {
 
   isOk(): this is HybridResult<T, never> {
     if (this.isAsyncState()) return false;
-    return this.state.value.ok;
+    return (this.state as { kind: "sync"; value: SyncResult<T, E> }).value.ok;
   }
 
   isErr(): this is HybridResult<never, E> {
     if (this.isAsyncState()) return false;
-    return !this.state.value.ok;
+    return !(this.state as { kind: "sync"; value: SyncResult<T, E> }).value.ok;
   }
 
   safeUnwrap(): T | null {
     if (!this.isAsyncState()) {
-      const result = this.state.value;
+      const result = (this.state as { kind: "sync"; value: SyncResult<T, E> })
+        .value;
       return result.ok ? result.value : null;
     }
     return null;
@@ -215,7 +227,8 @@ export class HybridResult<T, E = unknown> {
 
   unwrap(): T | Promise<T> {
     if (!this.isAsyncState()) {
-      const result = this.state.value;
+      const result = (this.state as { kind: "sync"; value: SyncResult<T, E> })
+        .value;
       if (result.ok) return result.value;
       throw new UnwrappedOkWithErr(HybridResult.formatSyncResult(result));
     }
@@ -234,15 +247,16 @@ export class HybridResult<T, E = unknown> {
 
   unwrapErr(): E | Promise<E> {
     if (!this.isAsyncState()) {
-      const result = this.state.value;
-      if (!result.ok) return result.error;
+      const result = (this.state as { kind: "sync"; value: SyncResult<T, E> })
+        .value;
+      if (!result.ok) return HybridResult.getError(result);
       throw new UnwrappedErrWithOk(HybridResult.formatSyncResult(result));
     }
 
     return this.toStatePromise()
       .then((result) => {
         if (!result.ok) {
-          return result.error;
+          return HybridResult.getError(result);
         }
         throw new UnwrappedErrWithOk(HybridResult.formatSyncResult(result));
       })
@@ -253,17 +267,18 @@ export class HybridResult<T, E = unknown> {
 
   flip(): HybridResult<E, T> {
     if (!this.isAsyncState()) {
-      const result = this.state.value;
+      const result = (this.state as { kind: "sync"; value: SyncResult<T, E> })
+        .value;
       if (result.ok) {
         return HybridResult.fromSync<E, T>({
           ok: false as const,
           error: result.value as unknown as E,
-        });
+        } as unknown as SyncResult<E, T>);
       }
       return HybridResult.fromSync<E, T>({
         ok: true as const,
-        value: result.error as unknown as T,
-      });
+        value: HybridResult.getError(result) as unknown as T,
+      } as unknown as SyncResult<E, T>);
     }
 
     const flipped = this.toStatePromise().then((result) => {
@@ -275,11 +290,11 @@ export class HybridResult<T, E = unknown> {
       }
       return {
         ok: true as const,
-        value: result.error as unknown as T,
+        value: HybridResult.getError(result) as unknown as T,
       } as unknown as SyncResult<E, T>;
     });
 
-    return HybridResult.fromAsync(flipped as Promise<SyncResult<E, T>>);
+    return HybridResult.fromAsync(flipped);
   }
 
   toPromise(): Promise<HybridResult<T, E>> {
@@ -394,14 +409,16 @@ export class HybridResult<T, E = unknown> {
       state: SyncResult<T, E>,
     ): SyncResult<U, E> | Promise<SyncResult<U, E>> => {
       if (!state.ok) {
-        return HybridResult.syncErr<U, E>(state.error);
+        return HybridResult.syncErr<U, E>(HybridResult.getError(state));
       }
 
       return HybridResult.invokeSafely<T, U, E>(fn, state.value);
     };
 
     if (!this.isAsyncState()) {
-      const next = applyMapper(this.state.value);
+      const next = applyMapper(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(next as Promise<SyncResult<U, E>>);
       }
@@ -427,9 +444,14 @@ export class HybridResult<T, E = unknown> {
         return HybridResult.syncOk<T, E2>(state.value);
       }
 
-      const mapped = HybridResult.invokeSafely<E, E2, E2>(fn, state.error);
+      const mapped = HybridResult.invokeSafely<E, E2, E2>(
+        fn,
+        HybridResult.getError(state),
+      );
       const toErrState = (result: SyncResult<E2, E2>): SyncResult<T, E2> =>
-        HybridResult.syncErr<T, E2>(result.ok ? result.value : result.error);
+        HybridResult.syncErr<T, E2>(
+          result.ok ? result.value : HybridResult.getError(result),
+        );
 
       if (isPromiseLike(mapped)) {
         return (mapped as Promise<SyncResult<E2, E2>>).then(toErrState);
@@ -439,7 +461,9 @@ export class HybridResult<T, E = unknown> {
     };
 
     if (!this.isAsyncState()) {
-      const next = mapError(this.state.value);
+      const next = mapError(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(next as Promise<SyncResult<T, E2>>);
       }
@@ -483,7 +507,9 @@ export class HybridResult<T, E = unknown> {
     ): SyncResult<T2, E2> | Promise<SyncResult<T2, E2>> => {
       const mapped = HybridResult.invokeSafely<E, E2, E2>(fnErr, error);
       const toErrState = (result: SyncResult<E2, E2>): SyncResult<T2, E2> =>
-        HybridResult.syncErr<T2, E2>(result.ok ? result.value : result.error);
+        HybridResult.syncErr<T2, E2>(
+          result.ok ? result.value : HybridResult.getError(result),
+        );
 
       if (isPromiseLike(mapped)) {
         return (mapped as Promise<SyncResult<E2, E2>>).then(toErrState);
@@ -495,10 +521,12 @@ export class HybridResult<T, E = unknown> {
     const apply = (
       state: SyncResult<T, E>,
     ): SyncResult<T2, E2> | Promise<SyncResult<T2, E2>> =>
-      state.ok ? onOk(state.value) : onErr(state.error);
+      state.ok ? onOk(state.value) : onErr(HybridResult.getError(state));
 
     if (!this.isAsyncState()) {
-      const next = apply(this.state.value);
+      const next = apply(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(next as Promise<SyncResult<T2, E2>>);
       }
@@ -527,7 +555,7 @@ export class HybridResult<T, E = unknown> {
       state: SyncResult<T, E>,
     ): SyncResult<U, E | E2> | Promise<SyncResult<U, E | E2>> => {
       if (!state.ok) {
-        return HybridResult.syncErr<U, E | E2>(state.error);
+        return HybridResult.syncErr<U, E | E2>(HybridResult.getError(state));
       }
 
       const invoked = HybridResult.invokeSafely<T, HybridResult<U, E2>, E | E2>(
@@ -539,7 +567,7 @@ export class HybridResult<T, E = unknown> {
         result: SyncResult<HybridResult<U, E2>, E | E2>,
       ): SyncResult<U, E | E2> | Promise<SyncResult<U, E | E2>> => {
         if (!result.ok) {
-          return HybridResult.syncErr<U, E | E2>(result.error);
+          return HybridResult.syncErr<U, E | E2>(HybridResult.getError(result));
         }
 
         return HybridResult.flattenHybridResult<U, E2, E | E2>(result.value);
@@ -555,7 +583,9 @@ export class HybridResult<T, E = unknown> {
     };
 
     if (!this.isAsyncState()) {
-      const next = onOk(this.state.value);
+      const next = onOk(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(next as Promise<SyncResult<U, E | E2>>);
       }
@@ -578,9 +608,9 @@ export class HybridResult<T, E = unknown> {
     fn: (value: T) => HybridResult<U, E2>,
   ): HybridResult<U, E | E2>;
   andThen<U, E2>(
-    fn: (value: T) => HybridResult<U, E2> | Promise<HybridResult<U, E2>>,
+    fn: (value: T) => MaybeAsync<HybridResult<U, E2>>,
   ): HybridResult<U, E | E2> {
-    return this.flatMap(fn);
+    return this.flatMap(fn as any);
   }
 
   zip<U>(fn: (value: T) => Promise<U>): HybridResult<[T, U], E>;
@@ -590,7 +620,7 @@ export class HybridResult<T, E = unknown> {
       state: SyncResult<T, E>,
     ): SyncResult<[T, U], E> | Promise<SyncResult<[T, U], E>> => {
       if (!state.ok) {
-        return HybridResult.syncErr<[T, U], E>(state.error);
+        return HybridResult.syncErr<[T, U], E>(HybridResult.getError(state));
       }
 
       const original = state.value;
@@ -598,7 +628,7 @@ export class HybridResult<T, E = unknown> {
       const toTuple = (result: SyncResult<U, E>): SyncResult<[T, U], E> =>
         result.ok
           ? HybridResult.syncOk<[T, U], E>([original, result.value])
-          : HybridResult.syncErr<[T, U], E>(result.error);
+          : HybridResult.syncErr<[T, U], E>(HybridResult.getError(result));
 
       if (isPromiseLike(mapped)) {
         return (mapped as Promise<SyncResult<U, E>>).then(toTuple);
@@ -608,7 +638,9 @@ export class HybridResult<T, E = unknown> {
     };
 
     if (!this.isAsyncState()) {
-      const next = onOk(this.state.value);
+      const next = onOk(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(next as Promise<SyncResult<[T, U], E>>);
       }
@@ -637,7 +669,9 @@ export class HybridResult<T, E = unknown> {
       state: SyncResult<T, E>,
     ): SyncResult<[T, U], E | E2> | Promise<SyncResult<[T, U], E | E2>> => {
       if (!state.ok) {
-        return HybridResult.syncErr<[T, U], E | E2>(state.error);
+        return HybridResult.syncErr<[T, U], E | E2>(
+          HybridResult.getError(state),
+        );
       }
 
       const original = state.value;
@@ -650,7 +684,9 @@ export class HybridResult<T, E = unknown> {
         result: SyncResult<HybridResult<U, E2>, E | E2>,
       ): SyncResult<[T, U], E | E2> | Promise<SyncResult<[T, U], E | E2>> => {
         if (!result.ok) {
-          return HybridResult.syncErr<[T, U], E | E2>(result.error);
+          return HybridResult.syncErr<[T, U], E | E2>(
+            HybridResult.getError(result),
+          );
         }
 
         const flattened = HybridResult.flattenHybridResult<U, E2, E | E2>(
@@ -662,7 +698,9 @@ export class HybridResult<T, E = unknown> {
         ): SyncResult<[T, U], E | E2> =>
           inner.ok
             ? HybridResult.syncOk<[T, U], E | E2>([original, inner.value])
-            : HybridResult.syncErr<[T, U], E | E2>(inner.error);
+            : HybridResult.syncErr<[T, U], E | E2>(
+                HybridResult.getError(inner),
+              );
 
         if (isPromiseLike(flattened)) {
           return (flattened as Promise<SyncResult<U, E | E2>>).then(toTuple);
@@ -681,7 +719,9 @@ export class HybridResult<T, E = unknown> {
     };
 
     if (!this.isAsyncState()) {
-      const next = onOk(this.state.value);
+      const next = onOk(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(
           next as Promise<SyncResult<[T, U], E | E2>>,
@@ -716,7 +756,7 @@ export class HybridResult<T, E = unknown> {
       state: SyncResult<T, E>,
     ): SyncResult<T, E | E2> | Promise<SyncResult<T, E | E2>> => {
       if (!state.ok) {
-        return HybridResult.syncErr<T, E | E2>(state.error);
+        return HybridResult.syncErr<T, E | E2>(HybridResult.getError(state));
       }
 
       const original = state.value;
@@ -730,7 +770,7 @@ export class HybridResult<T, E = unknown> {
         result: SyncResult<HybridResult<unknown, E2>, E | E2>,
       ): SyncResult<T, E | E2> | Promise<SyncResult<T, E | E2>> => {
         if (!result.ok) {
-          return HybridResult.syncErr<T, E | E2>(result.error);
+          return HybridResult.syncErr<T, E | E2>(HybridResult.getError(result));
         }
 
         const flattened = HybridResult.flattenHybridResult<unknown, E2, E | E2>(
@@ -742,7 +782,7 @@ export class HybridResult<T, E = unknown> {
         ): SyncResult<T, E | E2> =>
           inner.ok
             ? HybridResult.syncOk<T, E | E2>(original)
-            : HybridResult.syncErr<T, E | E2>(inner.error);
+            : HybridResult.syncErr<T, E | E2>(HybridResult.getError(inner));
 
         if (isPromiseLike(flattened)) {
           return (flattened as Promise<SyncResult<unknown, E | E2>>).then(
@@ -763,7 +803,9 @@ export class HybridResult<T, E = unknown> {
     };
 
     if (!this.isAsyncState()) {
-      const next = onOk(this.state.value);
+      const next = onOk(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(next as Promise<SyncResult<T, E | E2>>);
       }
@@ -801,7 +843,7 @@ export class HybridResult<T, E = unknown> {
         result: SyncResult<HybridResult<unknown, VE[number]>, VE[number]>,
       ): VE[number] | null | Promise<VE[number] | null> => {
         if (!result.ok) {
-          return result.error;
+          return HybridResult.getError(result);
         }
 
         const flattened = HybridResult.flattenHybridResult<
@@ -813,12 +855,12 @@ export class HybridResult<T, E = unknown> {
         if (isPromiseLike(flattened)) {
           hasAsync = true;
           return (flattened as Promise<SyncResult<unknown, VE[number]>>)
-            .then((inner) => (inner.ok ? null : inner.error))
+            .then((inner) => (inner.ok ? null : HybridResult.getError(inner)))
             .catch((error) => HybridResult.mapError<VE[number]>(error));
         }
 
         const inner = flattened as SyncResult<unknown, VE[number]>;
-        return inner.ok ? null : inner.error;
+        return inner.ok ? null : HybridResult.getError(inner);
       };
 
       for (const validator of validators) {
@@ -892,14 +934,18 @@ export class HybridResult<T, E = unknown> {
       | SyncResult<T, E | VE[number][]>
       | Promise<SyncResult<T, E | VE[number][]>> => {
       if (!state.ok) {
-        return HybridResult.syncErr<T, E | VE[number][]>(state.error);
+        return HybridResult.syncErr<T, E | VE[number][]>(
+          HybridResult.getError(state),
+        );
       }
 
       return runValidators(state.value);
     };
 
     if (!this.isAsyncState()) {
-      const next = apply(this.state.value);
+      const next = apply(
+        (this.state as { kind: "sync"; value: SyncResult<T, E> }).value,
+      );
       if (isPromiseLike(next)) {
         return HybridResult.fromAsync(
           next as Promise<SyncResult<T, E | VE[number][]>>,
@@ -938,7 +984,7 @@ export class HybridResult<T, E = unknown> {
         if (syncState.ok) {
           values[index] = syncState.value;
         } else {
-          errors.push(syncState.error as Err);
+          errors.push(HybridResult.getError(syncState) as Err);
         }
         return;
       }
@@ -948,7 +994,7 @@ export class HybridResult<T, E = unknown> {
           if (resolved.ok) {
             values[index] = resolved.value;
           } else {
-            errors.push(resolved.error as Err);
+            errors.push(HybridResult.getError(resolved) as Err);
           }
         })
         .catch((error) => {
@@ -1025,11 +1071,12 @@ export class HybridResult<T, E = unknown> {
     };
 
     if (!this.isAsyncState()) {
-      const state = this.state.value;
+      const state = (this.state as { kind: "sync"; value: SyncResult<T, E> })
+        .value;
       if (state.ok) {
         return state.value;
       }
-      const fallbackValue = evaluateFallback(state.error);
+      const fallbackValue = evaluateFallback(HybridResult.getError(state));
       return isPromiseLike(fallbackValue)
         ? (fallbackValue as Promise<T>)
         : (fallbackValue as T);
@@ -1040,7 +1087,7 @@ export class HybridResult<T, E = unknown> {
         if (state.ok) {
           return state.value;
         }
-        return evaluateFallback(state.error);
+        return evaluateFallback(HybridResult.getError(state));
       })
       .catch((error) => {
         throw HybridResult.mapError<unknown>(error);
