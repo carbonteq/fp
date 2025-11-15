@@ -15,7 +15,7 @@ export default defineConfig({
   target: "node",
   splitting: false,
   dts: true,
-  preferredTsconfig: "./tsconfig.build.json",
+  // preferredTsconfig: "./tsconfig.build.json",
   unused: true,
   drop: isProd ? ["console"] : undefined,
   exports: false,
