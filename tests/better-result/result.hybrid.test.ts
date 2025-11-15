@@ -83,19 +83,3 @@ describe("Hybrid Result unwrapping behaviour", () => {
     expect(settled.unwrapErr()).toBe(err);
   });
 });
-
-describe("Hybrid Result flip", () => {
-  it("flips synchronous values", () => {
-    const r = Result.Ok(1).flip();
-
-    expect(r.unwrapErr()).toBe(1);
-  });
-
-  it("flips asynchronous values", async () => {
-    const r = Result.Ok(Promise.resolve(5)).flip();
-
-    expect(r.unwrap()).rejects.toThrow(UnwrappedOkWithErr);
-    const errVal = await r.unwrapErr();
-    expect(errVal).toBe(5);
-  });
-});

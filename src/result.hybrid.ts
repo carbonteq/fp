@@ -265,38 +265,6 @@ export class HybridResult<T, E = unknown> {
       });
   }
 
-  flip(): HybridResult<E, T> {
-    if (!this.isAsyncState()) {
-      const result = (this.state as { kind: "sync"; value: SyncResult<T, E> })
-        .value;
-      if (result.ok) {
-        return HybridResult.fromSync<E, T>({
-          ok: false as const,
-          error: result.value as unknown as E,
-        } as unknown as SyncResult<E, T>);
-      }
-      return HybridResult.fromSync<E, T>({
-        ok: true as const,
-        value: HybridResult.getError(result) as unknown as T,
-      } as unknown as SyncResult<E, T>);
-    }
-
-    const flipped = this.toStatePromise().then((result) => {
-      if (result.ok) {
-        return {
-          ok: false as const,
-          error: result.value as unknown as E,
-        } as unknown as SyncResult<E, T>;
-      }
-      return {
-        ok: true as const,
-        value: HybridResult.getError(result) as unknown as T,
-      } as unknown as SyncResult<E, T>;
-    });
-
-    return HybridResult.fromAsync(flipped);
-  }
-
   toPromise(): Promise<HybridResult<T, E>> {
     return this.toStatePromise().then((state) =>
       HybridResult.fromSync<T, E>(state),

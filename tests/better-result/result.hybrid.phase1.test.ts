@@ -98,36 +98,6 @@ describe("Core Runtime Scaffolding", () => {
     });
   });
 
-  describe("Flip Operation", () => {
-    it("should flip Ok to Err", () => {
-      const okResult = HybridResult.Ok("value");
-      const flipped = okResult.flip();
-
-      expect(flipped.isOk()).toBe(false);
-      expect(flipped.isErr()).toBe(true);
-      expect(flipped.unwrapErr()).toBe("value");
-    });
-
-    it("should flip Err to Ok", () => {
-      const errResult = HybridResult.Err("error");
-      const flipped = errResult.flip();
-
-      expect(flipped.isOk()).toBe(true);
-      expect(flipped.isErr()).toBe(false);
-      expect(flipped.unwrap()).toBe("error");
-    });
-
-    it("should flip async results", async () => {
-      const asyncResult = HybridResult.Ok(Promise.resolve("async value"));
-      const flipped = asyncResult.flip();
-
-      expect(flipped.toString()).toBe("Result::Promise<...>");
-
-      const unwrappedErr = await flipped.unwrapErr();
-      expect(unwrappedErr).toBe("async value");
-    });
-  });
-
   describe("Helper Methods", () => {
     it("should handle try() with successful operations", () => {
       const result = HybridResult.try(() => "success");
