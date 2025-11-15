@@ -25,7 +25,6 @@ describe("HybridResult combinator regressions", () => {
       });
 
       const mapped = Result.Err("initial").mapErr(() => {
-        // eslint-disable-next-line @typescript-eslint/no-throw-literal
         throw "mapped";
       });
 
@@ -36,7 +35,7 @@ describe("HybridResult combinator regressions", () => {
   });
 
   describe("mapBoth", () => {
-    it("returns Err when the Ok mapper throws", () => {
+    it("returns Err when the Ok mapper throws", async () => {
       const failure = new Error("failure");
       const result = Result.Ok(42).mapBoth(
         () => {
@@ -46,7 +45,10 @@ describe("HybridResult combinator regressions", () => {
       );
 
       expect(result.isErr()).toBeTrue();
-      expect(result.unwrapErr()).toBe(failure);
+      const r = result.unwrapErr();
+      expect(r).not.toBeInstanceOf(Promise);
+      // @ts-expect-error
+      expect(await r).toBe(failure);
     });
 
     it("supports async error-side mapping", async () => {
@@ -57,22 +59,24 @@ describe("HybridResult combinator regressions", () => {
 
       const err = result.unwrapErr();
       expect(err).toBeInstanceOf(Promise);
-      await expect(err).resolves.toBe("error:bad");
+      expect(err).resolves.toBe("error:bad");
     });
   });
 
   describe("orElse", () => {
     it("allows fallback factories to inspect the error", () => {
-      const value = Result.Err("missing").orElse((err) => `fallback:${err}`);
+      const errResult = Result.Err<string, string>("missing");
+      const value = errResult.orElse((err) => `fallback:${err}`);
 
       expect(value).toBe("fallback:missing");
     });
 
     it("promotes to async when the fallback returns a promise", async () => {
-      const value = Result.Err("missing").orElse(async () => "fallback");
+      const errResult = Result.Err<string, string>("missing");
+      const value = errResult.orElse(async () => "fallback");
 
       expect(value).toBeInstanceOf(Promise);
-      await expect(value).resolves.toBe("fallback");
+      expect(value).resolves.toBe("fallback");
     });
 
     it("maps thrown fallback errors with the global mapper", () => {
@@ -85,7 +89,6 @@ describe("HybridResult combinator regressions", () => {
 
       expect(() =>
         Result.Err("boom").orElse(() => {
-          // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw "fallback failed";
         }),
       ).toThrowError(new Error("fallback failed"));

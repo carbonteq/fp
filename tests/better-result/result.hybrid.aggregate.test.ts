@@ -80,7 +80,10 @@ describe("Hybrid Result.all", () => {
 
     const awaited = await combined.toPromise();
     expect(awaited.isErr()).toBeTrue();
-    const [mapped] = awaited.unwrapErr();
+    const errors = awaited.unwrapErr();
+    expect(Array.isArray(errors)).toBeTrue();
+    const errorArray = errors as unknown[];
+    const mapped = errorArray[0];
     expect(mapped).toBeInstanceOf(DummyError);
     expect((mapped as DummyError).message).toBe("explode");
   });
@@ -129,7 +132,10 @@ describe("Hybrid Result.validate", () => {
     ]);
 
     expect(res.isErr()).toBeTrue();
-    const [mapped] = res.unwrapErr();
+    const errors = res.unwrapErr();
+    expect(errors).toBeArray();
+    const errorArray = errors as unknown[];
+    const mapped = errorArray[0];
     expect(mapped).toBeInstanceOf(DummyError);
     expect((mapped as DummyError).message).toBe("boom");
   });
