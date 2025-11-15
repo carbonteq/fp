@@ -24,7 +24,8 @@ describe("Hybrid Result construction", () => {
   it("creates an Err result synchronously", () => {
     const r = Result.Err(new DummyError());
 
-    expect(() => r.unwrap()).toThrow(DummyError);
+    expect(() => r.unwrap()).toThrow(UnwrappedOkWithErr);
+    expect(r.unwrapErr()).toBeInstanceOf(DummyError);
     expect(r.isOk()).toBeFalse();
     expect(r.isErr()).toBeTrue();
   });
@@ -43,7 +44,7 @@ describe("Hybrid Result construction", () => {
 
     const asyncErr = r.unwrapErr();
     expect(asyncErr).toBeInstanceOf(Promise);
-    await expect(async () => r.unwrap()).rejects.toThrow(DummyError);
+    expect(r.unwrap()).rejects.toThrow(UnwrappedOkWithErr);
     expect(await asyncErr).toBe(err);
   });
 });
@@ -93,7 +94,7 @@ describe("Hybrid Result flip", () => {
   it("flips asynchronous values", async () => {
     const r = Result.Ok(Promise.resolve(5)).flip();
 
-    expect(async () => r.unwrap()).rejects.toThrow(UnwrappedOkWithErr);
+    expect(r.unwrap()).rejects.toThrow(UnwrappedOkWithErr);
     const errVal = await r.unwrapErr();
     expect(errVal).toBe(5);
   });
