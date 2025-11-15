@@ -23,6 +23,11 @@ type FlatMapper<T, U, E> = (val: T) => Result<U, E>;
 type FlatPMapper<T, U, E> = (val: T) => Result<Promise<U>, E>;
 type AsyncFlatMapper<T, U, E> = (val: T) => Promise<Result<U, E>>;
 type AsyncFlatPMapper<T, U, E> = (val: T) => Promise<Result<Promise<U>, E>>;
+type FlatZipInput<T, U, E> =
+  | Result<U, E>
+  | Result<Promise<U>, E>
+  | Promise<Result<U, E>>
+  | Promise<Result<Promise<U>, E>>;
 
 type OkOrErr = "ok" | "err";
 const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
@@ -364,7 +369,8 @@ export class Result<T, E> {
       | AsyncFlatMapper<In, U, E2>
       | AsyncFlatPMapper<In, U, E2>,
   ) {
-    if (this.isErr()) return Result.Err(this.#ctx.errSlot);
+    if (this.isErr())
+      return Result.Err<E | E2>(this.#ctx.errSlot as E | E2);
 
     assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
 
@@ -399,11 +405,7 @@ export class Result<T, E> {
 
   private static flatMapHelper<U, E, E2>(
     mutableCtx: ResultCtx<E | E2>,
-    mapped:
-      | Promise<Result<Promise<U>, E | E2>>
-      | Promise<Result<U, E | E2>>
-      | Result<Promise<U>, E | E2>
-      | Result<U, E | E2>,
+    mapped: FlatZipInput<T, U, E | E2>,
   ) {
     if (isPromise(mapped)) {
       return mapped.then((r) => Result.flatMapInnerHelper(mutableCtx, r));
@@ -563,53 +565,9 @@ export class Result<T, E> {
   }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
-  flatZip<T, _U, E2>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
-  ): never;
-  flatZip<T, U, E2>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Promise<Result<Promise<U>, E2>>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Promise<Result<U, E2>>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Result<Promise<U>, E2>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Result<U, E2>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, _U, E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Promise<Result<Promise<Result<unknown, unknown>>, E2>>,
-  ): never;
-  flatZip<T, U, E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Promise<Result<Promise<U>, E2>>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Promise<Result<U, E2>>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Result<Promise<U>, E2>,
-  ): Result<Promise<[T, U]>, E | E2>;
-  flatZip<T, U, E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Result<U, E2>,
-  ): Result<[T, U], E | E2>;
   flatZip<U, E2, In = Awaited<T>>(
-    fn:
-      | FlatMapper<In, U, E | E2>
-      | FlatPMapper<In, U, E | E2>
-      | AsyncFlatMapper<In, U, E | E2>
-      | AsyncFlatPMapper<In, U, E | E2>,
-  ) {
+    fn: (val: NoInfer<In>) => FlatZipInput<In, U, E | E2>,
+  ): Result<[In, Awaited<U>] | Promise<[In, Awaited<U>]>, E | E2> {
     if (this.isErr()) return Result.Err(this.#ctx.errSlot);
 
     const curr = this.#val as Promise<In> | In;
@@ -628,13 +586,19 @@ export class Result<T, E> {
         const mapped = fn(v);
         return Result.flatZipHelper(mutableCtx, v, mapped);
       });
-      return new Result(newP, mutableCtx);
+      return new Result(
+        newP as Promise<[In, Awaited<U>]>,
+        mutableCtx,
+      );
     }
 
     const mapped = fn(curr);
     const p = Result.flatZipHelper(mutableCtx, curr, mapped);
 
-    return new Result(p, mutableCtx);
+    return new Result(
+      p as [In, Awaited<U>] | Promise<[In, Awaited<U>]>,
+      mutableCtx,
+    );
   }
 
   private static flatZipHelper<U, E, E2, T>(
@@ -665,7 +629,7 @@ export class Result<T, E> {
         if (v === Sentinel) {
           mutableCtx.errSlot = r.#ctx.errSlot;
         }
-        return [originalVal, v] as [T, U];
+        return [originalVal, v] as [T, Awaited<U>];
       });
     }
 
@@ -674,7 +638,7 @@ export class Result<T, E> {
       return Sentinel;
     }
 
-    return [originalVal, r.#val] as [T, U];
+    return [originalVal, r.#val] as [T, Awaited<U>];
   }
 
   //#endregion
@@ -741,21 +705,31 @@ export class Result<T, E> {
             return Sentinel;
           }
 
-          const results = validators.map((v) => v(currVal as T));
+          const awaitedVal = c as T;
+          const results = validators.map((v) => v(awaitedVal));
           return Promise.all(results).then((resolved) =>
-            Result.validateHelper(resolved, mutableCtx, c),
+            Result.validateHelper(
+              resolved as Result<unknown, unknown>[],
+              mutableCtx,
+              awaitedVal,
+            ),
           );
         }),
         mutableCtx,
       ) as Result<Promise<T>, E[]>;
     }
 
-    const results = validators.map((v) => v(currVal as T));
+    const baseVal: T = currVal as T;
+    const results = validators.map((v) => v(baseVal));
 
     if (results.some(isPromise)) {
       return new Result(
         Promise.all(results).then((resolved) =>
-          Result.validateHelper(resolved, mutableCtx, currVal),
+          Result.validateHelper(
+            resolved as Result<unknown, unknown>[],
+            mutableCtx,
+            baseVal,
+          ),
         ),
         mutableCtx,
       ) as Result<Promise<T>, E[]>;
@@ -770,10 +744,10 @@ export class Result<T, E> {
 
     if (values.some(isPromise)) {
       return new Result(
-        Result.validateHelper(
-          results as Result<unknown, E>[],
+        Result.validateHelper<any, E>(
+          results as Result<unknown, unknown>[],
           mutableCtx,
-          currVal,
+          baseVal as unknown as T,
         ),
         mutableCtx,
       ) as Result<Promise<T>, E>;
@@ -784,28 +758,28 @@ export class Result<T, E> {
     return combinedRes.isErr() ? combinedRes : this;
   }
 
-  private static validateHelper<T, E>(
-    results: Result<unknown, E>[],
-    currCtx: ResultCtx<E>,
-    currVal: T,
+  private static validateHelper<Val, Err>(
+    results: Result<unknown, unknown>[],
+    currCtx: ResultCtx<Err>,
+    currVal: Val | Promise<Val>,
   ) {
     const combinedRes = Result.all(...results);
 
     if (isPromise(combinedRes)) {
-      return (combinedRes as Promise<Result<T, unknown[]>>).then((cRes) => {
+      return (combinedRes as Promise<Result<Val, unknown[]>>).then((cRes) => {
         if (cRes.isErr()) {
-          currCtx.errSlot = cRes.#ctx.errSlot as E;
+          currCtx.errSlot = cRes.#ctx.errSlot as Err;
           return Sentinel;
         }
-        return currVal;
-      }) as Promise<T>;
+        return currVal as Val;
+      }) as Promise<Val>;
     }
 
     if (combinedRes.isErr()) {
-      currCtx.errSlot = combinedRes.#ctx.errSlot as E;
+      currCtx.errSlot = combinedRes.#ctx.errSlot as Err;
       return Sentinel;
     }
-    return currVal;
+    return currVal as Val;
   }
 
   static all<T extends Result<unknown, unknown>[]>(

@@ -180,12 +180,12 @@ export class Option<T> {
   zip<U, Curr>(
     this: Option<Promise<Curr>>,
     fn: (val: Curr) => U,
-  ): Option<Promise<[Curr, U]>>;
+  ): Option<Promise<[Curr, Awaited<U>]>>;
   zip<U, Curr>(
     this: Option<Curr>,
     fn: (val: Curr) => Promise<U>,
-  ): Option<Promise<[T, U]>>;
-  zip<U, Curr>(this: Option<Curr>, fn: (val: Curr) => U): Option<[T, U]>;
+  ): Option<Promise<[Curr, Awaited<U>]>>;
+  zip<U, Curr>(this: Option<Curr>, fn: (val: Curr) => U): Option<[Curr, U]>;
   zip<U, Curr = Awaited<T>>(fn: Mapper<Curr, U> | AsyncMapper<Curr, U>) {
     if (this.isNone()) return Option.None;
 
@@ -204,19 +204,20 @@ export class Option<T> {
         const next = await fn(v);
 
         return [v, next];
-      }) as Promise<[Curr, U]>;
+      }) as Promise<[Curr, Awaited<U>]>;
 
       return new Option(p, ctx);
     }
 
     // Curr is normal value, mapper can return promise
-    const u = fn(curr as unknown as Curr);
+    const value = curr as unknown as Curr;
+    const u = fn(value);
     if (isPromise(u)) {
-      const p = u.then((uu) => [curr, uu] as [T, U]);
+      const p = u.then((uu) => [value, uu] as [Curr, Awaited<U>]);
       return new Option(p, ctx);
     }
 
-    return new Option([curr, u], ctx);
+    return new Option([value, u], ctx);
   }
 
   flatZip<U, Curr>(

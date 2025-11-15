@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid";
+import { expectSyncValue } from "../testUtils";
 
 class DummyError extends Error {
   constructor(message = "dummyErr") {
@@ -37,20 +38,21 @@ describe("Hybrid Result.zip", () => {
     const r = Result.Err(err);
     const zipped = r.zip(double);
 
-    expect(zipped.unwrapErr()).toBe(err);
+    const unwrapped = expectSyncValue(zipped.unwrapErr());
+    expect(unwrapped).toBe(err);
   });
 
   it("maps mapper errors through the global error mapper", () => {
     Result.setErrorMapper((error) => new DummyError(String(error)));
 
-    const zipped = Result.Ok(10).zip(() => {
+    const zipped = Result.Ok<number, DummyError>(10).zip(() => {
       throw "boom";
     });
 
     expect(zipped.isErr()).toBeTrue();
-    const mapped = zipped.unwrapErr();
+    const mapped = expectSyncValue(zipped.unwrapErr());
     expect(mapped).toBeInstanceOf(DummyError);
-    expect((mapped as DummyError).message).toBe("boom");
+    expect(mapped.message).toBe("boom");
   });
 });
 

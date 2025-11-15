@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid";
+import { expectSyncValue } from "../testUtils";
 
 describe("Hybrid Result error mapper", () => {
   afterEach(() => {
@@ -15,12 +16,12 @@ describe("Hybrid Result error mapper", () => {
       return value;
     });
 
-    const res = Result.Ok(2).map(() => {
+    const res = Result.Ok<number, Error>(2).map(() => {
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       throw "boom";
     });
 
-    const err = res.unwrapErr();
+    const err = expectSyncValue(res.unwrapErr());
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("boom");
   });

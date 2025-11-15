@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Result } from "@/result.hybrid";
+import { expectSyncValue } from "../testUtils";
 
 class DummyError extends Error {
   constructor(message = "dummyErr") {
@@ -48,23 +49,28 @@ describe("Hybrid Result.map", () => {
 
   it("captures synchronous exceptions thrown by mapper", () => {
     const err = new DummyError();
-    const r = Result.Ok(2);
+    const r = Result.Ok<number, DummyError>(2);
     const mapped = r.map(() => {
       throw err;
     });
 
-    expect(mapped.unwrapErr()).toBe(err);
+    const unwrapped = expectSyncValue(mapped.unwrapErr());
+    expect(unwrapped).toBe(err);
   });
 
   it("captures rejections from async mapper", async () => {
     const err = new DummyError();
-    const r = Result.Ok(2);
+    const r = Result.Ok<number, DummyError>(2);
     const mapped = r.map(async () => {
       throw err;
     });
 
     const asyncResult = mapped.unwrapErr();
     expect(asyncResult).toBeInstanceOf(Promise);
+    if (!(asyncResult instanceof Promise)) {
+      throw new Error("Expected unwrapErr to return a Promise");
+    }
+
     await expect(asyncResult).resolves.toBe(err);
   });
 });

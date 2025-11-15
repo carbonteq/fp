@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { HybridResult } from "@/result.hybrid";
+import { expectSyncValue } from "../testUtils";
 
 describe("Combinators & Helpers", () => {
   describe("map", () => {
@@ -20,13 +21,14 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle exceptions in mapper", () => {
-      const result = HybridResult.Ok(42).map(() => {
+      const result = HybridResult.Ok<number, Error>(42).map(() => {
         throw new Error("mapper error");
       });
 
       expect(result.isErr()).toBe(true);
-      expect(result.unwrapErr()).toBeInstanceOf(Error);
-      expect((result.unwrapErr() as Error).message).toBe("mapper error");
+      const err = expectSyncValue(result.unwrapErr());
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toBe("mapper error");
     });
 
     it("should propagate Err results without calling mapper", () => {
@@ -104,12 +106,12 @@ describe("Combinators & Helpers", () => {
     });
 
     it("should handle Err results in zip", () => {
-      const result = HybridResult.Err<number, string>("error").zip(
+      const result = HybridResult.Err<string, number>("error").zip(
         (x) => x * 2,
       );
 
       expect(result.isErr()).toBe(true);
-      expect(result.unwrapErr()).toBe("error");
+      expect(expectSyncValue(result.unwrapErr())).toBe("error");
     });
 
     it("should promote to async when mapper returns promise", async () => {
@@ -364,17 +366,19 @@ describe("Combinators & Helpers", () => {
     it("should return Ok value when result is Ok", () => {
       const result = HybridResult.Ok(42).orElse(0);
 
-      expect(result).toBe(42);
+      expect(expectSyncValue(result)).toBe(42);
     });
 
     it("should return default value when result is Err", () => {
-      const result = HybridResult.Err("error").orElse(0);
+      const result = HybridResult.Err<string, number>("error").orElse(0);
 
-      expect(result).toBe(0);
+      expect(expectSyncValue(result)).toBe(0);
     });
 
     it("should handle async defaults", async () => {
-      const syncResult = HybridResult.Err("error").orElse(Promise.resolve(100));
+      const syncResult = HybridResult.Err<string, number>("error").orElse(
+        Promise.resolve(100),
+      );
 
       expect(syncResult).toBeInstanceOf(Promise);
       expect(await syncResult).toBe(100);

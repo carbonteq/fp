@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, UnwrappedNone } from "@/option.js";
+import { expectSyncValue } from "../testUtils";
 
 const doubleIt = (n: number) => n * 2;
 const doubleOptIt = (n: number) => Option.Some(n * 2);
@@ -282,8 +283,8 @@ describe("branching zip", () => {
     expect(o2.isSome()).toBeTrue();
     expect(o3.isNone()).toBeTrue();
     expect(o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toEqual([2, 4]);
-    expect(o2.unwrap()).toEqual([2, 4]);
+    expect(expectSyncValue(o1.unwrap())).toEqual([2, 4]);
+    expect(expectSyncValue(o2.unwrap())).toEqual([2, 4]);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
     expect(mockerC).toHaveBeenCalledTimes(1);
@@ -324,8 +325,8 @@ describe("branching zip", () => {
     expect(o2.isSome()).toBeTrue();
     expect(o3.isNone()).toBeTrue();
     expect(await o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toEqual([2, 4]);
-    expect(o2.unwrap()).toEqual([2, 4]);
+    expect(expectSyncValue(o1.unwrap())).toEqual([2, 4]);
+    expect(expectSyncValue(o2.unwrap())).toEqual([2, 4]);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
     expect(mockerC).toHaveBeenCalledTimes(1);
@@ -345,8 +346,8 @@ describe("branching zip", () => {
     expect(o2.isSome()).toBeTrue();
     expect(o3.isNone()).toBeTrue();
     expect(await o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toEqual([2, 4]);
-    expect(o2.unwrap()).toEqual([2, 4]);
+    expect(expectSyncValue(o1.unwrap())).toEqual([2, 4]);
+    expect(expectSyncValue(o2.unwrap())).toEqual([2, 4]);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
     expect(mockerC).toHaveBeenCalledTimes(1);
