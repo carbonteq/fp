@@ -29,6 +29,8 @@ type FlatZipInput<T, U, E> =
   | Promise<Result<U, E>>
   | Promise<Result<Promise<U>, E>>;
 
+type NestedTuple<T> = T | [NestedTuple<T>, NestedTuple<T>];
+
 type OkOrErr = "ok" | "err";
 const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
 const errPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isErr();
@@ -388,7 +390,7 @@ export class Result<T, E> {
           }
 
           const mapped = fn(v);
-          const p = Result.flatMapHelper(mutableCtx, mapped);
+          const p = Result.flatMapHelper<U, E, E2, T>(mutableCtx, mapped);
 
           resolve(p);
         }, reject);
@@ -398,12 +400,12 @@ export class Result<T, E> {
     }
 
     const mapped = fn(curr);
-    const p = Result.flatMapHelper(mutableCtx, mapped);
+    const p = Result.flatMapHelper<U, E, E2, T>(mutableCtx, mapped);
 
     return new Result(p, mutableCtx);
   }
 
-  private static flatMapHelper<U, E, E2>(
+  private static flatMapHelper<U, E, E2, T>(
     mutableCtx: ResultCtx<E | E2>,
     mapped: FlatZipInput<T, U, E | E2>,
   ) {
@@ -565,10 +567,10 @@ export class Result<T, E> {
   }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
-  flatZip<U, E2, In = Awaited<T>>(
-    fn: (val: NoInfer<In>) => FlatZipInput<In, U, E | E2>,
+  flatZip<U, E2, In = T>(
+    fn: (val: In) => FlatZipInput<In, U, E | E2>,
   ): Result<[In, Awaited<U>] | Promise<[In, Awaited<U>]>, E | E2> {
-    if (this.isErr()) return Result.Err(this.#ctx.errSlot);
+    if (this.isErr()) return new Result(Sentinel as unknown as [In, Awaited<U>] | Promise<[In, Awaited<U>]>, { errSlot: this.#ctx.errSlot });
 
     const curr = this.#val as Promise<In> | In;
     assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
