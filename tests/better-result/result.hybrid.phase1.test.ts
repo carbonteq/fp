@@ -3,9 +3,9 @@ import {
   HybridResult,
   UnwrappedErrWithOk,
   UnwrappedOkWithErr,
-} from "../src/result.hybrid";
+} from "@/result.hybrid";
 
-describe("Phase 1 - Core Runtime Scaffolding", () => {
+describe("Core Runtime Scaffolding", () => {
   describe("Basic Construction", () => {
     it("should create synchronous Ok results", () => {
       const result = HybridResult.Ok(42);

@@ -1,6 +1,15 @@
 import { describe, expect, it, mock } from "bun:test";
 import { matchOpt, matchRes, Option, Result } from "@/index.js";
 
+// expect.extend({
+//   toBeOkay<T, E>(actual: Result<T, E>) {
+//     return {
+//       pass: false,
+//       message: () => `Expected ${actual} to be Ok, but got Err.`,
+//     };
+//   },
+// });
+
 describe("match Result", () => {
   it("should run Ok handler on Ok values", () => {
     const spyFn = mock((val: number) => val);

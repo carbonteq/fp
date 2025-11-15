@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { HybridResult } from "../src/result.hybrid";
+import { HybridResult } from "@/result.hybrid";
 
-describe("Phase 2 & 3 - Combinators & Helpers", () => {
+describe("Combinators & Helpers", () => {
   describe("map", () => {
     it("should map sync Ok results without promoting to async", () => {
       const result = HybridResult.Ok(42).map((x) => x * 2);
@@ -237,8 +237,8 @@ describe("Phase 2 & 3 - Combinators & Helpers", () => {
     it("should return all validation errors", () => {
       const result = HybridResult.Ok(42).validate([
         (x) => HybridResult.Ok(x > 0),
-        (_x) => HybridResult.Err("too big"),
-        (_x) => HybridResult.Err("not odd"),
+        (x) => HybridResult.Err("too big"),
+        (x) => HybridResult.Err("not odd"),
       ]);
 
       expect(result.isErr()).toBe(true);
@@ -248,7 +248,7 @@ describe("Phase 2 & 3 - Combinators & Helpers", () => {
     it("should return early if initial result is Err", () => {
       const result = HybridResult.Err("initial error").validate([
         (x) => HybridResult.Ok(x > 0),
-        (_x) => HybridResult.Err("validation error"),
+        (x) => HybridResult.Err("validation error"),
       ]);
 
       expect(result.isErr()).toBe(true);
@@ -281,7 +281,7 @@ describe("Phase 2 & 3 - Combinators & Helpers", () => {
     it("should handle exceptions in validators", () => {
       const result = HybridResult.Ok(42).validate([
         (x) => HybridResult.Ok(x > 0),
-        (_x) => {
+        (x) => {
           throw new Error("validator error");
         },
       ]);
@@ -409,7 +409,7 @@ describe("Phase 2 & 3 - Combinators & Helpers", () => {
   describe("Complex Integration Tests", () => {
     it("should handle complex async/sync chains", async () => {
       const result = HybridResult.Ok("42")
-        .map((x) => parseInt(x, 10))
+        .map((x) => parseInt(x))
         .flatMap((x) => HybridResult.Ok(x * 2))
         .zip((x) => x.toString())
         .flatMap(([num, str]) => HybridResult.Ok(`${num}-${str}`))

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { Result } from "@/result.hybrid.js";
+import { Result } from "@/result.hybrid";
 
 describe("Hybrid Result error mapper", () => {
   afterEach(() => {

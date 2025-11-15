@@ -3,7 +3,7 @@ import {
   Result,
   UnwrappedErrWithOk,
   UnwrappedOkWithErr,
-} from "@/result.hybrid.js";
+} from "@/result.hybrid";
 
 class DummyError extends Error {
   constructor(message = "dummyErr") {

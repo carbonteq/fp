@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Result } from "@/result.hybrid.js";
+import { Result } from "@/result.hybrid";
 
 class DummyError extends Error {
   constructor(message = "dummyErr") {
@@ -41,6 +41,32 @@ describe("Hybrid Result.flatMap", () => {
     const err = res.unwrapErr();
     expect(err).toBeInstanceOf(Promise);
     expect(await err).toBeInstanceOf(DummyError);
+  });
+
+  it("captures synchronous exceptions thrown by mapper", () => {
+    const error = new DummyError("mapper blew up");
+    const res = Result.Ok(2).flatMap(() => {
+      throw error;
+    });
+
+    expect(res.isErr()).toBeTrue();
+    expect(res.unwrapErr()).toBe(error);
+  });
+
+  it("maps rejected mapper promises with the global error mapper", async () => {
+    Result.setErrorMapper((value: unknown) =>
+      typeof value === "string" ? new DummyError(value) : value,
+    );
+
+    const res = Result.Ok(2).flatMap(async () => {
+      return Promise.reject("async boom");
+    });
+
+    const err = res.unwrapErr();
+    expect(err).toBeInstanceOf(Promise);
+    await expect(err).resolves.toBeInstanceOf(DummyError);
+
+    Result.resetErrorMapper();
   });
 
   it("skips mapper when initial Result is Err", () => {
