@@ -27,18 +27,190 @@ type EitherState<L, R> =
   | { kind: "async-left"; promise: Promise<L> }
   | { kind: "async-right"; promise: Promise<R> };
 
-type PendingOperation<_L, _R> = {
+type PendingOperation<L, R, L2 = L, R2 = R> = {
   track: "left" | "right";
   operation: (
-    value: any,
-  ) => EitherState<any, any> | Promise<EitherState<any, any>>;
+    value: L | R,
+  ) => EitherState<L2, R2> | Promise<EitherState<L2, R2>>;
 };
 
-type EitherInternal<L, R> = {
-  state: EitherState<L, R>;
-  pendingLeft: PendingOperation<any, any>[];
-  pendingRight: PendingOperation<any, any>[];
-};
+// Hybrid Controller for managing state and pending operations
+class HybridController<L, R> {
+  private _state: EitherState<L, R>;
+  private _pendingLeft: PendingOperation<L, R, any, any>[] = [];
+  private _pendingRight: PendingOperation<L, R, any, any>[] = [];
+
+  constructor(initialState: EitherState<L, R>) {
+    this._state = initialState;
+  }
+
+  get state(): EitherState<L, R> {
+    return this._state;
+  }
+
+  get pendingLeft(): PendingOperation<L, R, any, any>[] {
+    return this._pendingLeft;
+  }
+
+  get pendingRight(): PendingOperation<L, R, any, any>[] {
+    return this._pendingRight;
+  }
+
+  setState(newState: EitherState<L, R>): void {
+    this._state = newState;
+  }
+
+  enqueueLeft<L2, R2>(
+    operation: (value: L) => EitherState<L2, R2> | Promise<EitherState<L2, R2>>,
+  ): void {
+    this._pendingLeft.push({
+      track: "left",
+      operation: operation as (
+        value: L | R,
+      ) => EitherState<L2, R2> | Promise<EitherState<L2, R2>>,
+    });
+  }
+
+  enqueueRight<L2, R2>(
+    operation: (value: R) => EitherState<L2, R2> | Promise<EitherState<L2, R2>>,
+  ): void {
+    this._pendingRight.push({
+      track: "right",
+      operation: operation as (
+        value: L | R,
+      ) => EitherState<L2, R2> | Promise<EitherState<L2, R2>>,
+    });
+  }
+
+  async flushLeft(): Promise<void> {
+    if (this._pendingLeft.length === 0) return;
+
+    const operations = [...this._pendingLeft];
+    this._pendingLeft = [];
+
+    for (const op of operations) {
+      if (this._state.kind === "left" || this._state.kind === "async-left") {
+        try {
+          const value =
+            this._state.kind === "left"
+              ? this._state.value
+              : await this._state.promise;
+          const newState = await op.operation(value);
+          this._state = newState as EitherState<L, R>;
+        } catch (_error) {
+          // If operation fails, we stay on current track
+          // Could potentially switch to Left track with error value
+        }
+      }
+    }
+  }
+
+  async flushRight(): Promise<void> {
+    if (this._pendingRight.length === 0) return;
+
+    const operations = [...this._pendingRight];
+    this._pendingRight = [];
+
+    for (const op of operations) {
+      if (this._state.kind === "right" || this._state.kind === "async-right") {
+        try {
+          const value =
+            this._state.kind === "right"
+              ? this._state.value
+              : await this._state.promise;
+          const newState = await op.operation(value);
+          this._state = newState as EitherState<L, R>;
+        } catch (_error) {
+          // If operation fails, we stay on current track
+          // Could potentially switch to Left track with error value
+        }
+      }
+    }
+  }
+}
+
+type EitherInternal<L, R> = HybridController<L, R>;
+
+// Helper predicates for state detection
+function _isLeftState<L, R>(
+  state: EitherState<L, R>,
+): state is EitherState<L, R> & { kind: "left" | "async-left" } {
+  return state.kind === "left" || state.kind === "async-left";
+}
+
+function _isRightState<L, R>(
+  state: EitherState<L, R>,
+): state is EitherState<L, R> & { kind: "right" | "async-right" } {
+  return state.kind === "right" || state.kind === "async-right";
+}
+
+function _isAsyncState<L, R>(
+  state: EitherState<L, R>,
+): state is EitherState<L, R> & { kind: "async-left" | "async-right" } {
+  return state.kind === "async-left" || state.kind === "async-right";
+}
+
+async function _resolveAsyncValue<L, R>(
+  state: EitherState<L, R>,
+): Promise<L | R> {
+  if (state.kind === "async-left") {
+    return await state.promise;
+  }
+  if (state.kind === "async-right") {
+    return await state.promise;
+  }
+  throw new Error("State is not async");
+}
+
+// Centralized state resolution
+async function _resolveState<L, R>(
+  state: EitherState<L, R>,
+): Promise<EitherState<L, R>> {
+  if (state.kind === "async-left") {
+    try {
+      const resolved = await state.promise;
+      return { kind: "left", value: resolved };
+    } catch (error) {
+      // Keep the error on the left track
+      return { kind: "left", value: error as L };
+    }
+  }
+  if (state.kind === "async-right") {
+    try {
+      const resolved = await state.promise;
+      return { kind: "right", value: resolved };
+    } catch (error) {
+      // Convert async errors to left track
+      return { kind: "left", value: error as L };
+    }
+  }
+  return state; // Already sync
+}
+
+// Track switching utilities
+async function _switchToLeft<L, R>(
+  controller: HybridController<L, R>,
+  newValue: L | Promise<L>,
+): Promise<void> {
+  const newState = isPromise(newValue)
+    ? { kind: "async-left" as const, promise: newValue }
+    : { kind: "left" as const, value: newValue };
+
+  controller.setState(newState as EitherState<L, R>);
+  await controller.flushRight(); // Flush right operations when switching to left
+}
+
+async function _switchToRight<L, R>(
+  controller: HybridController<L, R>,
+  newValue: R | Promise<R>,
+): Promise<void> {
+  const newState = isPromise(newValue)
+    ? { kind: "async-right" as const, promise: newValue }
+    : { kind: "right" as const, value: newValue };
+
+  controller.setState(newState as EitherState<L, R>);
+  await controller.flushLeft(); // Flush left operations when switching to right
+}
 
 // Helper to extract value types from EitherState
 type LeftValue<T> = T extends EitherState<infer L, any> ? L : never;
@@ -78,35 +250,23 @@ export class Either<L, R> {
   static Left<L, R = never>(value: L): Either<L, R>;
   static Left<L, R = never>(value: Promise<L>): Either<L, R>;
   static Left<L, R = never>(value: L | Promise<L>): Either<L, R> {
-    if (isPromise(value)) {
-      return new Either<L, R>({
-        state: { kind: "async-left", promise: value },
-        pendingLeft: [],
-        pendingRight: [],
-      });
-    }
-    return new Either<L, R>({
-      state: { kind: "left", value },
-      pendingLeft: [],
-      pendingRight: [],
-    });
+    const initialState = isPromise(value)
+      ? { kind: "async-left" as const, promise: value }
+      : { kind: "left" as const, value };
+    return new Either<L, R>(
+      new HybridController<L, R>(initialState as EitherState<L, R>),
+    );
   }
 
   static Right<R, L = never>(value: R): Either<L, R>;
   static Right<R, L = never>(value: Promise<R>): Either<L, R>;
   static Right<R, L = never>(value: R | Promise<R>): Either<L, R> {
-    if (isPromise(value)) {
-      return new Either<L, R>({
-        state: { kind: "async-right", promise: value },
-        pendingLeft: [],
-        pendingRight: [],
-      });
-    }
-    return new Either<L, R>({
-      state: { kind: "right", value },
-      pendingLeft: [],
-      pendingRight: [],
-    });
+    const initialState = isPromise(value)
+      ? { kind: "async-right" as const, promise: value }
+      : { kind: "right" as const, value };
+    return new Either<L, R>(
+      new HybridController<L, R>(initialState as EitherState<L, R>),
+    );
   }
 
   static fromPredicate<T, L>(
@@ -126,11 +286,12 @@ export class Either<L, R> {
       if (isPromise(result)) {
         // For async functions, return Either<L, Promise<T>> where Promise is the value
         // We need to bypass the automatic async state conversion
-        return new Either<L, Promise<T>>({
-          state: { kind: "right", value: result },
-          pendingLeft: [],
-          pendingRight: [],
-        });
+        const initialState = { kind: "right" as const, value: result };
+        return new Either<L, Promise<T>>(
+          new HybridController<L, Promise<T>>(
+            initialState as EitherState<L, Promise<T>>,
+          ),
+        );
       }
       return Either.Right(result) as Either<L, T>;
     } catch (error) {

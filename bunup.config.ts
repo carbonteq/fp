@@ -4,7 +4,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 export default defineConfig({
   sourceBase: "./src",
-  entry: ["./src/**/*.ts", "!./src/**/*_old.ts"],
+  entry: ["./src/**/*.ts", "!./src/**/*_old.ts", "!./src/internal/**/*.ts"],
   format: ["cjs", "esm"],
   sourcemap: "linked",
   minify: false,
