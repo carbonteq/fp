@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { SyncOpt } from "@/internal/option.experimental";
 
 describe("SyncOpt", () => {
@@ -187,7 +187,9 @@ describe("SyncOpt", () => {
       const firstStep = opt.flatZip((x) => SyncOpt.Some(x.toString()));
       expect(firstStep.value).toEqual([42, "42"]);
 
-      const secondStep = firstStep.flatZip(([original, str]) => SyncOpt.Some(str.length));
+      const secondStep = firstStep.flatZip(([_original, str]) =>
+        SyncOpt.Some(str.length),
+      );
       expect(secondStep.value).toEqual([[42, "42"], 2]);
     });
 
@@ -202,8 +204,12 @@ describe("SyncOpt", () => {
     it("should maintain type correctness through operations", () => {
       const opt: SyncOpt<number> = SyncOpt.Some(42);
       const mapped: SyncOpt<string> = opt.map((x) => x.toString());
-      const flatMapped: SyncOpt<number> = mapped.flatMap((s) => SyncOpt.Some(s.length));
-      const zipped: SyncOpt<[string, number]> = flatMapped.zip((len) => len * 2);
+      const flatMapped: SyncOpt<number> = mapped.flatMap((s) =>
+        SyncOpt.Some(s.length),
+      );
+      const zipped: SyncOpt<[string, number]> = flatMapped.zip(
+        (len) => len * 2,
+      );
 
       expect(zipped.value).toEqual([2, 4]);
     });
@@ -225,7 +231,9 @@ describe("SyncOpt", () => {
     it("should handle array types", () => {
       const numbers = SyncOpt.Some([1, 2, 3]);
       const doubled = numbers.map((arr) => arr.map((x) => x * 2));
-      const sum = numbers.flatMap((arr) => SyncOpt.Some(arr.reduce((a, b) => a + b, 0)));
+      const sum = numbers.flatMap((arr) =>
+        SyncOpt.Some(arr.reduce((a, b) => a + b, 0)),
+      );
 
       expect(doubled.value).toEqual([2, 4, 6]);
       expect(sum.value).toBe(6);

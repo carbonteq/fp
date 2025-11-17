@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { AsyncOpt } from "@/internal/option.experimental";
 
 describe("AsyncOpt", () => {
@@ -53,7 +53,9 @@ describe("AsyncOpt", () => {
 
     it("should throw error for None", async () => {
       const opt = AsyncOpt.None;
-      await expect(opt.unwrap()).rejects.toThrow("Called unwrap on a None value");
+      await expect(opt.unwrap()).rejects.toThrow(
+        "Called unwrap on a None value",
+      );
     });
 
     it("should handle rejected promises", async () => {
@@ -317,7 +319,9 @@ describe("AsyncOpt", () => {
       const firstValue = await firstStep.value;
       expect(firstValue).toEqual([42, "42"]);
 
-      const secondStep = firstStep.flatZip(([original, str]) => AsyncOpt.Some(str.length));
+      const secondStep = firstStep.flatZip(([_original, str]) =>
+        AsyncOpt.Some(str.length),
+      );
       const secondValue = await secondStep.value;
       expect(secondValue).toEqual([[42, "42"], 2]);
     });
@@ -344,8 +348,12 @@ describe("AsyncOpt", () => {
     it("should maintain type correctness through operations", async () => {
       const opt: AsyncOpt<number> = AsyncOpt.Some(42);
       const mapped: AsyncOpt<string> = opt.map((x) => x.toString());
-      const flatMapped: AsyncOpt<number> = mapped.flatMap((s) => AsyncOpt.Some(s.length));
-      const zipped: AsyncOpt<[string, number]> = flatMapped.zip((len) => len * 2);
+      const flatMapped: AsyncOpt<number> = mapped.flatMap((s) =>
+        AsyncOpt.Some(s.length),
+      );
+      const zipped: AsyncOpt<[string, number]> = flatMapped.zip(
+        (len) => len * 2,
+      );
 
       const result = await zipped.value;
       expect(result).toEqual([2, 4]);
@@ -371,7 +379,9 @@ describe("AsyncOpt", () => {
     it("should handle array types", async () => {
       const numbers = AsyncOpt.Some([1, 2, 3]);
       const doubled = numbers.map((arr) => arr.map((x) => x * 2));
-      const sum = numbers.flatMap((arr) => AsyncOpt.Some(arr.reduce((a, b) => a + b, 0)));
+      const sum = numbers.flatMap((arr) =>
+        AsyncOpt.Some(arr.reduce((a, b) => a + b, 0)),
+      );
 
       const doubledResult = await doubled.value;
       const sumResult = await sum.value;
@@ -447,7 +457,7 @@ describe("AsyncOpt", () => {
       const [result1, result2, result3] = await Promise.all([
         opt.map((x) => x * 2).value,
         opt.map((x) => x + 10).value,
-        opt.map((x) => x.toString()).value
+        opt.map((x) => x.toString()).value,
       ]);
 
       expect(result1).toBe(84);
@@ -461,7 +471,7 @@ describe("AsyncOpt", () => {
       const [result1, result2, result3] = await Promise.all([
         opt.flatMap((x) => AsyncOpt.Some(x * 2)).value,
         opt.flatMap((x) => AsyncOpt.Some(x + 10)).value,
-        opt.flatMap((x) => AsyncOpt.Some(x.toString())).value
+        opt.flatMap((x) => AsyncOpt.Some(x.toString())).value,
       ]);
 
       expect(result1).toBe(84);

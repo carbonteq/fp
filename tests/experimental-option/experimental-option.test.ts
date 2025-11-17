@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { ExperimentalOption } from "@/internal/option.experimental";
 
 describe("ExperimentalOption", () => {
@@ -271,7 +271,7 @@ describe("ExperimentalOption", () => {
 
       const user: ExperimentalOption<User> = ExperimentalOption.Some({
         id: 1,
-        name: "Alice"
+        name: "Alice",
       });
 
       const userName = user.map((u) => u.name);
@@ -344,7 +344,7 @@ describe("ExperimentalOption", () => {
 
     it("should handle promise rejection in mapping function", async () => {
       const opt = ExperimentalOption.Some(42);
-      const mapped = opt.map(async (x) => {
+      const mapped = opt.map(async (_x) => {
         await new Promise((resolve) => setTimeout(resolve, 1));
         throw new Error("mapping error");
       });
@@ -405,8 +405,8 @@ describe("ExperimentalOption", () => {
     it("should handle promise detection correctly", () => {
       const opt = ExperimentalOption.Some(42);
 
-      const syncMap = opt.map((x) => "hello");
-      const asyncMap = opt.map((x) => Promise.resolve("hello"));
+      const syncMap = opt.map((_x) => "hello");
+      const asyncMap = opt.map((_x) => Promise.resolve("hello"));
 
       expect(syncMap.value.constructor.name).toBe("SyncOpt");
       expect(asyncMap.value.constructor.name).toBe("AsyncOpt");

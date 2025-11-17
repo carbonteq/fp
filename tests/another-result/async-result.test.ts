@@ -1,21 +1,6 @@
-import { test, describe, expect } from "bun:test";
-import { AsyncResult, SyncResult } from "@/internal/result.experimental";
-import {
-  double,
-  triple,
-  addOne,
-  toString,
-  toUpperCase,
-  pairWithTriple,
-  prependError,
-  doubleResult,
-  addOneResult,
-  sumPair,
-  TEST_ERROR,
-  asyncDouble,
-  asyncAddOne,
-  asyncToString
-} from "./test-utils";
+import { describe, expect, test } from "bun:test";
+import { AsyncResult } from "@/internal/result.experimental";
+import { double, TEST_ERROR } from "./test-utils";
 
 describe("AsyncResult", () => {
   test("should create Ok value", async () => {
@@ -42,12 +27,16 @@ describe("AsyncResult", () => {
 
   test("should throw when unwrapping Err value", async () => {
     const result = AsyncResult.Err<string, string>("error");
-    await expect(result.unwrap()).rejects.toThrow("Called unwrap on an Err value");
+    await expect(result.unwrap()).rejects.toThrow(
+      "Called unwrap on an Err value",
+    );
   });
 
   test("should throw when unwrapping Err on Ok value", async () => {
     const result = AsyncResult.Ok<string, string>("success");
-    await expect(result.unwrapErr()).rejects.toThrow("Called unwrapErr on an Ok value");
+    await expect(result.unwrapErr()).rejects.toThrow(
+      "Called unwrapErr on an Ok value",
+    );
   });
 
   test("should safe unwrap Ok value", async () => {
@@ -77,13 +66,17 @@ describe("AsyncResult", () => {
   });
 
   test("should map Err value", async () => {
-    const result = AsyncResult.Err<string, string>(TEST_ERROR).mapErr((e: string) => e.toUpperCase());
+    const result = AsyncResult.Err<string, string>(TEST_ERROR).mapErr(
+      (e: string) => e.toUpperCase(),
+    );
     expect(await result.isErr()).toBe(true);
     expect(await result.unwrapErr()).toBe("TEST ERROR");
   });
 
   test("should not mapErr Ok value", async () => {
-    const result = AsyncResult.Ok("success").mapErr((e: string) => e.toUpperCase());
+    const result = AsyncResult.Ok("success").mapErr((e: string) =>
+      e.toUpperCase(),
+    );
     expect(await result.isOk()).toBe(true);
     expect(await result.unwrap()).toBe("success");
   });
@@ -95,13 +88,17 @@ describe("AsyncResult", () => {
   });
 
   test("should flatMap Ok to Err", async () => {
-    const result = AsyncResult.Ok(5).flatMap((x) => AsyncResult.Err("too small"));
+    const result = AsyncResult.Ok(5).flatMap((_x) =>
+      AsyncResult.Err("too small"),
+    );
     expect(await result.isErr()).toBe(true);
     expect(await result.unwrapErr()).toBe("too small");
   });
 
   test("should not flatMap Err value", async () => {
-    const result = AsyncResult.Err<number, string>("error").flatMap((x) => AsyncResult.Ok(x * 2));
+    const result = AsyncResult.Err<number, string>("error").flatMap((x) =>
+      AsyncResult.Ok(x * 2),
+    );
     expect(await result.isErr()).toBe(true);
     expect(await result.unwrapErr()).toBe("error");
   });
@@ -125,13 +122,17 @@ describe("AsyncResult", () => {
   });
 
   test("should flatZip Ok value with failing function", async () => {
-    const result = AsyncResult.Ok(5).flatZip((x) => AsyncResult.Err("calculation failed"));
+    const result = AsyncResult.Ok(5).flatZip((_x) =>
+      AsyncResult.Err("calculation failed"),
+    );
     expect(await result.isErr()).toBe(true);
     expect(await result.unwrapErr()).toBe("calculation failed");
   });
 
   test("should not flatZip Err value", async () => {
-    const result = AsyncResult.Err<number, string>("error").flatZip((x) => AsyncResult.Ok(x * 2));
+    const result = AsyncResult.Err<number, string>("error").flatZip((x) =>
+      AsyncResult.Ok(x * 2),
+    );
     expect(await result.isErr()).toBe(true);
     expect(await result.unwrapErr()).toBe("error");
   });

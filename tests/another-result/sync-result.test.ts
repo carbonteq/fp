@@ -1,21 +1,15 @@
-import { test, describe, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { SyncResult } from "@/internal/result.experimental";
 import {
-  double,
-  triple,
   addOne,
-  toString,
-  toUpperCase,
-  pairWithDouble,
-  pairWithTriple,
-  prependError,
-  doubleResult,
-  tripleResult,
   addOneResult,
-  ifEvenTriple,
-  complexMapper,
+  double,
+  doubleResult,
+  pairWithTriple,
   sumPair,
-  TEST_ERROR
+  TEST_ERROR,
+  toString,
+  triple,
 } from "./test-utils";
 
 describe("SyncResult", () => {
@@ -92,31 +86,41 @@ describe("SyncResult", () => {
   });
 
   test("should map Err value", () => {
-    const result = SyncResult.Err<string, string>(TEST_ERROR).mapErr((e: string) => e.toUpperCase());
+    const result = SyncResult.Err<string, string>(TEST_ERROR).mapErr(
+      (e: string) => e.toUpperCase(),
+    );
     expect(result.isErr()).toBe(true);
     expect(result.unwrapErr()).toBe("TEST ERROR");
   });
 
   test("should not mapErr Ok value", () => {
-    const result = SyncResult.Ok("success").mapErr((e: string) => e.toUpperCase());
+    const result = SyncResult.Ok("success").mapErr((e: string) =>
+      e.toUpperCase(),
+    );
     expect(result.isOk()).toBe(true);
     expect(result.unwrap()).toBe("success");
   });
 
   test("should flatMap Ok value", () => {
-    const result = SyncResult.Ok(5).flatMap((x) => SyncResult.Ok(doubleResult(x)));
+    const result = SyncResult.Ok(5).flatMap((x) =>
+      SyncResult.Ok(doubleResult(x)),
+    );
     expect(result.isOk()).toBe(true);
     expect(result.unwrap()).toBe(10);
   });
 
   test("should flatMap Ok to Err", () => {
-    const result = SyncResult.Ok(5).flatMap((x) => SyncResult.Err(x < 10 ? "too small" : "ok"));
+    const result = SyncResult.Ok(5).flatMap((x) =>
+      SyncResult.Err(x < 10 ? "too small" : "ok"),
+    );
     expect(result.isErr()).toBe(true);
     expect(result.unwrapErr()).toBe("too small");
   });
 
   test("should not flatMap Err value", () => {
-    const result = SyncResult.Err<number, string>(TEST_ERROR).flatMap((x) => SyncResult.Ok(doubleResult(x)));
+    const result = SyncResult.Err<number, string>(TEST_ERROR).flatMap((x) =>
+      SyncResult.Ok(doubleResult(x)),
+    );
     expect(result.isErr()).toBe(true);
     expect(result.unwrapErr()).toBe(TEST_ERROR);
   });
@@ -128,25 +132,33 @@ describe("SyncResult", () => {
   });
 
   test("should not zip Err value", () => {
-    const result = SyncResult.Err<number, string>(TEST_ERROR).zip(pairWithTriple);
+    const result = SyncResult.Err<number, string>(TEST_ERROR).zip(
+      pairWithTriple,
+    );
     expect(result.isErr()).toBe(true);
     expect(result.unwrapErr()).toBe(TEST_ERROR);
   });
 
   test("should flatZip Ok value with successful function", () => {
-    const result = SyncResult.Ok(5).flatZip((x) => SyncResult.Ok(doubleResult(x)));
+    const result = SyncResult.Ok(5).flatZip((x) =>
+      SyncResult.Ok(doubleResult(x)),
+    );
     expect(result.isOk()).toBe(true);
     expect(result.unwrap()).toEqual([5, 10]);
   });
 
   test("should flatZip Ok value with failing function", () => {
-    const result = SyncResult.Ok(5).flatZip((x) => SyncResult.Err("calculation failed"));
+    const result = SyncResult.Ok(5).flatZip((_x) =>
+      SyncResult.Err("calculation failed"),
+    );
     expect(result.isErr()).toBe(true);
     expect(result.unwrapErr()).toBe("calculation failed");
   });
 
   test("should not flatZip Err value", () => {
-    const result = SyncResult.Err<number, string>(TEST_ERROR).flatZip((x) => SyncResult.Ok(doubleResult(x)));
+    const result = SyncResult.Err<number, string>(TEST_ERROR).flatZip((x) =>
+      SyncResult.Ok(doubleResult(x)),
+    );
     expect(result.isErr()).toBe(true);
     expect(result.unwrapErr()).toBe(TEST_ERROR);
   });
@@ -182,10 +194,7 @@ describe("SyncResult", () => {
   });
 
   test("should chain multiple map operations", () => {
-    const result = SyncResult.Ok(5)
-      .map(double)
-      .map(addOne)
-      .map(toString);
+    const result = SyncResult.Ok(5).map(double).map(addOne).map(toString);
     expect(result.isOk()).toBe(true);
     expect(result.unwrap()).toBe("11");
   });

@@ -282,9 +282,11 @@ export class BetterResult<T, E> {
     if (this.state instanceof SyncResult) {
       return new BetterResult<T, E>(this.state.clone());
     } else {
-      return new BetterResult<T, E>(new AsyncResult<T, E>(
-        this.state.inner.then(result => result.clone())
-      ));
+      return new BetterResult<T, E>(
+        new AsyncResult<T, E>(
+          this.state.inner.then((result) => result.clone()),
+        ),
+      );
     }
   }
 
@@ -292,9 +294,11 @@ export class BetterResult<T, E> {
     if (this.state instanceof SyncResult) {
       return new BetterResult<T, Err>(this.state.cloneOk<Err>());
     } else {
-      return new BetterResult<T, Err>(new AsyncResult<T, Err>(
-        this.state.inner.then(result => result.cloneOk<Err>())
-      ));
+      return new BetterResult<T, Err>(
+        new AsyncResult<T, Err>(
+          this.state.inner.then((result) => result.cloneOk<Err>()),
+        ),
+      );
     }
   }
 
@@ -302,9 +306,11 @@ export class BetterResult<T, E> {
     if (this.state instanceof SyncResult) {
       return new BetterResult<U, E>(this.state.cloneErr<U>());
     } else {
-      return new BetterResult<U, E>(new AsyncResult<U, E>(
-        this.state.inner.then(result => result.cloneErr<U>())
-      ));
+      return new BetterResult<U, E>(
+        new AsyncResult<U, E>(
+          this.state.inner.then((result) => result.cloneErr<U>()),
+        ),
+      );
     }
   }
 

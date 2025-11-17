@@ -289,7 +289,7 @@ type ExperimentalOptionType<T> = SyncOpt<T> | AsyncOpt<T>;
 
 export class ExperimentalOption<
   T,
-  InternalType extends ExperimentalOptionType<T> = ExperimentalOptionType<T>,
+  _InternalType extends ExperimentalOptionType<T> = ExperimentalOptionType<T>,
 > {
   value: SyncOpt<T> | AsyncOpt<T>;
 
@@ -353,14 +353,10 @@ export class ExperimentalOption<
 
       if (isPromise(result)) {
         // Convert to AsyncOpt
-        return new ExperimentalOption<U, AsyncOpt<U>>(
-          new AsyncOpt(result),
-        );
+        return new ExperimentalOption<U, AsyncOpt<U>>(new AsyncOpt(result));
       } else {
         // Sync result
-        return new ExperimentalOption<U, SyncOpt<U>>(
-          new SyncOpt(result),
-        );
+        return new ExperimentalOption<U, SyncOpt<U>>(new SyncOpt(result));
       }
     } else {
       // AsyncOpt case
@@ -372,9 +368,7 @@ export class ExperimentalOption<
         return isPromise(result) ? await result : result;
       });
 
-      return new ExperimentalOption<U, AsyncOpt<U>>(
-        new AsyncOpt(newPromise),
-      );
+      return new ExperimentalOption<U, AsyncOpt<U>>(new AsyncOpt(newPromise));
     }
   }
 
@@ -459,9 +453,7 @@ export class ExperimentalOption<
     this: ExperimentalOption<T, SyncOpt<T>>,
     fn: (val: T) => U,
   ): ExperimentalOption<[T, U], SyncOpt<[T, U]>>;
-  zip<U>(
-    fn: (val: T) => U | Promise<U>,
-  ): ExperimentalOption<[T, U]> {
+  zip<U>(fn: (val: T) => U | Promise<U>): ExperimentalOption<[T, U]> {
     if (this.value instanceof SyncOpt) {
       if (this.value.value === OptSentinelSym) {
         return new ExperimentalOption<[T, U]>(SyncOpt.None);
@@ -473,9 +465,7 @@ export class ExperimentalOption<
       if (isPromise(result)) {
         // Convert to AsyncOpt
         return new ExperimentalOption<[T, U], AsyncOpt<[T, U]>>(
-          new AsyncOpt(
-            result.then((u) => [originalValue, u] as [T, U]),
-          ),
+          new AsyncOpt(result.then((u) => [originalValue, u] as [T, U])),
         );
       } else {
         // Sync result
@@ -531,27 +521,30 @@ export class ExperimentalOption<
         // Convert to AsyncOpt
         return new ExperimentalOption<[T, U], AsyncOpt<[T, U]>>(
           new AsyncOpt(
-            result.then((expOpt) => {
-              if (expOpt.value instanceof SyncOpt) {
-                if (expOpt.value.value === OptSentinelSym) {
-                  return OptSentinelSym;
-                }
-                return [originalValue, expOpt.value.value] as [T, U];
-              } else {
-                // If it's AsyncOpt, we need to handle the promise
-                return expOpt.value.value.then((u) => {
-                  if (u === OptSentinelSym) {
+            result
+              .then((expOpt) => {
+                if (expOpt.value instanceof SyncOpt) {
+                  if (expOpt.value.value === OptSentinelSym) {
                     return OptSentinelSym;
                   }
-                  return [originalValue, u] as [T, U];
-                });
-              }
-            }).then((result) => {
-              // Handle the case where result might be a promise
-              return isPromise(result) ? result : Promise.resolve(result);
-            }).then(async (promisedResult) => {
-              return await promisedResult;
-            }),
+                  return [originalValue, expOpt.value.value] as [T, U];
+                } else {
+                  // If it's AsyncOpt, we need to handle the promise
+                  return expOpt.value.value.then((u) => {
+                    if (u === OptSentinelSym) {
+                      return OptSentinelSym;
+                    }
+                    return [originalValue, u] as [T, U];
+                  });
+                }
+              })
+              .then((result) => {
+                // Handle the case where result might be a promise
+                return isPromise(result) ? result : Promise.resolve(result);
+              })
+              .then(async (promisedResult) => {
+                return await promisedResult;
+              }),
           ),
         );
       } else {

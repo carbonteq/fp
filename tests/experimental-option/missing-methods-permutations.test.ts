@@ -1,11 +1,14 @@
-import { describe, it, expect, beforeEach } from "bun:test";
-import { ExperimentalOption, SyncOpt, AsyncOpt } from "@/internal/option.experimental";
+import { describe, expect, it } from "bun:test";
+import {
+  AsyncOpt,
+  ExperimentalOption,
+  SyncOpt,
+} from "@/internal/option.experimental";
 
 // These tests document the expected behavior for missing methods in ExperimentalOption
 // They will currently fail, but serve as specification for implementation
 
 describe("ExperimentalOption - Missing Methods Specification Tests", () => {
-
   // These tests will fail until flatMap is implemented
   describe("flatMap method expectations", () => {
     it("should handle sync -> sync -> sync flatMap chain", () => {
@@ -13,7 +16,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
 
       // These operations will fail until flatMap is implemented
       // @ts-expect-error - flatMap is not implemented yet
-      const result = opt
+      const _result = opt
         .flatMap((x) => ExperimentalOption.Some(x * 2))
         .flatMap((x) => ExperimentalOption.Some(x + 10))
         .flatMap((x) => ExperimentalOption.Some(x.toString()));
@@ -27,7 +30,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - flatMap is not implemented yet
-      const result = opt
+      const _result = opt
         .flatMap((x) => ExperimentalOption.Some(x * 2))
         .flatMap(async (x) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
@@ -45,7 +48,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.None;
 
       // @ts-expect-error - flatMap is not implemented yet
-      const result = opt
+      const _result = opt
         .flatMap((x) => ExperimentalOption.Some(x * 2))
         .flatMap((x) => ExperimentalOption.Some(x + 10));
 
@@ -58,7 +61,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - flatMap is not implemented yet
-      const result = opt
+      const _result = opt
         .flatMap((x) => ExperimentalOption.Some(x * 2))
         .flatMap(() => ExperimentalOption.None)
         .flatMap((x) => ExperimentalOption.Some(x + 10));
@@ -74,7 +77,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - zip is not implemented yet
-      const result = opt
+      const _result = opt
         .zip((x) => x * 2)
         .zip(([original, doubled]) => original + doubled)
         .zip(([sum, third]) => sum * third);
@@ -88,7 +91,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - zip is not implemented yet
-      const result = opt
+      const _result = opt
         .zip((x) => x * 2)
         .zip(async ([original, doubled]) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
@@ -106,7 +109,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.None;
 
       // @ts-expect-error - zip is not implemented yet
-      const result = opt
+      const _result = opt
         .zip((x) => x * 2)
         .zip(([original, doubled]) => original + doubled);
 
@@ -122,9 +125,11 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - flatZip is not implemented yet
-      const result = opt
+      const _result = opt
         .flatZip((x) => ExperimentalOption.Some(x * 2))
-        .flatZip(([original, doubled]) => ExperimentalOption.Some(original + doubled))
+        .flatZip(([original, doubled]) =>
+          ExperimentalOption.Some(original + doubled),
+        )
         .flatZip(([sum, _]) => ExperimentalOption.Some(sum.toString()));
 
       // Expected behavior when implemented:
@@ -136,7 +141,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - flatZip is not implemented yet
-      const result = opt
+      const _result = opt
         .flatZip((x) => ExperimentalOption.Some(x * 2))
         .flatZip(async ([original, doubled]) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
@@ -154,9 +159,11 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.None;
 
       // @ts-expect-error - flatZip is not implemented yet
-      const result = opt
+      const _result = opt
         .flatZip((x) => ExperimentalOption.Some(x * 2))
-        .flatZip(([original, doubled]) => ExperimentalOption.Some(original + doubled));
+        .flatZip(([original, doubled]) =>
+          ExperimentalOption.Some(original + doubled),
+        );
 
       // Expected behavior when implemented:
       // expect(result.value.constructor.name).toBe("SyncOpt");
@@ -167,7 +174,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - flatZip is not implemented yet
-      const result = opt
+      const _result = opt
         .flatZip((x) => ExperimentalOption.Some(x * 2))
         .flatZip(() => ExperimentalOption.None)
         .flatZip(([sum, _]) => ExperimentalOption.Some(sum.toString()));
@@ -183,7 +190,7 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some(42);
 
       // @ts-expect-error - flatMap is not implemented yet
-      const result = opt
+      const _result = opt
         .map((x) => x * 2)
         .flatMap((x) => ExperimentalOption.Some(x + 10))
         .map((x) => x.toString());
@@ -197,8 +204,10 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some([1, 2, 3]);
 
       // @ts-expect-error - flatMap and flatZip are not implemented yet
-      const result = opt
-        .flatMap((arr) => ExperimentalOption.Some(arr.reduce((a, b) => a + b, 0)))
+      const _result = opt
+        .flatMap((arr) =>
+          ExperimentalOption.Some(arr.reduce((a, b) => a + b, 0)),
+        )
         .map((sum) => sum * 2)
         .flatZip((doubled) => ExperimentalOption.Some(doubled.toString()));
 
@@ -217,14 +226,22 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
         age: number;
       }
 
-      const opt = ExperimentalOption.Some<User>({ id: 1, name: "Alice", age: 25 });
+      const opt = ExperimentalOption.Some<User>({
+        id: 1,
+        name: "Alice",
+        age: 25,
+      });
 
       // @ts-expect-error - flatZip and flatMap are not implemented yet
-      const result = opt
+      const _result = opt
         .map((user) => user.age)
-        .flatZip((age) => age >= 18 ? ExperimentalOption.Some("adult") : ExperimentalOption.None)
+        .flatZip((age) =>
+          age >= 18
+            ? ExperimentalOption.Some("adult")
+            : ExperimentalOption.None,
+        )
         .flatMap(([actualAge, status]) =>
-          ExperimentalOption.Some(`${status}: age ${actualAge}`)
+          ExperimentalOption.Some(`${status}: age ${actualAge}`),
         );
 
       // Expected behavior when implemented:
@@ -236,12 +253,14 @@ describe("ExperimentalOption - Missing Methods Specification Tests", () => {
       const opt = ExperimentalOption.Some("hello world");
 
       // @ts-expect-error - flatZip and flatMap are not implemented yet
-      const result = opt
+      const _result = opt
         .map((str) => str.split(" "))
-        .flatMap((words) => ExperimentalOption.Some(words.map(w => w.length)))
+        .flatMap((words) => ExperimentalOption.Some(words.map((w) => w.length)))
         .zip((lengths) => lengths.reduce((a, b) => a + b, 0))
         .flatZip(([lengths, total]) =>
-          total > 5 ? ExperimentalOption.Some({ lengths, total }) : ExperimentalOption.None
+          total > 5
+            ? ExperimentalOption.Some({ lengths, total })
+            : ExperimentalOption.None,
         );
 
       // Expected behavior when implemented:
@@ -270,7 +289,9 @@ describe("Internal Option Classes - Working Examples", () => {
       expect(zipped.value).toEqual([94, "94"]);
 
       // FlatZip operation
-      const flatZipped = zipped.flatZip(([num, str]) => SyncOpt.Some(str.length));
+      const flatZipped = zipped.flatZip(([_num, str]) =>
+        SyncOpt.Some(str.length),
+      );
       expect(flatZipped.value).toEqual([[94, "94"], 2]);
     });
 
@@ -308,7 +329,9 @@ describe("Internal Option Classes - Working Examples", () => {
       expect(await zipped.value).toEqual([94, "94"]);
 
       // FlatZip operation
-      const flatZipped = zipped.flatZip(([num, str]) => AsyncOpt.Some(str.length));
+      const flatZipped = zipped.flatZip(([_num, str]) =>
+        AsyncOpt.Some(str.length),
+      );
       expect(await flatZipped.value).toEqual([[94, "94"], 2]);
     });
 
@@ -337,7 +360,7 @@ describe("Internal Option Classes - Working Examples", () => {
       expect(await zipped.value).toEqual([94, "94"]);
 
       // Async flatZip
-      const flatZipped = zipped.flatZip(async ([num, str]) => {
+      const flatZipped = zipped.flatZip(async ([_num, str]) => {
         await new Promise((resolve) => setTimeout(resolve, 1));
         return AsyncOpt.Some(str.length);
       });

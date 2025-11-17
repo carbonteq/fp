@@ -1,5 +1,9 @@
-import { describe, it, expect } from "bun:test";
-import { ExperimentalOption, AsyncOpt, SyncOpt } from "@/internal/option.experimental";
+import { describe, expect, it } from "bun:test";
+import {
+  AsyncOpt,
+  ExperimentalOption,
+  SyncOpt,
+} from "@/internal/option.experimental";
 
 describe("ExperimentalOption - Immutability and Referential Transparency", () => {
   describe("AsyncOpt branching immutability", () => {
@@ -40,17 +44,17 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
 
       // Create multiple branches with different operations
       const branchNone = original.flatZip(async (str) => {
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return str.length > 10 ? AsyncOpt.Some(str.length) : AsyncOpt.None;
       });
 
       const branchMap = original.map(async (str) => {
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return str.toUpperCase();
       });
 
       const branchFlatMap = original.flatMap(async (str) => {
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return AsyncOpt.Some(`${str}-processed`);
       });
 
@@ -70,12 +74,15 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       const branch3 = original;
 
       // Apply different operations to each branch
-      const processed1 = branch1.map(arr => arr.reduce((a, b) => a + b, 0)); // sync
-      const processed2 = branch2.map(async arr => { // async
-        await new Promise(resolve => setTimeout(resolve, 1));
+      const processed1 = branch1.map((arr) => arr.reduce((a, b) => a + b, 0)); // sync
+      const processed2 = branch2.map(async (arr) => {
+        // async
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return arr.length;
       });
-      const processed3 = branch3.flatZip(arr => arr.length > 0 ? AsyncOpt.Some(arr.join(",")) : AsyncOpt.None); // flatZip
+      const processed3 = branch3.flatZip((arr) =>
+        arr.length > 0 ? AsyncOpt.Some(arr.join(",")) : AsyncOpt.None,
+      ); // flatZip
 
       // All should work independently
       expect(await processed1.value).toBe(6); // 1+2+3
@@ -88,7 +95,7 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       const original = AsyncOpt.Some("data");
 
       // Create multiple branches
-      const branches = Array.from({ length: 5 }, (_, i) => original);
+      const branches = Array.from({ length: 5 }, (_, _i) => original);
 
       // Make first branch become None
       const noneBranch = branches[0].flatMap(() => AsyncOpt.None);
@@ -96,10 +103,10 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       // Apply different operations to other branches
       const processedBranches = await Promise.all([
         noneBranch.value, // Should be None
-        branches[1].map(s => s.toUpperCase()).value, // Should work
-        branches[2].flatMap(s => AsyncOpt.Some(s.length)).value, // Should work
-        branches[3].map(s => `${s}-suffix`).value, // Should work
-        branches[4].flatZip(s => AsyncOpt.Some(s.repeat(2))).value, // Should work
+        branches[1].map((s) => s.toUpperCase()).value, // Should work
+        branches[2].flatMap((s) => AsyncOpt.Some(s.length)).value, // Should work
+        branches[3].map((s) => `${s}-suffix`).value, // Should work
+        branches[4].flatZip((s) => AsyncOpt.Some(s.repeat(2))).value, // Should work
       ]);
 
       // Verify only the first branch became None
@@ -119,9 +126,11 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       const original = SyncOpt.Some(100);
 
       // Create branches that become None
-      const branchNone = original.flatZip(x => x > 200 ? SyncOpt.Some(x * 2) : SyncOpt.None);
-      const branchWorking = original.map(x => x + 50);
-      const branchFlatMap = original.flatMap(x => SyncOpt.Some(x.toString()));
+      const branchNone = original.flatZip((x) =>
+        x > 200 ? SyncOpt.Some(x * 2) : SyncOpt.None,
+      );
+      const branchWorking = original.map((x) => x + 50);
+      const branchFlatMap = original.flatMap((x) => SyncOpt.Some(x.toString()));
 
       // Verify branch independence
       expect(branchNone.value).toBe(Symbol.for("OptSentinel"));
@@ -137,16 +146,16 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
 
       // Create branches that will convert to AsyncOpt
       const branchAsync = original.map(async (x) => {
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return x * 3;
       });
 
       const branchNoneAsync = original.flatMap(async (x) => {
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return x > 100 ? ExperimentalOption.Some(x) : ExperimentalOption.None;
       });
 
-      const branchSync = original.map(x => x + 5);
+      const branchSync = original.map((x) => x + 5);
 
       // All should work independently
       expect(await branchAsync.value.value).toBe(126); // 42 * 3
@@ -159,15 +168,21 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       const original = ExperimentalOption.Some("hello");
 
       // Multiple branches with different behaviors
-      const branch1 = original.map(s => s.length); // Remains SyncOpt
-      const branch2 = original.map(async s => { // Becomes AsyncOpt
-        await new Promise(resolve => setTimeout(resolve, 1));
+      const branch1 = original.map((s) => s.length); // Remains SyncOpt
+      const branch2 = original.map(async (s) => {
+        // Becomes AsyncOpt
+        await new Promise((resolve) => setTimeout(resolve, 1));
         return s.toUpperCase();
       });
-      const branch3 = original.flatMap(s => ExperimentalOption.Some(s.split(""))); // Remains SyncOpt
-      const branch4 = original.flatMap(async s => { // Becomes AsyncOpt
-        await new Promise(resolve => setTimeout(resolve, 1));
-        return s.includes("x") ? ExperimentalOption.Some(s) : ExperimentalOption.None;
+      const branch3 = original.flatMap((s) =>
+        ExperimentalOption.Some(s.split("")),
+      ); // Remains SyncOpt
+      const branch4 = original.flatMap(async (s) => {
+        // Becomes AsyncOpt
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return s.includes("x")
+          ? ExperimentalOption.Some(s)
+          : ExperimentalOption.None;
       });
 
       // Verify all branches work independently
@@ -198,15 +213,17 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       const original = new AsyncOpt(createCountingPromise(42));
 
       // Create multiple branches
-      const branch1 = original.map(x => x * 2);
-      const branch2 = original.map(x => x + 10);
-      const branch3 = original.flatMap(x => new AsyncOpt(Promise.resolve(x.toString())));
+      const branch1 = original.map((x) => x * 2);
+      const branch2 = original.map((x) => x + 10);
+      const branch3 = original.flatMap(
+        (x) => new AsyncOpt(Promise.resolve(x.toString())),
+      );
 
       // Execute all branches
       const [result1, result2, result3] = await Promise.all([
         branch1.value,
         branch2.value,
-        branch3.value
+        branch3.value,
       ]);
 
       // The promise should only be executed once (shared execution)
@@ -224,8 +241,8 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       await original.value;
 
       // Create branches after resolution
-      const branch1 = original.map(s => s.toUpperCase());
-      const branch2 = original.flatMap(s => AsyncOpt.Some(s.length));
+      const branch1 = original.map((s) => s.toUpperCase());
+      const branch2 = original.flatMap((s) => AsyncOpt.Some(s.length));
 
       // Should still work correctly
       expect(await branch1.value).toBe("INITIAL");
@@ -238,14 +255,16 @@ describe("ExperimentalOption - Immutability and Referential Transparency", () =>
       const original = AsyncOpt.Some(42);
 
       // Branch that will throw an error
-      const errorBranch = original.map(async (x) => {
-        await new Promise(resolve => setTimeout(resolve, 1));
+      const errorBranch = original.map(async (_x) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
         throw new Error("Branch error");
       });
 
       // Branches that should work normally
-      const workingBranch1 = original.map(x => x * 2);
-      const workingBranch2 = original.flatMap(x => AsyncOpt.Some(x.toString()));
+      const workingBranch1 = original.map((x) => x * 2);
+      const workingBranch2 = original.flatMap((x) =>
+        AsyncOpt.Some(x.toString()),
+      );
 
       // Verify error isolation
       await expect(errorBranch.value).rejects.toThrow("Branch error");

@@ -1,18 +1,5 @@
-import { test, describe, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { BetterResult } from "@/internal/result.experimental";
-import {
-  double,
-  triple,
-  addOne,
-  toString,
-  toUpperCase,
-  pairWithTriple,
-  prependError,
-  doubleResult,
-  addOneResult,
-  sumPair,
-  TEST_ERROR
-} from "./test-utils";
 
 describe("BetterResult", () => {
   test("should create sync Ok value", () => {
@@ -73,7 +60,9 @@ describe("BetterResult", () => {
   });
 
   test("should map async Ok value", async () => {
-    const result = BetterResult.fromPromise(Promise.resolve(5)).map((x) => x * 2);
+    const result = BetterResult.fromPromise(Promise.resolve(5)).map(
+      (x) => x * 2,
+    );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
   });
@@ -85,7 +74,9 @@ describe("BetterResult", () => {
   });
 
   test("should not map async Err value", async () => {
-    const result = BetterResult.fromPromise(Promise.reject("error")).map((x) => x * 2);
+    const result = BetterResult.fromPromise(Promise.reject("error")).map(
+      (x) => x * 2,
+    );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(false);
   });
@@ -98,7 +89,7 @@ describe("BetterResult", () => {
 
   test("should flatMap sync Ok value to async result", async () => {
     const result = BetterResult.Ok(5).flatMap((x) =>
-      BetterResult.fromPromise(Promise.resolve(x * 2))
+      BetterResult.fromPromise(Promise.resolve(x * 2)),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
@@ -106,7 +97,7 @@ describe("BetterResult", () => {
 
   test("should flatMap async Ok value to sync result", async () => {
     const result = BetterResult.fromPromise(Promise.resolve(5)).flatMap((x) =>
-      BetterResult.Ok(x * 2)
+      BetterResult.Ok(x * 2),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
@@ -114,7 +105,7 @@ describe("BetterResult", () => {
 
   test("should flatMap async Ok value to async result", async () => {
     const result = BetterResult.fromPromise(Promise.resolve(5)).flatMap((x) =>
-      BetterResult.fromPromise(Promise.resolve(x * 2))
+      BetterResult.fromPromise(Promise.resolve(x * 2)),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
@@ -122,15 +113,15 @@ describe("BetterResult", () => {
 
   test("should not flatMap sync Err value", () => {
     const result = BetterResult.Err<number, string>("error").flatMap((x) =>
-      BetterResult.Ok(x * 2)
+      BetterResult.Ok(x * 2),
     );
     expect(result.isAsync()).toBe(false);
     expect(result.isOk()).toBe(false);
   });
 
   test("should not flatMap async Err value", async () => {
-    const result = BetterResult.fromPromise(Promise.reject("error")).flatMap((x) =>
-      BetterResult.Ok(x * 2)
+    const result = BetterResult.fromPromise(Promise.reject("error")).flatMap(
+      (x) => BetterResult.Ok(x * 2),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(false);
@@ -143,7 +134,9 @@ describe("BetterResult", () => {
   });
 
   test("should zip async Ok value", async () => {
-    const result = BetterResult.fromPromise(Promise.resolve(5)).zip((x) => x * 2);
+    const result = BetterResult.fromPromise(Promise.resolve(5)).zip(
+      (x) => x * 2,
+    );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
   });
@@ -155,7 +148,9 @@ describe("BetterResult", () => {
   });
 
   test("should not zip async Err value", async () => {
-    const result = BetterResult.fromPromise(Promise.reject("error")).zip((x) => x * 2);
+    const result = BetterResult.fromPromise(Promise.reject("error")).zip(
+      (x) => x * 2,
+    );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(false);
   });
@@ -168,7 +163,7 @@ describe("BetterResult", () => {
 
   test("should flatZip sync Ok value with async result", async () => {
     const result = BetterResult.Ok(5).flatZip((x) =>
-      BetterResult.fromPromise(Promise.resolve(x * 2))
+      BetterResult.fromPromise(Promise.resolve(x * 2)),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
@@ -176,7 +171,7 @@ describe("BetterResult", () => {
 
   test("should flatZip async Ok value with sync result", async () => {
     const result = BetterResult.fromPromise(Promise.resolve(5)).flatZip((x) =>
-      BetterResult.Ok(x * 2)
+      BetterResult.Ok(x * 2),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
@@ -184,19 +179,21 @@ describe("BetterResult", () => {
 
   test("should flatZip async Ok value with async result", async () => {
     const result = BetterResult.fromPromise(Promise.resolve(5)).flatZip((x) =>
-      BetterResult.fromPromise(Promise.resolve(x * 2))
+      BetterResult.fromPromise(Promise.resolve(x * 2)),
     );
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
   });
 
   test("should handle flatZip with failing function", async () => {
-    const syncResult = BetterResult.Ok(5).flatZip((x) => BetterResult.Err("failed"));
+    const syncResult = BetterResult.Ok(5).flatZip((_x) =>
+      BetterResult.Err("failed"),
+    );
     expect(syncResult.isAsync()).toBe(false);
     expect(syncResult.isOk()).toBe(false);
 
-    const asyncResult = BetterResult.Ok(5).flatZip((x) =>
-      BetterResult.fromPromise(Promise.reject("async failed"))
+    const asyncResult = BetterResult.Ok(5).flatZip((_x) =>
+      BetterResult.fromPromise(Promise.reject("async failed")),
     );
     expect(asyncResult.isAsync()).toBe(true);
     expect(await asyncResult.isOk()).toBe(false);
@@ -215,14 +212,16 @@ describe("BetterResult", () => {
 
   test("should handle complex mixed operations", async () => {
     const computeAsync = async (n: number): Promise<number> => {
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       return n * n;
     };
 
     const result = BetterResult.fromPromise(computeAsync(5))
       .map((x) => x + 10)
       .flatZip((x) => BetterResult.Ok(x / 2))
-      .flatMap(([sum, half]) => BetterResult.fromPromise(Promise.resolve(sum + half)));
+      .flatMap(([sum, half]) =>
+        BetterResult.fromPromise(Promise.resolve(sum + half)),
+      );
 
     expect(result.isAsync()).toBe(true);
     expect(await result.isOk()).toBe(true);
@@ -231,14 +230,20 @@ describe("BetterResult", () => {
   test("should preserve error types through transformations", () => {
     type AppError = { code: string; message: string };
 
-    const result = BetterResult.Err<number, AppError>({ code: "VALIDATION", message: "Invalid input" })
+    const result = BetterResult.Err<number, AppError>({
+      code: "VALIDATION",
+      message: "Invalid input",
+    })
       .map((x) => x * 2)
       .flatMap((x) => BetterResult.Ok(x + 1));
 
     expect(result.isAsync()).toBe(false);
     expect(result.isOk()).toBe(false);
     expect(result.isErr()).toBe(true);
-    expect(result.unwrapErr()).toEqual({ code: "VALIDATION", message: "Invalid input" });
+    expect(result.unwrapErr()).toEqual({
+      code: "VALIDATION",
+      message: "Invalid input",
+    });
   });
 
   // Tests for unwrap and unwrapErr methods

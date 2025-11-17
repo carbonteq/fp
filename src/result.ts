@@ -24,7 +24,7 @@ type FlatMapper<T, U, E> = (val: T) => Result<U, E>;
 type FlatPMapper<T, U, E> = (val: T) => Result<Promise<U>, E>;
 type AsyncFlatMapper<T, U, E> = (val: T) => Promise<Result<U, E>>;
 type AsyncFlatPMapper<T, U, E> = (val: T) => Promise<Result<Promise<U>, E>>;
-type FlatZipInput<T, U, E> =
+type FlatZipInput<_T, U, E> =
   | Result<U, E>
   | Result<Promise<U>, E>
   | Promise<Result<U, E>>

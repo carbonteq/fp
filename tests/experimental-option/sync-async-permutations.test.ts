@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { ExperimentalOption } from "@/internal/option.experimental";
 
 describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
@@ -212,7 +212,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
 
       const result = opt
         .map((x) => x * 2) // sync
-        .map(async (x) => {
+        .map(async (_x) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
           throw new Error("Async error");
         }) // async with error
@@ -233,26 +233,27 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
       const opt = ExperimentalOption.Some<User>({
         id: 1,
         name: "Alice",
-        scores: [85, 90, 78, 92]
+        scores: [85, 90, 78, 92],
       });
 
       const result = opt
         // Sync operation - calculate average score
         .map((user) => {
-          const avg = user.scores.reduce((a, b) => a + b, 0) / user.scores.length;
+          const avg =
+            user.scores.reduce((a, b) => a + b, 0) / user.scores.length;
           return { ...user, averageScore: avg };
         })
         // Async operation - fetch additional data
         .map(async (user) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
-          return { ...user, grade: user.averageScore >= 85 ? 'A' : 'B' };
+          return { ...user, grade: user.averageScore >= 85 ? "A" : "B" };
         })
         // Sync operation - format display name
         .map((user) => `${user.name} (${user.grade})`)
         // Async operation - validate and process
         .map(async (displayName) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
-          if (displayName.includes('A')) {
+          if (displayName.includes("A")) {
             return `Excellent: ${displayName}`;
           }
           return `Good: ${displayName}`;
@@ -282,19 +283,20 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
     it("should convert to AsyncOpt at first async operation and stay AsyncOpt", async () => {
       const opt = ExperimentalOption.Some(42);
 
-      let step1 = opt.map((x) => x * 2); // sync
+      const step1 = opt.map((x) => x * 2); // sync
       expect(step1.value.constructor.name).toBe("SyncOpt");
 
-      let step2 = step1.map(async (x) => { // async - converts to AsyncOpt
+      const step2 = step1.map(async (x) => {
+        // async - converts to AsyncOpt
         await new Promise((resolve) => setTimeout(resolve, 1));
         return x + 10;
       });
       expect(step2.value.constructor.name).toBe("AsyncOpt");
 
-      let step3 = step2.map((x) => x.toString()); // sync on AsyncOpt
+      const step3 = step2.map((x) => x.toString()); // sync on AsyncOpt
       expect(step3.value.constructor.name).toBe("AsyncOpt");
 
-      let step4 = step3.map((s) => s.length); // sync on AsyncOpt
+      const step4 = step3.map((s) => s.length); // sync on AsyncOpt
       expect(step4.value.constructor.name).toBe("AsyncOpt");
 
       const finalValue = await step4.value.value;
@@ -322,12 +324,14 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
 
       const result = opt
         .map((x) => x) // sync
-        .map(async (x) => { // async
+        .map(async (_x) => {
+          // async
           await new Promise((resolve) => setTimeout(resolve, 1));
           return null;
         })
-        .map((x) => x === null ? undefined : x) // sync on async
-        .map(async (x) => { // async on async
+        .map((x) => (x === null ? undefined : x)) // sync on async
+        .map(async (x) => {
+          // async on async
           await new Promise((resolve) => setTimeout(resolve, 1));
           return x === undefined ? "was_undefined" : "was_something_else";
         });
@@ -342,17 +346,19 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
 
       const result = opt
         .map((arr) => arr.filter((_, i) => i % 2 === 0)) // sync
-        .map(async (filtered) => { // async
+        .map(async (filtered) => {
+          // async
           await new Promise((resolve) => setTimeout(resolve, 1));
           return filtered.join("-");
         })
         .map((str) => str.split("-")) // sync on async
-        .map(async (parts) => { // async on async
+        .map(async (parts) => {
+          // async on async
           await new Promise((resolve) => setTimeout(resolve, 1));
           return {
             original: parts,
             count: parts.length,
-            first: parts[0] || "empty"
+            first: parts[0] || "empty",
           };
         });
 
@@ -361,7 +367,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
       expect(finalValue).toEqual({
         original: ["a", "c"],
         count: 2,
-        first: "a"
+        first: "a",
       });
     });
 
@@ -371,7 +377,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
       // Test rejection in first async operation
       const result1 = opt
         .map((x) => x * 2)
-        .map(async (x) => {
+        .map(async (_x) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
           throw new Error("First async failed");
         })
@@ -386,7 +392,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
           await new Promise((resolve) => setTimeout(resolve, 1));
           return x + 10;
         })
-        .map(async (x) => {
+        .map(async (_x) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
           throw new Error("Second async failed");
         });
@@ -425,7 +431,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
       const [result1, result2, result3] = await Promise.all([
         Promise.resolve(final1.value.value),
         final2.value.value,
-        Promise.resolve(final3.value.value)
+        Promise.resolve(final3.value.value),
       ]);
 
       expect(result1).toBe(89); // 42 * 2 + 5
@@ -450,8 +456,11 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
         metadata: {
           created: new Date(),
           tags: ["tag1", "tag2"],
-          scores: new Map([["math", 95], ["science", 88]])
-        }
+          scores: new Map([
+            ["math", 95],
+            ["science", 88],
+          ]),
+        },
       });
 
       const result = opt
@@ -460,19 +469,21 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
           ...data,
           metadata: {
             ...data.metadata,
-            scores: new Map([...data.metadata.scores])
-          }
+            scores: new Map([...data.metadata.scores]),
+          },
         }))
         // Async operation modifying scores
         .map(async (data) => {
           await new Promise((resolve) => setTimeout(resolve, 1));
           const newScores = new Map(data.metadata.scores);
-          newScores.set("average",
-            Array.from(newScores.values()).reduce((a, b) => a + b, 0) / newScores.size
+          newScores.set(
+            "average",
+            Array.from(newScores.values()).reduce((a, b) => a + b, 0) /
+              newScores.size,
           );
           return {
             ...data,
-            metadata: { ...data.metadata, scores: newScores }
+            metadata: { ...data.metadata, scores: newScores },
           };
         })
         // Sync operation extracting specific data
@@ -480,7 +491,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
           id: data.id,
           tagCount: data.metadata.tags.length,
           scoreCount: data.metadata.scores.size,
-          averageScore: data.metadata.scores.get("average")
+          averageScore: data.metadata.scores.get("average"),
         }));
 
       expect(result.value.constructor.name).toBe("AsyncOpt");
@@ -489,7 +500,7 @@ describe("ExperimentalOption - Sync/Async Permutation Tests", () => {
         id: "test-123",
         tagCount: 2,
         scoreCount: 3,
-        averageScore: 91.5
+        averageScore: 91.5,
       });
     });
   });
