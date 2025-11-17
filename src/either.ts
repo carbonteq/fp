@@ -236,9 +236,6 @@ export type UnwrapEither<T extends Either<unknown, unknown>> = {
   right: RightOf<T>;
 };
 
-// Option type for integration
-export type Option<T> = { kind: "some"; value: T } | { kind: "none" };
-
 export class Either<L, R> {
   private readonly internal: EitherInternal<L, R>;
 
@@ -280,22 +277,20 @@ export class Either<L, R> {
   static tryCatch<T, L>(
     fn: () => T | Promise<T>,
     onError: (error: unknown) => L,
-  ): Either<L, T> | Either<L, Promise<T>> {
+  ): Either<L, T> {
     try {
       const result = fn();
       if (isPromise(result)) {
-        // For async functions, return Either<L, Promise<T>> where Promise is the value
-        // We need to bypass the automatic async state conversion
-        const initialState = { kind: "right" as const, value: result };
-        return new Either<L, Promise<T>>(
-          new HybridController<L, Promise<T>>(
-            initialState as EitherState<L, Promise<T>>,
-          ),
-        );
+        // For async functions, create an async-right state
+        const initialState: EitherState<L, T> = {
+          kind: "async-right",
+          promise: result,
+        };
+        return new Either<L, T>(new HybridController<L, T>(initialState));
       }
-      return Either.Right(result) as Either<L, T>;
+      return Either.Right(result);
     } catch (error) {
-      return Either.Left(onError(error)) as Either<L, T>;
+      return Either.Left(onError(error));
     }
   }
 
@@ -304,8 +299,8 @@ export class Either<L, R> {
     onError: (error: unknown) => L,
   ): Promise<Either<L, T>> {
     return promise
-      .then((value) => Either.Right(value))
-      .catch((error) => Either.Left(onError(error)));
+      .then((value) => Either.Right(value) as Either<L, T>)
+      .catch((error) => Either.Left(onError(error)) as Either<L, T>);
   }
 
   // Introspection methods
@@ -366,18 +361,18 @@ export class Either<L, R> {
   }
 
   // Safe unwrapping methods
-  safeUnwrap(): Option<R> {
+  safeUnwrap(): R | null {
     if (this.internal.state.kind === "right") {
-      return { kind: "some", value: this.internal.state.value };
+      return this.internal.state.value;
     }
-    return { kind: "none" };
+    return null;
   }
 
-  safeUnwrapLeft(): Option<L> {
+  safeUnwrapLeft(): L | null {
     if (this.internal.state.kind === "left") {
-      return { kind: "some", value: this.internal.state.value };
+      return this.internal.state.value;
     }
-    return { kind: "none" };
+    return null;
   }
 
   toTuple(): [L, null] | [null, R] {
@@ -430,7 +425,7 @@ export class Either<L, R> {
         return this.internal.state.promise;
       case "left":
       case "async-left":
-        throw new UnwrappedLeftWithRight(this);
+        throw new UnwrappedLeftWithRight(this as Either<unknown, unknown>);
       default:
         throw new Error("Invalid Either state");
     }
@@ -444,7 +439,7 @@ export class Either<L, R> {
         return this.internal.state.promise;
       case "right":
       case "async-right":
-        throw new UnwrappedRightWithLeft(this);
+        throw new UnwrappedRightWithLeft(this as Either<unknown, unknown>);
       default:
         throw new Error("Invalid Either state");
     }
@@ -460,12 +455,13 @@ export class Either<L, R> {
   mapRight<U>(
     fn: (value: R) => U | Promise<U>,
   ): Either<L, U> | Either<L, Promise<U>> {
-    // If we're on the Left track, just return this Either with updated type
+    // If we're on the Left track, Left operations are skipped, return unchanged
     if (
       this.internal.state.kind === "left" ||
       this.internal.state.kind === "async-left"
     ) {
-      return this as Either<L, U> | Either<L, Promise<U>>;
+      // For Left track, mapRight doesn't affect the Left value, just return this with new type annotation
+      return this as unknown as Either<L, U> | Either<L, Promise<U>>;
     }
 
     // We're on the Right track
@@ -474,27 +470,15 @@ export class Either<L, R> {
       const result = fn(currentValue);
 
       if (isPromise(result)) {
-        return new Either({
-          state: { kind: "async-right", promise: result },
-          pendingLeft: [],
-          pendingRight: [],
-        }) as unknown as Either<L, Promise<U>>;
+        return Either.Right(result) as Either<L, Promise<U>>;
       }
-      return new Either({
-        state: { kind: "right", value: result },
-        pendingLeft: [],
-        pendingRight: [],
-      }) as unknown as Either<L, U>;
+      return Either.Right(result) as Either<L, U>;
     }
 
     // We're on the async Right track
     if (this.internal.state.kind === "async-right") {
       const newPromise = this.internal.state.promise.then((val) => fn(val));
-      return new Either({
-        state: { kind: "async-right", promise: newPromise },
-        pendingLeft: [],
-        pendingRight: [],
-      }) as unknown as Either<L, Promise<U>>;
+      return Either.Right(newPromise) as Either<L, Promise<U>>;
     }
 
     // This should never happen with proper typing
@@ -509,21 +493,13 @@ export class Either<L, R> {
   ): Either<L2, R> | Either<Promise<L2>, R> {
     if (this.internal.state.kind === "right") {
       // We're on the Right track, so Left operations are skipped
-      // Return this Either with updated type but preserve the Right state
-      return new Either({
-        state: this.internal.state as EitherState<L2, R>,
-        pendingLeft: [],
-        pendingRight: [],
-      }) as Either<L2, R>;
+      // Return this Either with updated type annotation
+      return this as unknown as Either<L2, R>;
     }
 
     if (this.internal.state.kind === "async-left") {
       const newPromise = this.internal.state.promise.then((val) => fn(val));
-      return new Either({
-        state: { kind: "async-left", promise: newPromise },
-        pendingLeft: [],
-        pendingRight: [],
-      }) as unknown as Either<Promise<L2>, R>;
+      return Either.Left(newPromise) as unknown as Either<Promise<L2>, R>;
     }
 
     // We're on sync Left track
@@ -532,29 +508,19 @@ export class Either<L, R> {
     const result = fn(currentValue);
 
     if (isPromise(result)) {
-      return new Either({
-        state: { kind: "async-left", promise: result },
-        pendingLeft: [],
-        pendingRight: [],
-      }) as unknown as Either<Promise<L2>, R>;
+      return Either.Left(result) as unknown as Either<Promise<L2>, R>;
     }
 
-    return new Either({
-      state: { kind: "left", value: result },
-      pendingLeft: [],
-      pendingRight: [],
-    }) as unknown as Either<L2, R>;
+    return Either.Left(result) as unknown as Either<L2, R>;
   }
 
   // Flat mapping operations
   flatMap<U, L2 = never>(fn: (value: R) => Either<L2, U>): Either<L | L2, U> {
     if (this.internal.state.kind === "left") {
       // We're on Left track, so Right operations are skipped
-      return new Either({
-        state: this.internal.state as EitherState<L | L2, U>,
-        pendingLeft: [],
-        pendingRight: [],
-      }) as Either<L | L2, U>;
+      const leftValue = (this.internal.state as { kind: "left"; value: L })
+        .value;
+      return Either.Left(leftValue) as Either<L | L2, U>;
     }
 
     if (this.internal.state.kind === "async-right") {
@@ -563,11 +529,12 @@ export class Either<L, R> {
         return result.internal.state;
       });
 
-      return new Either({
-        state: { kind: "async-right", promise: newPromise },
-        pendingLeft: [],
-        pendingRight: [],
-      }) as unknown as Either<L | L2, U>;
+      return Either.Right(newPromise) as unknown as Either<L | L2, U>;
+    }
+
+    if (this.internal.state.kind === "async-left") {
+      // For async-left, the operation is skipped but we preserve the async nature
+      return this as unknown as Either<L | L2, U>;
     }
 
     // We're on sync Right track
@@ -577,16 +544,21 @@ export class Either<L, R> {
     return result as Either<L | L2, U>;
   }
 
+  // Alias for flatMap - operates on Right track
+  flatMapRight<U, L2 = never>(
+    fn: (value: R) => Either<L2, U>,
+  ): Either<L | L2, U> {
+    return this.flatMap(fn);
+  }
+
   flatMapLeft<U, L2 = never>(
     fn: (value: L) => Either<L2, U>,
   ): Either<L2, R | U> {
     if (this.internal.state.kind === "right") {
       // We're on Right track, so Left operations are skipped
-      return new Either({
-        state: this.internal.state as EitherState<L2, R | U>,
-        pendingLeft: [],
-        pendingRight: [],
-      }) as Either<L2, R | U>;
+      const rightValue = (this.internal.state as { kind: "right"; value: R })
+        .value;
+      return Either.Right(rightValue) as Either<L2, R | U>;
     }
 
     if (this.internal.state.kind === "async-left") {
@@ -595,11 +567,12 @@ export class Either<L, R> {
         return result.internal.state;
       });
 
-      return new Either({
-        state: { kind: "async-left", promise: newPromise },
-        pendingLeft: [],
-        pendingRight: [],
-      }) as unknown as Either<L2, R | U>;
+      return Either.Left(newPromise) as unknown as Either<L2, R | U>;
+    }
+
+    if (this.internal.state.kind === "async-right") {
+      // For async-right, the operation is skipped but we preserve the async nature
+      return this as unknown as Either<L2, R | U>;
     }
 
     // We're on sync Left track
@@ -645,12 +618,15 @@ export class Either<L, R> {
     // since the original Right value is not available.
     // This implementation returns Either<L2, R | U> instead.
     if (this.internal.state.kind === "right") {
-      // If on Right track, we need to create a new Either with correct types
-      return new Either({
-        state: this.internal.state as EitherState<L2, R | U>,
-        pendingLeft: [],
-        pendingRight: [],
-      }) as Either<L2, R | U>;
+      // If on Right track, we need to preserve the Right value
+      const rightValue = (this.internal.state as { kind: "right"; value: R })
+        .value;
+      return Either.Right(rightValue) as Either<L2, R | U>;
+    }
+
+    if (this.internal.state.kind === "async-right") {
+      // For async-right, preserve the async nature and type
+      return this as unknown as Either<L2, R | U>;
     }
 
     return this.flatMapLeft((value: L) => {
@@ -674,22 +650,46 @@ export class Either<L, R> {
       const leftResult = this.mapLeft(left);
       // mapLeft returns Either<L2, R>, but we need Either<L2, R2>
       // Since we're on the Left track, the R type doesn't matter
-      return new Either({
-        state: leftResult.internal.state as EitherState<L2, R2>,
-        pendingLeft: [],
-        pendingRight: [],
-      });
+      // We need to extract the Left value and create a new Either with correct types
+      if (leftResult.internal.state.kind === "left") {
+        const leftValue = (
+          leftResult.internal.state as { kind: "left"; value: L2 }
+        ).value;
+        return Either.Left(leftValue) as Either<L2, R2>;
+      } else if (leftResult.internal.state.kind === "async-left") {
+        const leftPromise = (
+          leftResult.internal.state as {
+            kind: "async-left";
+            promise: Promise<L2>;
+          }
+        ).promise;
+        return Either.Left(leftPromise) as Either<L2, R2>;
+      }
+      // Fallback - this shouldn't happen with proper mapLeft
+      return leftResult as Either<L2, R2>;
     }
 
     // We're on the Right track
     const rightResult = this.mapRight(right);
     // mapRight returns Either<L, R2>, but we need Either<L2, R2>
     // Since we're on the Right track, the L type doesn't matter
-    return new Either({
-      state: rightResult.internal.state as EitherState<L2, R2>,
-      pendingLeft: [],
-      pendingRight: [],
-    });
+    // We need to extract the Right value and create a new Either with correct types
+    if (rightResult.internal.state.kind === "right") {
+      const rightValue = (
+        rightResult.internal.state as { kind: "right"; value: R2 }
+      ).value;
+      return Either.Right(rightValue) as Either<L2, R2>;
+    } else if (rightResult.internal.state.kind === "async-right") {
+      const rightPromise = (
+        rightResult.internal.state as {
+          kind: "async-right";
+          promise: Promise<R2>;
+        }
+      ).promise;
+      return Either.Right(rightPromise) as Either<L2, R2>;
+    }
+    // Fallback - this shouldn't happen with proper mapRight
+    return rightResult as Either<L2, R2>;
   }
 
   match<T>({
@@ -947,27 +947,9 @@ export class Either<L, R> {
     throw new Error("Invalid Either state");
   }
 
-  // Option integration
-  static fromOption<T, L>(option: Option<T>, leftValue: L): Either<L, T> {
-    return option.kind === "some"
-      ? Either.Right(option.value)
-      : Either.Left(leftValue);
-  }
-
-  toOption(): Option<R> {
-    if (this.internal.state.kind === "right") {
-      const value = (this.internal.state as { kind: "right"; value: R }).value;
-      return { kind: "some", value };
-    }
-    return { kind: "none" };
-  }
-
-  toOptionLeft(): Option<L> {
-    if (this.internal.state.kind === "left") {
-      const value = (this.internal.state as { kind: "left"; value: L }).value;
-      return { kind: "some", value };
-    }
-    return { kind: "none" };
+  // Utility methods
+  static lift<A, B, L = never>(fn: (a: A) => B): Either<L, (a: A) => B> {
+    return Either.Right(fn);
   }
 
   // Async conversion

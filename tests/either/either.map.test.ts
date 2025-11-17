@@ -20,9 +20,9 @@ describe("Either.mapRight behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).not.toBeNull();
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe("right-84");
+        expect(result.safeUnwrap()).toBe("right-84");
       }
     });
 
@@ -32,9 +32,9 @@ describe("Either.mapRight behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -46,9 +46,9 @@ describe("Either.mapRight behavior", () => {
         .mapRight(mapHelpers.syncRightMapper);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
   });
@@ -69,9 +69,9 @@ describe("Either.mapRight behavior", () => {
       const result = either.mapRight(mapHelpers.asyncRightMapper);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
   });
@@ -96,9 +96,9 @@ describe("Either.mapRight behavior", () => {
         .mapRight((value: string) => `sync-${value}`);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -109,23 +109,23 @@ describe("Either.mapRight behavior", () => {
 
       // Original should be unchanged
       expect(either.isRight()).toBe(true);
-      expect(either.safeUnwrap().kind).toBe("some");
+      expect(either.safeUnwrap()).not.toBeNull();
       if (either.safeUnwrap().kind === "some") {
-        expect(either.safeUnwrap().value).toBe(42);
+        expect(either.safeUnwrap()).toBe(42);
       }
 
       // First result should be mapped
       expect(result1.isRight()).toBe(true);
-      expect(result1.safeUnwrap().kind).toBe("some");
+      expect(result1.safeUnwrap()).not.toBeNull();
       if (result1.safeUnwrap().kind === "some") {
-        expect(result1.safeUnwrap().value).toBe("right-84");
+        expect(result1.safeUnwrap()).toBe("right-84");
       }
 
       // Second result should be unchanged (still on Right track)
       expect(result2.isRight()).toBe(true);
-      expect(result2.safeUnwrap().kind).toBe("some");
+      expect(result2.safeUnwrap()).not.toBeNull();
       if (result2.safeUnwrap().kind === "some") {
-        expect(result2.safeUnwrap().value).toBe("right-84");
+        expect(result2.safeUnwrap()).toBe("right-84");
       }
     });
 
@@ -136,9 +136,9 @@ describe("Either.mapRight behavior", () => {
         .mapLeft(mapHelpers.asyncLeftMapper);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -150,9 +150,9 @@ describe("Either.mapRight behavior", () => {
         .mapRight((x) => `final-${x}`);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).not.toBeNull();
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe("final-20");
+        expect(result.safeUnwrap()).toBe("final-20");
       }
     });
   });
@@ -166,9 +166,9 @@ describe("Either.mapLeft behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("left-INITIAL-ERROR");
+        expect(result.safeUnwrapLeft()).toBe("left-INITIAL-ERROR");
       }
     });
 
@@ -178,9 +178,9 @@ describe("Either.mapLeft behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).not.toBeNull();
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -192,9 +192,9 @@ describe("Either.mapLeft behavior", () => {
         .mapLeft(mapHelpers.syncLeftMapper);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).not.toBeNull();
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
   });
@@ -215,9 +215,9 @@ describe("Either.mapLeft behavior", () => {
       const result = either.mapLeft(mapHelpers.asyncLeftMapper);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).not.toBeNull();
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
   });
@@ -242,9 +242,9 @@ describe("Either.mapLeft behavior", () => {
         .mapLeft(mapHelpers.asyncLeftMapper);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).not.toBeNull();
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -256,9 +256,9 @@ describe("Either.mapLeft behavior", () => {
         .mapRight(mapHelpers.syncRightMapper);
 
       expect(leftResult.isLeft()).toBe(true);
-      expect(leftResult.safeUnwrapLeft().kind).toBe("some");
+      expect(leftResult.safeUnwrapLeft()).not.toBeNull();
       if (leftResult.safeUnwrapLeft().kind === "some") {
-        expect(leftResult.safeUnwrapLeft().value).toBe("left-INITIAL-ERROR");
+        expect(leftResult.safeUnwrapLeft()).toBe("left-INITIAL-ERROR");
       }
 
       // Test starting with Right
@@ -268,9 +268,9 @@ describe("Either.mapLeft behavior", () => {
         .mapRight(mapHelpers.syncRightMapper);
 
       expect(rightResult.isRight()).toBe(true);
-      expect(rightResult.safeUnwrap().kind).toBe("some");
+      expect(rightResult.safeUnwrap()).not.toBeNull();
       if (rightResult.safeUnwrap().kind === "some") {
-        expect(rightResult.safeUnwrap().value).toBe("right-84");
+        expect(rightResult.safeUnwrap()).toBe("right-84");
       }
     });
 
@@ -306,9 +306,9 @@ describe("Either.mapLeft behavior", () => {
         .mapLeft((err) => `final-${err}`);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).not.toBeNull();
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("final-prefix-ERROR");
+        expect(result.safeUnwrapLeft()).toBe("final-prefix-ERROR");
       }
     });
   });
@@ -323,15 +323,15 @@ describe("Either.map (alias for mapRight) behavior", () => {
     expect(result1.isRight()).toBe(true);
     expect(result2.isRight()).toBe(true);
 
-    expect(result1.safeUnwrap().kind).toBe("some");
-    expect(result2.safeUnwrap().kind).toBe("some");
+    expect(result1.safeUnwrap()).not.toBeNull();
+    expect(result2.safeUnwrap()).not.toBeNull();
 
     if (
       result1.safeUnwrap().kind === "some" &&
       result2.safeUnwrap().kind === "some"
     ) {
-      expect(result1.safeUnwrap().value).toBe(result2.safeUnwrap().value);
-      expect(result1.safeUnwrap().value).toBe(30);
+      expect(result1.safeUnwrap()).toBe(result2.safeUnwrap());
+      expect(result1.safeUnwrap()).toBe(30);
     }
   });
 
@@ -340,9 +340,9 @@ describe("Either.map (alias for mapRight) behavior", () => {
     const result = either.map((x) => x * 3);
 
     expect(result.isLeft()).toBe(true);
-    expect(result.safeUnwrapLeft().kind).toBe("some");
+    expect(result.safeUnwrapLeft()).not.toBeNull();
     if (result.safeUnwrapLeft().kind === "some") {
-      expect(result.safeUnwrapLeft().value).toBe("error");
+      expect(result.safeUnwrapLeft()).toBe("error");
     }
   });
 });

@@ -25,9 +25,9 @@ describe("Either.flatMapRight behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe("right-84");
+        expect(result.safeUnwrap()).toBe("right-84");
       }
     });
 
@@ -37,9 +37,9 @@ describe("Either.flatMapRight behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -49,9 +49,9 @@ describe("Either.flatMapRight behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("error-10");
+        expect(result.safeUnwrapLeft()).toBe("error-10");
       }
     });
 
@@ -62,9 +62,9 @@ describe("Either.flatMapRight behavior", () => {
         .mapLeft((err) => `processed-${err}`);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("processed-error-10");
+        expect(result.safeUnwrapLeft()).toBe("processed-error-10");
       }
     });
   });
@@ -85,9 +85,9 @@ describe("Either.flatMapRight behavior", () => {
       const result = either.flatMapRight(flatMapHelpers.asyncRightBinder);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -125,9 +125,9 @@ describe("Either.flatMapRight behavior", () => {
         .flatMapRight((value: string) => Either.Right(`final-${value}`));
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -138,9 +138,9 @@ describe("Either.flatMapRight behavior", () => {
         .flatMapLeft(flatMapHelpers.syncLeftBinder);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -152,9 +152,9 @@ describe("Either.flatMapRight behavior", () => {
         .flatMapLeft(flatMapHelpers.asyncLeftBinder);
 
       expect(leftResult.isLeft()).toBe(true);
-      expect(leftResult.safeUnwrapLeft().kind).toBe("some");
+      expect(leftResult.safeUnwrapLeft()).toBe("some");
       if (leftResult.safeUnwrapLeft().kind === "some") {
-        expect(leftResult.safeUnwrapLeft().value).toBe("initial-error");
+        expect(leftResult.safeUnwrapLeft()).toBe("initial-error");
       }
 
       // Test starting with Right and switching to Left
@@ -177,9 +177,9 @@ describe("Either.flatMapRight behavior", () => {
         .flatMapLeft((error) => Either.Right(`recovered-${error}`)); // Switch back to Right
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe("recovered-processed-error-10");
+        expect(result.safeUnwrap()).toBe("recovered-processed-error-10");
       }
     });
 
@@ -191,16 +191,16 @@ describe("Either.flatMapRight behavior", () => {
 
       // Original should be unchanged
       expect(original.isRight()).toBe(true);
-      expect(original.safeUnwrap().kind).toBe("some");
+      expect(original.safeUnwrap()).toBe("some");
       if (original.safeUnwrap().kind === "some") {
-        expect(original.safeUnwrap().value).toBe(100);
+        expect(original.safeUnwrap()).toBe(100);
       }
 
       // Chained should have final result
       expect(chained.isRight()).toBe(true);
-      expect(chained.safeUnwrap().kind).toBe("some");
+      expect(chained.safeUnwrap()).toBe("some");
       if (chained.safeUnwrap().kind === "some") {
-        expect(chained.safeUnwrap().value).toBe("right-336"); // 100 * 2 = 200, then 200 * 2 = 400, then "right-400"
+        expect(chained.safeUnwrap()).toBe("right-336"); // 100 * 2 = 200, then 200 * 2 = 400, then "right-400"
       }
     });
   });
@@ -214,9 +214,9 @@ describe("Either.flatMapLeft behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error".length);
+        expect(result.safeUnwrapLeft()).toBe("initial-error".length);
       }
     });
 
@@ -226,9 +226,9 @@ describe("Either.flatMapLeft behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -238,9 +238,9 @@ describe("Either.flatMapLeft behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe("success-error-message");
+        expect(result.safeUnwrap()).toBe("success-error-message");
       }
     });
 
@@ -251,9 +251,9 @@ describe("Either.flatMapLeft behavior", () => {
         .mapRight((success) => `processed-${success}`);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe("processed-success-error");
+        expect(result.safeUnwrap()).toBe("processed-success-error");
       }
     });
   });
@@ -274,9 +274,9 @@ describe("Either.flatMapLeft behavior", () => {
       const result = either.flatMapLeft(flatMapHelpers.asyncLeftBinder);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -314,9 +314,9 @@ describe("Either.flatMapLeft behavior", () => {
         .flatMapLeft(flatMapHelpers.asyncLeftBinder);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -328,9 +328,9 @@ describe("Either.flatMapLeft behavior", () => {
         .flatMapRight(flatMapHelpers.syncRightBinder);
 
       expect(leftResult.isLeft()).toBe(true);
-      expect(leftResult.safeUnwrapLeft().kind).toBe("some");
+      expect(leftResult.safeUnwrapLeft()).toBe("some");
       if (leftResult.safeUnwrapLeft().kind === "some") {
-        expect(leftResult.safeUnwrapLeft().value).toBe("initial-error".length);
+        expect(leftResult.safeUnwrapLeft()).toBe("initial-error".length);
       }
 
       // Test starting with Left and switching to Right
@@ -340,11 +340,9 @@ describe("Either.flatMapLeft behavior", () => {
         .flatMapRight(flatMapHelpers.syncRightBinder);
 
       expect(switchResult.isRight()).toBe(true);
-      expect(switchResult.safeUnwrap().kind).toBe("some");
+      expect(switchResult.safeUnwrap()).toBe("some");
       if (switchResult.safeUnwrap().kind === "some") {
-        expect(switchResult.safeUnwrap().value).toBe(
-          "right-success-initial-error",
-        );
+        expect(switchResult.safeUnwrap()).toBe("right-success-initial-error");
       }
 
       // Test starting with Right
@@ -354,9 +352,9 @@ describe("Either.flatMapLeft behavior", () => {
         .flatMapRight(flatMapHelpers.syncRightBinder);
 
       expect(rightResult.isRight()).toBe(true);
-      expect(rightResult.safeUnwrap().kind).toBe("some");
+      expect(rightResult.safeUnwrap()).toBe("some");
       if (rightResult.safeUnwrap().kind === "some") {
-        expect(rightResult.safeUnwrap().value).toBe("right-84");
+        expect(rightResult.safeUnwrap()).toBe("right-84");
       }
     });
 
@@ -403,11 +401,9 @@ describe("Either.flatMapLeft behavior", () => {
         .flatMapRight((success) => Either.Left(`final-${success}`)); // Switch back to Left
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe(
-          "final-RECOVERED-START-ERROR",
-        );
+        expect(result.safeUnwrapLeft()).toBe("final-RECOVERED-START-ERROR");
       }
     });
   });
@@ -422,15 +418,15 @@ describe("Either.flatMap (alias for flatMapRight) behavior", () => {
     expect(result1.isRight()).toBe(true);
     expect(result2.isRight()).toBe(true);
 
-    expect(result1.safeUnwrap().kind).toBe("some");
-    expect(result2.safeUnwrap().kind).toBe("some");
+    expect(result1.safeUnwrap()).toBe("some");
+    expect(result2.safeUnwrap()).toBe("some");
 
     if (
       result1.safeUnwrap().kind === "some" &&
       result2.safeUnwrap().kind === "some"
     ) {
-      expect(result1.safeUnwrap().value).toBe(result2.safeUnwrap().value);
-      expect(result1.safeUnwrap().value).toBe(30);
+      expect(result1.safeUnwrap()).toBe(result2.safeUnwrap());
+      expect(result1.safeUnwrap()).toBe(30);
     }
   });
 
@@ -439,9 +435,9 @@ describe("Either.flatMap (alias for flatMapRight) behavior", () => {
     const result = either.flatMap((x) => Either.Right(x * 3));
 
     expect(result.isLeft()).toBe(true);
-    expect(result.safeUnwrapLeft().kind).toBe("some");
+    expect(result.safeUnwrapLeft()).toBe("some");
     if (result.safeUnwrapLeft().kind === "some") {
-      expect(result.safeUnwrapLeft().value).toBe("error");
+      expect(result.safeUnwrapLeft()).toBe("error");
     }
   });
 });

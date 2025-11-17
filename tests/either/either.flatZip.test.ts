@@ -32,9 +32,9 @@ describe("Either.flatZip behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toEqual([42, "flatzip-right-84"]);
+        expect(result.safeUnwrap()).toEqual([42, "flatzip-right-84"]);
       }
     });
 
@@ -44,9 +44,9 @@ describe("Either.flatZip behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("error-10");
+        expect(result.safeUnwrapLeft()).toBe("error-10");
       }
     });
 
@@ -56,9 +56,9 @@ describe("Either.flatZip behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
   });
@@ -92,9 +92,9 @@ describe("Either.flatZip behavior", () => {
       const result = either.flatZip(flatZipHelpers.asyncRightBinder);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
   });
@@ -108,9 +108,9 @@ describe("Either.flatZipRight behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toEqual([42, "flatzip-right-84"]);
+        expect(result.safeUnwrap()).toEqual([42, "flatzip-right-84"]);
       }
     });
 
@@ -120,9 +120,9 @@ describe("Either.flatZipRight behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -131,9 +131,9 @@ describe("Either.flatZipRight behavior", () => {
       const result = either.flatZipRight(flatZipHelpers.rightToLeftBinder);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("error-20");
+        expect(result.safeUnwrapLeft()).toBe("error-20");
       }
     });
 
@@ -145,10 +145,7 @@ describe("Either.flatZipRight behavior", () => {
 
       expect(result.isRight()).toBe(true);
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toEqual([
-          "original",
-          "mapped-original",
-        ]);
+        expect(result.safeUnwrap()).toEqual(["original", "mapped-original"]);
       }
     });
   });
@@ -169,9 +166,9 @@ describe("Either.flatZipRight behavior", () => {
       const result = either.flatZipRight(flatZipHelpers.asyncRightBinder);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -216,9 +213,9 @@ describe("Either.flatZipRight behavior", () => {
         );
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -229,23 +226,23 @@ describe("Either.flatZipRight behavior", () => {
 
       // Original should be unchanged
       expect(either.isRight()).toBe(true);
-      expect(either.safeUnwrap().kind).toBe("some");
+      expect(either.safeUnwrap()).toBe("some");
       if (either.safeUnwrap().kind === "some") {
-        expect(either.safeUnwrap().value).toBe(42);
+        expect(either.safeUnwrap()).toBe(42);
       }
 
       // First result should be flatZipped
       expect(result1.isRight()).toBe(true);
-      expect(result1.safeUnwrap().kind).toBe("some");
+      expect(result1.safeUnwrap()).toBe("some");
       if (result1.safeUnwrap().kind === "some") {
-        expect(result1.safeUnwrap().value).toEqual([42, "flatzip-right-84"]);
+        expect(result1.safeUnwrap()).toEqual([42, "flatzip-right-84"]);
       }
 
       // Second result should be unchanged (still on Right track)
       expect(result2.isRight()).toBe(true);
-      expect(result2.safeUnwrap().kind).toBe("some");
+      expect(result2.safeUnwrap()).toBe("some");
       if (result2.safeUnwrap().kind === "some") {
-        expect(result2.safeUnwrap().value).toEqual([42, "flatzip-right-84"]);
+        expect(result2.safeUnwrap()).toEqual([42, "flatzip-right-84"]);
       }
     });
 
@@ -256,9 +253,9 @@ describe("Either.flatZipRight behavior", () => {
         .flatZipLeft(flatZipHelpers.asyncLeftBinder);
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("initial-error");
+        expect(result.safeUnwrapLeft()).toBe("initial-error");
       }
     });
 
@@ -269,9 +266,9 @@ describe("Either.flatZipRight behavior", () => {
         .flatZipLeft((error) => Either.Left(`nested-${error}`)); // Stay on Left
 
       expect(result.isLeft()).toBe(true);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toBe("nested-error-20");
+        expect(result.safeUnwrapLeft()).toBe("nested-error-20");
       }
     });
   });
@@ -285,9 +282,9 @@ describe("Either.flatZipLeft behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       expect(result.isRight()).toBe(false);
-      expect(result.safeUnwrapLeft().kind).toBe("some");
+      expect(result.safeUnwrapLeft()).toBe("some");
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toEqual([
+        expect(result.safeUnwrapLeft()).toEqual([
           "initial-error",
           "initial-error".length,
         ]);
@@ -300,9 +297,9 @@ describe("Either.flatZipLeft behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -312,9 +309,9 @@ describe("Either.flatZipLeft behavior", () => {
 
       expect(result.isRight()).toBe(true);
       expect(result.isLeft()).toBe(false);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toEqual([
+        expect(result.safeUnwrap()).toEqual([
           "error-message",
           "success-error-message",
         ]);
@@ -329,7 +326,7 @@ describe("Either.flatZipLeft behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toEqual([
+        expect(result.safeUnwrapLeft()).toEqual([
           "original-error",
           "mapped-original-error",
         ]);
@@ -353,9 +350,9 @@ describe("Either.flatZipLeft behavior", () => {
       const result = either.flatZipLeft(flatZipHelpers.asyncLeftBinder);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -398,9 +395,9 @@ describe("Either.flatZipLeft behavior", () => {
         .flatZipLeft(flatZipHelpers.asyncLeftBinder);
 
       expect(result.isRight()).toBe(true);
-      expect(result.safeUnwrap().kind).toBe("some");
+      expect(result.safeUnwrap()).toBe("some");
       if (result.safeUnwrap().kind === "some") {
-        expect(result.safeUnwrap().value).toBe(42);
+        expect(result.safeUnwrap()).toBe(42);
       }
     });
 
@@ -412,9 +409,9 @@ describe("Either.flatZipLeft behavior", () => {
         .flatZipRight(flatZipHelpers.syncRightBinder);
 
       expect(leftResult.isLeft()).toBe(true);
-      expect(leftResult.safeUnwrapLeft().kind).toBe("some");
+      expect(leftResult.safeUnwrapLeft()).toBe("some");
       if (leftResult.safeUnwrapLeft().kind === "some") {
-        expect(leftResult.safeUnwrapLeft().value).toEqual([
+        expect(leftResult.safeUnwrapLeft()).toEqual([
           "initial-error",
           "initial-error".length,
         ]);
@@ -427,9 +424,9 @@ describe("Either.flatZipLeft behavior", () => {
         .flatZipRight(flatZipHelpers.syncRightBinder);
 
       expect(switchResult.isRight()).toBe(true);
-      expect(switchResult.safeUnwrap().kind).toBe("some");
+      expect(switchResult.safeUnwrap()).toBe("some");
       if (switchResult.safeUnwrap().kind === "some") {
-        expect(switchResult.safeUnwrap().value).toEqual([
+        expect(switchResult.safeUnwrap()).toEqual([
           ["initial-error", "success-initial-error"],
           "flatzip-right-success-initial-error".length * 2,
         ]);
@@ -442,12 +439,9 @@ describe("Either.flatZipLeft behavior", () => {
         .flatZipRight(flatZipHelpers.syncRightBinder);
 
       expect(rightResult.isRight()).toBe(true);
-      expect(rightResult.safeUnwrap().kind).toBe("some");
+      expect(rightResult.safeUnwrap()).toBe("some");
       if (rightResult.safeUnwrap().kind === "some") {
-        expect(rightResult.safeUnwrap().value).toEqual([
-          42,
-          "flatzip-right-84",
-        ]);
+        expect(rightResult.safeUnwrap()).toEqual([42, "flatzip-right-84"]);
       }
     });
 
@@ -499,7 +493,7 @@ describe("Either.flatZipLeft behavior", () => {
 
       expect(result.isLeft()).toBe(true);
       if (result.safeUnwrapLeft().kind === "some") {
-        expect(result.safeUnwrapLeft().value).toEqual([
+        expect(result.safeUnwrapLeft()).toEqual([
           ["start-error", "recovered-start-error"],
           "final-recovered-start-error",
         ]);
@@ -519,7 +513,7 @@ describe("Complex flatZip scenarios", () => {
 
     expect(result.isRight()).toBe(true);
     if (result.safeUnwrap().kind === "some") {
-      expect(result.safeUnwrap().value).toEqual([[10, 20], 30]);
+      expect(result.safeUnwrap()).toEqual([[10, 20], 30]);
     }
   });
 
@@ -532,10 +526,7 @@ describe("Complex flatZip scenarios", () => {
 
     expect(result.isRight()).toBe(true);
     if (result.safeUnwrap().kind === "some") {
-      expect(result.safeUnwrap().value).toEqual([
-        ["recovered-START-ERROR"],
-        21,
-      ]);
+      expect(result.safeUnwrap()).toEqual([["recovered-START-ERROR"], 21]);
     }
   });
 
@@ -546,13 +537,13 @@ describe("Complex flatZip scenarios", () => {
     // Original should be unchanged
     expect(original.isRight()).toBe(true);
     if (original.safeUnwrap().kind === "some") {
-      expect(original.safeUnwrap().value).toBe(100);
+      expect(original.safeUnwrap()).toBe(100);
     }
 
     // FlatZipped should contain tuple
     expect(flatZipped.isRight()).toBe(true);
     if (flatZipped.safeUnwrap().kind === "some") {
-      expect(flatZipped.safeUnwrap().value).toEqual([100, 200]);
+      expect(flatZipped.safeUnwrap()).toEqual([100, 200]);
     }
   });
 
@@ -565,7 +556,7 @@ describe("Complex flatZip scenarios", () => {
 
     expect(result.isRight()).toBe(true);
     if (result.safeUnwrap().kind === "some") {
-      expect(result.safeUnwrap().value).toEqual([
+      expect(result.safeUnwrap()).toEqual([
         [
           [5, 10],
           [5, 10, 15],
@@ -585,7 +576,7 @@ describe("Complex flatZip scenarios", () => {
 
     expect(result.isRight()).toBe(true);
     if (result.safeUnwrap().kind === "some") {
-      expect(result.safeUnwrap().value).toEqual([
+      expect(result.safeUnwrap()).toEqual([
         ["too-large-10"],
         "recovered-from-too-large-10",
       ]);

@@ -86,9 +86,9 @@ describe("Either construction", () => {
       const either = Either.fromPredicate(42, (x) => x > 40, "too-small");
 
       expect(either.isRight()).toBe(true);
-      expect(either.safeUnwrap().kind).toBe("some");
-      if (either.safeUnwrap().kind === "some") {
-        expect(either.safeUnwrap().value).toBe(42);
+      expect(either.safeUnwrap()).not.toBeNull();
+      if (either.safeUnwrap() !== null) {
+        expect(either.safeUnwrap()).toBe(42);
       }
     });
 
@@ -96,9 +96,9 @@ describe("Either construction", () => {
       const either = Either.fromPredicate(42, (x) => x > 50, "too-small");
 
       expect(either.isLeft()).toBe(true);
-      expect(either.safeUnwrapLeft().kind).toBe("some");
-      if (either.safeUnwrapLeft().kind === "some") {
-        expect(either.safeUnwrapLeft().value).toBe("too-small");
+      expect(either.safeUnwrapLeft()).not.toBeNull();
+      if (either.safeUnwrapLeft() !== null) {
+        expect(either.safeUnwrapLeft()).toBe("too-small");
       }
     });
 
@@ -122,9 +122,9 @@ describe("Either construction", () => {
       );
 
       expect(either.isRight()).toBe(true);
-      expect(either.safeUnwrap().kind).toBe("some");
-      if (either.safeUnwrap().kind === "some") {
-        expect(either.safeUnwrap().value).toBe("success");
+      expect(either.safeUnwrap()).not.toBeNull();
+      if (either.safeUnwrap() !== null) {
+        expect(either.safeUnwrap()).toBe("success");
       }
     });
 
@@ -137,9 +137,9 @@ describe("Either construction", () => {
       );
 
       expect(either.isLeft()).toBe(true);
-      expect(either.safeUnwrapLeft().kind).toBe("some");
-      if (either.safeUnwrapLeft().kind === "some") {
-        expect(either.safeUnwrapLeft().value).toContain("caught:");
+      expect(either.safeUnwrapLeft()).not.toBeNull();
+      if (either.safeUnwrapLeft() !== null) {
+        expect(either.safeUnwrapLeft()).toContain("caught:");
       }
     });
 
@@ -170,9 +170,9 @@ describe("Either construction", () => {
       );
 
       expect(either.isRight()).toBe(true);
-      expect(either.safeUnwrap().kind).toBe("some");
-      if (either.safeUnwrap().kind === "some") {
-        expect(either.safeUnwrap().value).toBe("success");
+      expect(either.safeUnwrap()).not.toBeNull();
+      if (either.safeUnwrap() !== null) {
+        expect(either.safeUnwrap()).toBe("success");
       }
     });
 
@@ -184,9 +184,9 @@ describe("Either construction", () => {
       );
 
       expect(either.isLeft()).toBe(true);
-      expect(either.safeUnwrapLeft().kind).toBe("some");
-      if (either.safeUnwrapLeft().kind === "some") {
-        expect(either.safeUnwrapLeft().value).toContain("caught:");
+      expect(either.safeUnwrapLeft()).not.toBeNull();
+      if (either.safeUnwrapLeft() !== null) {
+        expect(either.safeUnwrapLeft()).toContain("caught:");
       }
     });
   });
@@ -285,34 +285,20 @@ describe("Either unwrapping methods", () => {
   });
 
   describe("safeUnwrap and safeUnwrapLeft", () => {
-    test("safeUnwrap returns Option for Right values", () => {
+    test("safeUnwrap returns value for Right values, null for Left", () => {
       const rightEither = Either.Right("success");
       const leftEither = Either.Left("error");
 
-      const rightOption = rightEither.safeUnwrap();
-      const leftOption = leftEither.safeUnwrap();
-
-      expect(rightOption.kind).toBe("some");
-      if (rightOption.kind === "some") {
-        expect(rightOption.value).toBe("success");
-      }
-
-      expect(leftOption.kind).toBe("none");
+      expect(rightEither.safeUnwrap()).toBe("success");
+      expect(leftEither.safeUnwrap()).toBeNull();
     });
 
-    test("safeUnwrapLeft returns Option for Left values", () => {
+    test("safeUnwrapLeft returns value for Left values, null for Right", () => {
       const rightEither = Either.Right("success");
       const leftEither = Either.Left("error");
 
-      const rightOption = rightEither.safeUnwrapLeft();
-      const leftOption = leftEither.safeUnwrapLeft();
-
-      expect(leftOption.kind).toBe("some");
-      if (leftOption.kind === "some") {
-        expect(leftOption.value).toBe("error");
-      }
-
-      expect(rightOption.kind).toBe("none");
+      expect(rightEither.safeUnwrapLeft()).toBeNull();
+      expect(leftEither.safeUnwrapLeft()).toBe("error");
     });
   });
 
@@ -369,13 +355,13 @@ describe("Either unified operations", () => {
       });
 
       expect(rightResult.isRight()).toBe(true);
-      if (rightResult.safeUnwrap().kind === "some") {
-        expect(rightResult.safeUnwrap().value).toBe("right-success");
+      if (rightResult.safeUnwrap() !== null) {
+        expect(rightResult.safeUnwrap()).toBe("right-success");
       }
 
       expect(leftResult.isLeft()).toBe(true);
-      if (leftResult.safeUnwrapLeft().kind === "some") {
-        expect(leftResult.safeUnwrapLeft().value).toBe("left-error");
+      if (leftResult.safeUnwrapLeft() !== null) {
+        expect(leftResult.safeUnwrapLeft()).toBe("left-error");
       }
     });
 
@@ -462,13 +448,13 @@ describe("Either track manipulation", () => {
       const swappedLeft = leftEither.swap();
 
       expect(swappedRight.isLeft()).toBe(true);
-      if (swappedRight.safeUnwrapLeft().kind === "some") {
-        expect(swappedRight.safeUnwrapLeft().value).toBe("success");
+      if (swappedRight.safeUnwrapLeft() !== null) {
+        expect(swappedRight.safeUnwrapLeft()).toBe("success");
       }
 
       expect(swappedLeft.isRight()).toBe(true);
-      if (swappedLeft.safeUnwrap().kind === "some") {
-        expect(swappedLeft.safeUnwrap().value).toBe("error");
+      if (swappedLeft.safeUnwrap() !== null) {
+        expect(swappedLeft.safeUnwrap()).toBe("error");
       }
     });
   });
@@ -519,66 +505,6 @@ describe("Either track manipulation", () => {
   });
 });
 
-describe("Either Option integration", () => {
-  describe("fromOption", () => {
-    test("creates Right from Some", () => {
-      const option = { kind: "some" as const, value: "success" };
-      const either = Either.fromOption(option, "error");
-
-      expect(either.isRight()).toBe(true);
-      if (either.safeUnwrap().kind === "some") {
-        expect(either.safeUnwrap().value).toBe("success");
-      }
-    });
-
-    test("creates Left from None", () => {
-      const option = { kind: "none" as const };
-      const either = Either.fromOption(option, "error");
-
-      expect(either.isLeft()).toBe(true);
-      if (either.safeUnwrapLeft().kind === "some") {
-        expect(either.safeUnwrapLeft().value).toBe("error");
-      }
-    });
-  });
-
-  describe("toOption and toOptionLeft", () => {
-    test("converts Right to Some Option", () => {
-      const either = Either.Right("success");
-      const option = either.toOption();
-
-      expect(option.kind).toBe("some");
-      if (option.kind === "some") {
-        expect(option.value).toBe("success");
-      }
-    });
-
-    test("converts Left to None Option", () => {
-      const either = Either.Left("error");
-      const option = either.toOption();
-
-      expect(option.kind).toBe("none");
-    });
-
-    test("converts Left to Some OptionLeft", () => {
-      const either = Either.Left("error");
-      const option = either.toOptionLeft();
-
-      expect(option.kind).toBe("some");
-      if (option.kind === "some") {
-        expect(option.value).toBe("error");
-      }
-    });
-
-    test("converts Right to None OptionLeft", () => {
-      const either = Either.Right("success");
-      const option = either.toOptionLeft();
-
-      expect(option.kind).toBe("none");
-    });
-  });
-});
-
 describe("Either async conversion", () => {
   describe("toPromise", () => {
     test("converts sync Either to resolved Promise Either", async () => {
@@ -600,13 +526,13 @@ describe("Either async conversion", () => {
       const leftPromise = await asyncLeftEither.toPromise();
 
       expect(rightPromise.isRight()).toBe(true);
-      if (rightPromise.safeUnwrap().kind === "some") {
-        expect(rightPromise.safeUnwrap().value).toBe("async-success");
+      if (rightPromise.safeUnwrap() !== null) {
+        expect(rightPromise.safeUnwrap()).toBe("async-success");
       }
 
       expect(leftPromise.isLeft()).toBe(true);
-      if (leftPromise.safeUnwrapLeft().kind === "some") {
-        expect(leftPromise.safeUnwrapLeft().value).toBe("async-error");
+      if (leftPromise.safeUnwrapLeft() !== null) {
+        expect(leftPromise.safeUnwrapLeft()).toBe("async-error");
       }
     });
   });
@@ -637,8 +563,8 @@ describe("Complex Either scenarios", () => {
       .mapRight((val) => `success-${val}`);
 
     expect(result.isLeft()).toBe(true);
-    if (result.safeUnwrapLeft().kind === "some") {
-      expect(result.safeUnwrapLeft().value).toBe("error-too-large");
+    if (result.safeUnwrapLeft() !== null) {
+      expect(result.safeUnwrapLeft()).toBe("error-too-large");
     }
   });
 
@@ -649,10 +575,8 @@ describe("Complex Either scenarios", () => {
       .mapRight((success) => `final-${success}`);
 
     expect(result.isRight()).toBe(true);
-    if (result.safeUnwrap().kind === "some") {
-      expect(result.safeUnwrap().value).toBe(
-        "final-recovered-from-INITIAL-ERROR",
-      );
+    if (result.safeUnwrap() !== null) {
+      expect(result.safeUnwrap()).toBe("final-recovered-from-INITIAL-ERROR");
     }
   });
 
