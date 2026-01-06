@@ -1,9 +1,9 @@
 {
-  "extends": "@tsconfig/node20/tsconfig.json",
+  "extends": "@tsconfig/node22/tsconfig.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "moduleResolution": "node16",
-    "module": "Node16",
+    "target": "ESNext",
+    "moduleResolution": "bundler",
+    "module": "ESNext",
     "composite": false,
     "declarationMap": true,
     "forceConsistentCasingInFileNames": true,
@@ -19,7 +19,6 @@
     "declaration": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
       "@": ["./src"],
       "@/*": ["./src/*"],
@@ -27,11 +26,6 @@
       "@carbonteq/hexapp/*": ["./src/*"]
     }
   },
-  "exclude": [
-    "node_modules",
-    "jest.config.js",
-    "dist",
-    "tsup.config.ts",
-    "rollup.config.ts"
-  ]
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
 }

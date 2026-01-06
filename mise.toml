@@ -1,2 +1,7 @@
+[settings]
+lockfile = true
+
 [tools]
 node = "20"
+bun = "latest"
+

@@ -1,10 +1,15 @@
 {
   "name": "@carbonteq/fp",
-  "version": "0.7.0",
+  "version": "0.8.2",
   "publish": {
     "include": ["src", "README.md", "LICENCE", "package.json", "deno.jsonc"]
   },
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./result": "./src/result.ts",
+    "./option": "./src/option.ts",
+    "./match": "./src/match.ts"
+  },
   "imports": {
     "@/": "./src/"
   }

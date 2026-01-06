@@ -1,365 +1,540 @@
-import { isPromise } from "node:util/types";
+import { Result } from "./result.js";
 import { UNIT } from "./unit.js";
+import { isPromiseLike } from "./utils.js";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
-type OptMapper<T, U> = (val: T) => Option<U>;
-type AsyncOptMapper<T, U> = (val: T) => Promise<Option<U>>;
+type FlatMapper<T, U> = (val: T) => Option<U>;
+type AsyncFlatMapper<T, U> = (val: T) => Promise<Option<U>>;
+type Predicate<T> = (val: T) => boolean;
+type AsyncPredicate<T> = (val: T) => Promise<boolean>;
+type Falsy = false | 0 | "" | null | undefined;
 
-type InnerMapMapper<T, U> = T extends Array<infer Inner>
-  ? (val: Inner) => U
-  : never;
-
-type InnerMapReturn<T, U> = T extends Array<unknown> ? Option<Array<U>> : never;
-// type ArrayInner<T> = T extends Array<infer R> ? R : never;
-// type ArrayOpt<Opt extends Option<unknown>> = Opt extends Option<infer T>
-// 	? T extends Array<infer Inner>
-// 		? Inner
-// 		: never
-// 	: never;
+// ============================================================================
+// Error Types
+// ============================================================================
 
 export class UnwrappedNone extends Error {
+  readonly name = "UnwrapError";
+
   constructor() {
-    super("Unwrapped Option<None>");
+    super("Attempted to unwrap Option::None");
   }
 }
 
 const UNWRAPPED_NONE_ERR = new UnwrappedNone();
-const NONE_VAL = Symbol.for("None");
+
+// ============================================================================
+// Internal Sentinel
+// ============================================================================
+
+const NONE_VAL = Symbol.for("Option::None");
+
+// ============================================================================
+// Exported Types
+// ============================================================================
 
 export type UnitOption = Option<UNIT>;
 export type UnwrapOption<T> = T extends Option<infer R> ? R : never;
+
 type CombinedOptions<T extends Option<unknown>[]> = {
   [K in keyof T]: UnwrapOption<T[K]>;
 };
 
+// ============================================================================
+// Context for async tracking
+// ============================================================================
+
+type OptionCtx = { promiseNoneSlot: boolean };
+
+// ============================================================================
+// Match Cases Type
+// ============================================================================
+
+interface MatchCases<T, U> {
+  Some: (val: T) => U;
+  None: () => U;
+}
+
+// ============================================================================
+// Option Class
+// ============================================================================
+
 export class Option<T> {
-  private constructor(readonly val: T) {}
+  /** Discriminant tag for type-level identification */
+  readonly _tag: "Some" | "None";
 
-  static readonly None: Option<never> = new Option(NONE_VAL) as Option<never>;
-  static readonly UNIT_OPT: UnitOption = new Option(UNIT);
+  readonly #ctx: OptionCtx;
+  readonly #val: T;
 
+  private constructor(val: T, ctx: OptionCtx, tag: "Some" | "None") {
+    this.#val = val;
+    this.#ctx = ctx;
+    this._tag = tag;
+  }
+
+  // ==========================================================================
+  // Static Constructors
+  // ==========================================================================
+
+  /** Singleton None instance */
+  static readonly None: Option<never> = new Option(
+    NONE_VAL as never,
+    { promiseNoneSlot: true },
+    "None",
+  );
+
+  /** Create a Some containing the given value */
   static Some<Inner>(val: Inner): Option<Inner> {
-    return new Option(val);
+    return new Option(val, { promiseNoneSlot: false }, "Some");
   }
 
+  /** Create Option from nullable value - returns None for null/undefined */
   static fromNullable<T>(val: T): Option<NonNullable<T>> {
-    return val === null ? Option.None : Option.Some(val as NonNullable<T>);
+    return val === null || val === undefined
+      ? Option.None
+      : Option.Some(val as NonNullable<T>);
   }
 
-  isSome(): this is Option<T> {
-    return this.val !== NONE_VAL;
+  /** Create Option from potentially falsy value - returns None for falsy */
+  static fromFalsy<T>(val: T | Falsy): Option<T> {
+    return val ? Option.Some(val as T) : Option.None;
   }
 
-  isNone(): this is Option<never> {
-    return this.val === NONE_VAL;
+  /** Create Option based on predicate result */
+  static fromPredicate<T>(val: T, pred: Predicate<T>): Option<T> {
+    return pred(val) ? Option.Some(val) : Option.None;
   }
 
-  isUnit(): this is Option<UNIT> {
-    return this.val === UNIT;
+  /** Wrap Promise<Option<T>> as Option<Promise<T>> */
+  static fromPromise<U>(o: Promise<Option<U>>): Option<Promise<U>> {
+    const ctx: OptionCtx = { promiseNoneSlot: false };
+    const p = new Promise<U>((resolve, reject) =>
+      o.then((innerOpt) => {
+        if (innerOpt.isNone()) {
+          ctx.promiseNoneSlot = true;
+        }
+        resolve(innerOpt.#val);
+      }, reject),
+    );
+
+    return new Option(p, ctx, "Some");
   }
 
-  unwrap(): T {
-    if (this.val !== NONE_VAL) {
-      return this.val;
-    }
+  // ==========================================================================
+  // Static Combinators
+  // ==========================================================================
 
-    throw UNWRAPPED_NONE_ERR;
-  }
-
-  /* Useful to serialize. Inverse operation for `fromNullable` */
-  safeUnwrap(): T | null {
-    if (this.val !== NONE_VAL) return this.val;
-
-    return null;
-  }
-
-  toString(): string {
-    if (this.isNone()) return "Option::None";
-
-    return `Option::Some(${this.val})`;
-  }
-
-  map<U>(fn: (val: T) => U): Option<U>;
-  map<U>(fn: (val: T) => Promise<U>): Promise<Option<U>>;
-  map<U>(fn: OptMapper<T, U> | AsyncOptMapper<T, U>) {
-    if (this.isNone()) return Option.None;
-
-    const val = fn(this.val);
-    if (isPromise(val)) return val.then((u) => Option.Some(u));
-
-    return Option.Some(val);
-  }
-
-  mapOr<U>(def: U, fn: (val: T) => U): Option<U>;
-  mapOr<U>(def: U, fn: (val: T) => Promise<U>): Promise<Option<U>>;
-  mapOr<U>(def: U, fn: (val: T) => U) {
-    if (this.isNone()) return Option.Some(def);
-
-    const val = fn(this.val);
-    if (isPromise(val)) return val.then((u) => Option.Some(u));
-
-    return Option.Some(val);
-  }
-
-  flatMap<U>(fn: (val: T) => Option<U>): Option<U>;
-  flatMap<U>(fn: (val: T) => Promise<Option<U>>): Promise<Option<U>>;
-  flatMap<U>(fn: OptMapper<T, U> | AsyncOptMapper<T, U>) {
-    if (this.val !== NONE_VAL) return fn(this.val);
-
-    return Option.None;
-  }
-
-  /* Alias for flatMap  */
-  bind<U>(fn: (val: T) => Option<U>): Option<U>;
-  bind<U>(fn: (val: T) => Promise<Option<U>>): Promise<Option<U>>;
-  bind<U>(fn: OptMapper<T, U> | AsyncOptMapper<T, U>) {
-    if (this.val !== NONE_VAL) return fn(this.val);
-
-    return Option.None;
-  }
-
-  and<U>(opt: Option<U>): Option<[T, U]> {
-    if (this.val !== NONE_VAL && opt.val !== NONE_VAL)
-      return Option.Some([this.val, opt.val]);
-
-    return Option.None;
-  }
-
-  tap(fn: (val: T) => void): Option<T> {
-    if (this.val !== NONE_VAL) fn(this.val);
-
-    return this;
-  }
-
-  async tapAsync(fn: (val: T) => Promise<unknown>): Promise<Option<T>> {
-    if (this.val !== NONE_VAL) {
-      await fn(this.val);
-    }
-
-    return this;
-  }
-
-  zip<U>(fn: (val: T) => Promise<U>): Promise<Option<[T, U]>>;
-  zip<U>(fn: (val: T) => U): Option<[T, U]>;
-  zip<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
-    if (this.val === NONE_VAL) return Option.None; // await won't hurt it
-
-    const r = fn(this.val);
-    if (isPromise(r)) {
-      return r.then((u) => Option.Some([this.val, u]));
-    }
-
-    return Option.Some([this.val, r]);
-  }
-  // zip<U>(
-  // 	fn: (val: T) => Promise<U>,
-  // ): Promise<Option<Tuple<AppendToTuple<T, U>>>>;
-  // zip<U>(fn: (val: T) => U): Option<Tuple<AppendToTuple<T, U>>>;
-  // zip<U>(fn: Mapper<T, U> | AsyncMapper<T, U>) {
-  // 	if (this.val === NONE_VAL) return Option.None; // await won't hurt it
-  //
-  // 	type Tup = AppendToTuple<T, U>;
-  // 	const isTuple = Array.isArray(this.val);
-  //
-  // 	const r = fn(this.val);
-  // 	if (isPromise(r)) {
-  // 		return r.then((u) => {
-  // 			const inner: Tuple<Tup> = setAsTuple(
-  // 				isTuple ? [...this.val, u] : [this.val, u],
-  // 			);
-  //
-  // 			return Option.Some(inner) as Option<Tuple<Tup>>;
-  // 		});
-  // 	}
-  //
-  // 	const inner: Tuple<Tup> = setAsTuple(
-  // 		isTuple ? [...this.val, r] : [this.val, r],
-  // 	);
-  //
-  // 	return Option.Some(inner) as Option<Tuple<Tup>>;
-  // }
-
-  flatZip<U>(fn: (val: T) => Promise<Option<U>>): Promise<Option<[T, U]>>;
-  flatZip<U>(fn: (val: T) => Option<U>): Option<[T, U]>;
-  flatZip<U>(fn: OptMapper<T, U> | AsyncOptMapper<T, U>) {
-    if (this.val === NONE_VAL) return Option.None;
-
-    const r = fn(this.val);
-    if (isPromise(r)) {
-      return r.then((opt) => opt.map((u) => [this.val, u]));
-    }
-
-    return r.map((u) => [this.val, u]);
-  }
-  // flatZip<U>(
-  // 	fn: (val: T) => Promise<Option<U>>,
-  // ): Promise<Option<AppendToTuple<T, U>>>;
-  // flatZip<U>(fn: (val: T) => Option<U>): Option<AppendToTuple<T, U>>;
-  // flatZip<U>(fn: OptMapper<T, U> | AsyncOptMapper<T, U>) {
-  // 	if (this.val === NONE_VAL) return Option.None;
-  //
-  // 	type Tup = AppendToTuple<T, U>;
-  // 	const isTuple = Array.isArray(this.val);
-  // 	const r = fn(this.val);
-  // 	if (isPromise(r)) {
-  // 		return r.then((opt) =>
-  // 			opt.map(
-  // 				(u) =>
-  // 					setAsTuple(
-  // 						isTuple ? [...this.val, u] : [this.val, u],
-  // 					) as Tuple<Tup>,
-  // 			),
-  // 		);
-  // 	}
-  //
-  // 	return r.map(
-  // 		(u) =>
-  // 			setAsTuple(isTuple ? [...this.val, u] : [this.val, u]) as Tuple<Tup>,
-  // 	);
-  // }
-
-  static any<T>(seq: Option<T>[]): boolean {
-    for (const el of seq) {
-      if (el.val !== NONE_VAL) return true;
-    }
-
-    return false;
-  }
-
-  static all<T>(seq: Option<T>[]): boolean {
-    for (const el of seq) {
-      if (el.val === NONE_VAL) return false;
-    }
-
-    return true;
-  }
-
-  static sequence<T extends Option<unknown>[]>(
+  /** Combine multiple Options - returns Some array if all are Some, else None */
+  static all<T extends Option<unknown>[]>(
     ...options: T
   ): Option<CombinedOptions<T>> {
     const vals = [] as CombinedOptions<T>;
 
     for (const opt of options) {
-      if (opt.val === NONE_VAL) return Option.None;
-
-      vals.push(opt.val);
+      if (opt.isNone()) return Option.None;
+      vals.push(opt.#val);
     }
 
     return Option.Some(vals);
   }
 
-  static async lift<T>(opt: Option<Promise<T>>): Promise<Option<T>> {
-    if (opt.isNone()) return Promise.resolve(Option.None);
-
-    return opt.val.then((val) => Option.Some(val));
+  /** Returns first Some, or None if all are None */
+  static any<T>(...options: Option<T>[]): Option<T> {
+    for (const opt of options) {
+      if (opt.isSome()) return opt;
+    }
+    return Option.None;
   }
 
-  // innerMap<Inner, U>(
-  // 	this: Option<Array<Inner>>,
-  // 	mapper: (val: Inner) => U,
-  // ): Option<Array<U>>;
-  // innerMap<U>(this: Option<T>, mapper: (val: never) => U): never;
-  // innerMap<U>(this: Option<T>, mapper: (val: T) => U) {
-  // 	if (this.isNone()) return this;
-  //
-  // 	if (Array.isArray(this.val)) {
-  // 		return Option.Some(this.val.map(mapper));
-  // 	}
-  //
-  // 	throw new Error("Can only be called for Option<Array<T>>");
-  // }
+  // ==========================================================================
+  // State Inspection
+  // ==========================================================================
 
-  innerMap<U>(mapper: InnerMapMapper<T, U>): InnerMapReturn<T, U> {
-    type Ret = InnerMapReturn<T, U>;
-
-    //@ts-expect-error
-    if (this.val === NONE_VAL) return this as Ret;
-
-    if (Array.isArray(this.val)) {
-      return Option.Some(this.val.map(mapper)) as Ret;
-    }
-
-    throw new Error("Can only be called for Option<Array<T>>");
+  /** Type guard for Some state */
+  isSome(): this is Option<T> & { readonly _tag: "Some" } {
+    return this._tag === "Some" && this.#val !== NONE_VAL;
   }
 
-  //@ts-expect-error
-  pipe<U>(fn: (val: T) => U): Option<U>;
-  pipe<U, V>(fn: (val: T) => U, fn2: (val: U) => V): Option<V>;
-  pipe<U, V, W>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-  ): Option<W>;
-  pipe<U, V, W, X>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-  ): Option<X>;
-  pipe<U, V, W, X, Y>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-  ): Option<Y>;
-  pipe<U, V, W, X, Y, Z>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-  ): Option<Z>;
-  pipe<U, V, W, X, Y, Z, A>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-  ): Option<A>;
-  pipe<U, V, W, X, Y, Z, A, B>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-    fn8: (val: A) => B,
-  ): Option<B>;
-  pipe<U, V, W, X, Y, Z, A, B, C>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-    fn8: (val: A) => B,
-    fn9: (val: B) => C,
-  ): Option<C>;
-  pipe<U, V, W, X, Y, Z, A, B, C, D>(
-    fn: (val: T) => U,
-    fn2: (val: U) => V,
-    fn3: (val: V) => W,
-    fn4: (val: W) => X,
-    fn5: (val: X) => Y,
-    fn6: (val: Y) => Z,
-    fn7: (val: Z) => A,
-    fn8: (val: A) => B,
-    fn9: (val: B) => C,
-    fn10: (val: C) => D,
-  ): Option<D>;
-  pipe(...fns: Mapper<unknown, unknown>[]) {
-    let x = this;
-    for (const fn of fns) {
-      // @ts-expect-error
-      x = x.map(fn);
+  /** Type guard for None state */
+  isNone(): this is Option<never> & { readonly _tag: "None" } {
+    return (
+      this._tag === "None" ||
+      this.#val === NONE_VAL ||
+      (isPromiseLike(this.#val) && this.#ctx.promiseNoneSlot)
+    );
+  }
+
+  /** Type guard for Unit value */
+  isUnit(): this is Option<UNIT> {
+    return this.#val === UNIT;
+  }
+
+  // ==========================================================================
+  // Value Extraction
+  // ==========================================================================
+
+  /** Returns value or throws UnwrapError */
+  unwrap(): T {
+    if (this.isNone()) {
+      throw UNWRAPPED_NONE_ERR;
     }
-    return x;
+    return this.#val;
+  }
+
+  /** Returns value or the provided default */
+  unwrapOr(defaultValue: T): T {
+    if (this.isNone()) return defaultValue;
+    return this.#val;
+  }
+
+  /** Returns value or calls factory to get default */
+  unwrapOrElse(fn: () => T): T {
+    if (this.isNone()) return fn();
+    return this.#val;
+  }
+
+  /** Returns value or null for None */
+  safeUnwrap(): T | null {
+    if (this.isNone()) return null;
+    return this.#val;
+  }
+
+  /** Pattern match on Option state */
+  match<U>(cases: MatchCases<T, U>): U {
+    if (this.isNone()) {
+      return cases.None();
+    }
+    return cases.Some(this.#val);
+  }
+
+  // ==========================================================================
+  // Transformation Methods
+  // ==========================================================================
+
+  // -------------------------------------------------------------------------
+  // map() - with async overloads per spec
+  // -------------------------------------------------------------------------
+
+  map<U, Curr = Awaited<T>>(
+    this: Option<Promise<Curr>>,
+    mapper: AsyncMapper<Curr, U>,
+  ): Option<Promise<U>>;
+  map<U, Curr = Awaited<T>>(
+    this: Option<Promise<Curr>>,
+    mapper: Mapper<Curr, U>,
+  ): Option<Promise<U>>;
+  map<U>(this: Option<T>, mapper: AsyncMapper<T, U>): Option<Promise<U>>;
+  map<U>(this: Option<T>, mapper: Mapper<T, U>): Option<U>;
+  map<U, Curr = Awaited<T>>(
+    mapper: Mapper<NoInfer<Curr>, U> | AsyncMapper<NoInfer<Curr>, U>,
+  ) {
+    if (this.isNone()) return Option.None;
+
+    const curr = this.#val;
+
+    if (isPromiseLike(curr)) {
+      const p = curr as Promise<Curr>;
+      // Create a NEW context for this branch to avoid cross-branch mutation
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
+      const safetlyMapped = Option.safeMap(p, mapper, newCtx);
+      return new Option(safetlyMapped, newCtx, "Some");
+    }
+
+    const transformed = mapper(curr as unknown as Curr);
+    if (isPromiseLike(transformed)) {
+      return new Option(transformed, { promiseNoneSlot: false }, "Some");
+    }
+    // Sync operations can share context since there's no async mutation
+    return new Option(transformed, { promiseNoneSlot: false }, "Some");
+  }
+
+  private static safeMap<Curr, U>(
+    p: Promise<Curr>,
+    mapper: (val: Curr) => U | Promise<U>,
+    ctx: OptionCtx,
+  ) {
+    return p.then((v) => {
+      if (v === NONE_VAL) {
+        ctx.promiseNoneSlot = true;
+        return NONE_VAL;
+      }
+      return mapper(v);
+    }) as Promise<U>;
+  }
+
+  // -------------------------------------------------------------------------
+  // mapOr() - maps value or returns default (returns U, not Option<U>)
+  // -------------------------------------------------------------------------
+
+  mapOr<U, Curr = Awaited<T>>(defaultVal: U, fn: Mapper<Curr, U>): U {
+    if (this.isNone()) return defaultVal;
+    return fn(this.#val as unknown as Curr);
+  }
+
+  // -------------------------------------------------------------------------
+  // flatMap() - with async overloads per spec
+  // -------------------------------------------------------------------------
+
+  flatMap<U, Curr = Awaited<T>>(
+    this: Option<Promise<Curr>>,
+    mapper: AsyncFlatMapper<Curr, U>,
+  ): Option<Promise<U>>;
+  flatMap<U, Curr = Awaited<T>>(
+    this: Option<Promise<Curr>>,
+    mapper: FlatMapper<Curr, U>,
+  ): Option<Promise<U>>;
+  flatMap<U>(
+    this: Option<T>,
+    mapper: AsyncFlatMapper<T, U>,
+  ): Option<Promise<U>>;
+  flatMap<U>(this: Option<T>, mapper: FlatMapper<T, U>): Option<U>;
+  flatMap<U, Curr = Awaited<T>>(
+    mapper: FlatMapper<NoInfer<Curr>, U> | AsyncFlatMapper<NoInfer<Curr>, U>,
+  ): Option<U> | Option<Promise<U>> {
+    if (this.isNone()) return Option.None;
+
+    const curr = this.#val;
+
+    if (isPromiseLike(curr)) {
+      const p = curr as Promise<Curr>;
+      // Create a NEW context for this branch to avoid cross-branch mutation
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
+      const castedNone = NONE_VAL as unknown as Promise<U>;
+      const newP = new Promise<U>((resolve, reject) => {
+        p.then((innerVal) => {
+          if (innerVal === NONE_VAL) {
+            newCtx.promiseNoneSlot = true;
+            resolve(castedNone);
+          } else {
+            const r = mapper(innerVal);
+            if (isPromiseLike(r)) {
+              r.then((innerOpt) => {
+                if (innerOpt.isNone()) {
+                  newCtx.promiseNoneSlot = true;
+                }
+                resolve(innerOpt.#val);
+              }, reject);
+            } else {
+              if (r.isNone()) {
+                newCtx.promiseNoneSlot = true;
+                resolve(NONE_VAL as unknown as U);
+              } else {
+                resolve(r.#val);
+              }
+            }
+          }
+        }, reject);
+      });
+      return new Option(newP, newCtx, "Some");
+    }
+
+    const mapped = mapper(curr as unknown as Curr);
+    if (isPromiseLike(mapped)) {
+      return Option.fromPromise(mapped);
+    }
+    return mapped;
+  }
+
+  // -------------------------------------------------------------------------
+  // filter() - with async predicate support
+  // -------------------------------------------------------------------------
+
+  filter(pred: Predicate<T>): Option<T>;
+  filter(pred: AsyncPredicate<T>): Option<Promise<T>>;
+  filter(
+    pred: Predicate<T> | AsyncPredicate<T>,
+  ): Option<T> | Option<Promise<T>> {
+    if (this.isNone()) return Option.None;
+
+    const result = pred(this.#val);
+
+    if (isPromiseLike(result)) {
+      const p = result.then((passed) => {
+        if (passed) return this.#val;
+        return NONE_VAL;
+      }) as Promise<T>;
+      return new Option(p, { promiseNoneSlot: false }, "Some");
+    }
+
+    return result ? this : Option.None;
+  }
+
+  // -------------------------------------------------------------------------
+  // zip() - with async overloads per spec
+  // -------------------------------------------------------------------------
+
+  zip<U, Curr>(
+    this: Option<Promise<Curr>>,
+    fn: (val: Curr) => U,
+  ): Option<Promise<[Curr, Awaited<U>]>>;
+  zip<U, Curr>(
+    this: Option<Curr>,
+    fn: (val: Curr) => Promise<U>,
+  ): Option<Promise<[Curr, Awaited<U>]>>;
+  zip<U, Curr>(this: Option<Curr>, fn: (val: Curr) => U): Option<[Curr, U]>;
+  zip<U, Curr = Awaited<T>>(fn: Mapper<Curr, U> | AsyncMapper<Curr, U>) {
+    if (this.isNone()) return Option.None;
+
+    const curr = this.#val;
+
+    if (isPromiseLike(curr)) {
+      const val = curr as Promise<Curr>;
+      // Create a NEW context for this branch to avoid cross-branch mutation
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
+
+      const p = val.then(async (v) => {
+        if (v === NONE_VAL) {
+          newCtx.promiseNoneSlot = true;
+          return NONE_VAL;
+        }
+
+        const next = await fn(v);
+        return [v, next];
+      }) as Promise<[Curr, Awaited<U>]>;
+
+      return new Option(p, newCtx, "Some");
+    }
+
+    const value = curr as unknown as Curr;
+    const u = fn(value);
+    if (isPromiseLike(u)) {
+      const p = u.then((uu) => [value, uu] as [Curr, Awaited<U>]);
+      return new Option(p, { promiseNoneSlot: false }, "Some");
+    }
+
+    return new Option([value, u], { promiseNoneSlot: false }, "Some");
+  }
+
+  // -------------------------------------------------------------------------
+  // flatZip() - with async overloads per spec
+  // -------------------------------------------------------------------------
+
+  flatZip<U, Curr>(
+    this: Option<Promise<Curr>>,
+    fn: (val: Curr) => Promise<Option<U>>,
+  ): Option<Promise<[Curr, U]>>;
+  flatZip<U, Curr>(
+    this: Option<Promise<Curr>>,
+    fn: (val: Curr) => Option<U>,
+  ): Option<Promise<[Curr, U]>>;
+  flatZip<U, Curr>(
+    this: Option<Curr>,
+    fn: (val: Curr) => Promise<Option<U>>,
+  ): Option<Promise<[T, U]>>;
+  flatZip<U, Curr>(
+    this: Option<Curr>,
+    fn: (val: Curr) => Option<U>,
+  ): Option<[T, U]>;
+  flatZip<U, Curr = Awaited<T>>(
+    fn: Mapper<Curr, Option<U>> | AsyncMapper<Curr, Option<U>>,
+  ) {
+    if (this.isNone()) return Option.None;
+
+    const curr = this.#val;
+
+    if (isPromiseLike(curr)) {
+      const val = curr as Promise<Curr>;
+      // Create a NEW context for this branch to avoid cross-branch mutation
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
+
+      const p = val.then(async (v) => {
+        if (v === NONE_VAL) {
+          newCtx.promiseNoneSlot = true;
+          return NONE_VAL;
+        }
+
+        const next = await fn(v);
+        if (next.isNone()) {
+          newCtx.promiseNoneSlot = true;
+          return NONE_VAL;
+        }
+        return [v, next.#val] as [Curr, U];
+      }) as Promise<[Curr, U]>;
+
+      return new Option(p, newCtx, "Some");
+    }
+
+    const c = curr as unknown as Curr;
+    const u = fn(c);
+    if (isPromiseLike(u)) {
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
+      const p = u.then((uu) => {
+        if (uu.isNone()) {
+          newCtx.promiseNoneSlot = true;
+          return NONE_VAL;
+        }
+        return [c, uu.#val] as [Curr, U];
+      });
+      return new Option(p, newCtx, "Some");
+    }
+
+    return u.map((inner) => [c, inner]);
+  }
+
+  // ==========================================================================
+  // Utility Methods
+  // ==========================================================================
+
+  /** Execute side effect for Some, return self */
+  tap(fn: (val: T) => void): Option<T> {
+    if (this.isSome()) {
+      fn(this.#val);
+    }
+    return this;
+  }
+
+  /** Convert Option to Result */
+  toResult<E>(error: E): Result<T, E> {
+    if (this.isNone()) {
+      return Result.Err(error);
+    }
+    return Result.Ok(this.#val);
+  }
+
+  /** Resolve inner Promise and maintain Option structure */
+  async toPromise<Curr = Awaited<T>>(): Promise<Option<Curr>> {
+    if (this.isNone()) {
+      return Option.None;
+    }
+
+    const curr = this.#val;
+
+    let inner: Curr;
+    if (isPromiseLike(curr)) {
+      const awaited = await curr;
+      if (awaited === NONE_VAL) {
+        return Option.None;
+      }
+      inner = awaited as Curr;
+    } else {
+      inner = curr as unknown as Curr;
+    }
+
+    return new Option(inner, this.#ctx, "Some");
+  }
+
+  /** Map over array elements inside Option */
+  innerMap<Inner, Out>(
+    this: Option<Array<Inner>>,
+    mapper: (val: Inner) => Out,
+  ): Option<NoInfer<Out>[]> {
+    if (this.isNone()) return Option.None;
+
+    if (!Array.isArray(this.#val)) {
+      throw new TypeError("innerMap can only be called on Option<Array<T>>");
+    }
+
+    return new Option((this.#val as Inner[]).map(mapper), this.#ctx, "Some");
+  }
+
+  /** String representation */
+  toString(): string {
+    if (this.isNone()) return "Option::None";
+    return `Option::Some(${this.#val})`;
   }
 }

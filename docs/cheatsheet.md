@@ -13,7 +13,7 @@ const res3 = Result.Err<Array<number>, SomeOtherError>;
 const mapper = (str: string) => new Date();
 
 const anotherMapper = (b: boolean): Result<number, BazError> =>
- b ? Result.Ok(420) : new BazError("");
+  b ? Result.Ok(420) : new BazError("");
 ```
 
 |                   | Mapper returns primitive | Mapper returns Result |
@@ -21,7 +21,7 @@ const anotherMapper = (b: boolean): Result<number, BazError> =>
 | Replace Ok type   | `map`                    | `flatMap`             |
 | Append to Ok type | `zip`                    | `flatZip`             |
 
-### `map`
+## `map`
 
 Used when you want to morph the internal `Ok` type from `T` to `U` using a function that accepts `T` and returns `U`.
 

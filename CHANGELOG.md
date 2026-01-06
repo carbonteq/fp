@@ -1,5 +1,37 @@
 # @carbonteq/fp
 
+## 0.8.2
+
+### Patch Changes
+
+- ef4476f: Remove node specific export to fix bun types
+
+## 0.8.1
+
+### Patch Changes
+
+- 0ef93f7: Update exports for better bun compatibility and tree-shaking
+
+## 0.8.0
+
+### Minor Changes
+
+- 13979ad: Rewrite Option and most of Result to be async chainable
+
+### Patch Changes
+
+- 03a96f6: Test publish
+
+## 0.8.0-alpha.0
+
+### Minor Changes
+
+- 13979ad: Rewrite Option and most of Result to be async chainable
+
+### Patch Changes
+
+- 03a96f6: Test publish
+
 ## 0.7.0
 
 ### Minor Changes
