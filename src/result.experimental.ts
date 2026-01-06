@@ -1,5 +1,6 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { UNIT } from "./unit.js";
+import { isPromiseLike } from "./utils.js";
 
 // Core types for hybrid Result implementation
 type SyncResult<T, E> = { ok: true; value: T } | { ok: false; error: E };
@@ -14,9 +15,6 @@ type HybridState<T, E> =
   | { kind: "async"; promise: Promise<SyncResult<T, E>> };
 
 type MaybeAsync<T> = T | Promise<T>;
-
-const isPromiseLike = <T>(value: MaybeAsync<T>): value is Promise<T> =>
-  typeof (value as Promise<T>)?.then === "function";
 
 // Error mapper type and state
 type ErrorMapper = (unknown: unknown) => unknown;
