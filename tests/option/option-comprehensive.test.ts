@@ -2,17 +2,6 @@ import { describe, expect, it, mock } from "bun:test";
 import { Option, UnwrappedNone } from "@/option.js";
 import { UNIT } from "@/unit.js";
 
-/**
- * Comprehensive Option<T> Test Suite
- *
- * Based on docs/option-spec.md specification.
- * Tests are organized by spec section for exhaustive coverage.
- */
-
-// ============================================================================
-// SECTION 1: CONSTRUCTORS
-// ============================================================================
-
 describe("Constructors", () => {
   describe("Option.Some()", () => {
     it("should create Some containing the value", () => {
@@ -117,10 +106,6 @@ describe("Constructors", () => {
   });
 });
 
-// ============================================================================
-// SECTION 2: STATE INSPECTION
-// ============================================================================
-
 describe("State Inspection", () => {
   describe("isSome()", () => {
     it("should return true for Some", () => {
@@ -162,10 +147,6 @@ describe("State Inspection", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 3: VALUE EXTRACTION
-// ============================================================================
 
 describe("Value Extraction", () => {
   describe("unwrap()", () => {
@@ -241,10 +222,6 @@ describe("Value Extraction", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 4: TRANSFORMATION METHODS
-// ============================================================================
 
 describe("Transformation Methods", () => {
   describe("map()", () => {
@@ -384,10 +361,6 @@ describe("Transformation Methods", () => {
   });
 });
 
-// ============================================================================
-// SECTION 5: COMBINING OPTIONS
-// ============================================================================
-
 describe("Combining Options", () => {
   describe("Option.all()", () => {
     it("should combine all Some into Some array", () => {
@@ -426,10 +399,6 @@ describe("Combining Options", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 6: UTILITY METHODS
-// ============================================================================
 
 describe("Utility Methods", () => {
   describe("tap()", () => {
@@ -517,10 +486,6 @@ describe("Utility Methods", () => {
   });
 });
 
-// ============================================================================
-// SECTION 7: ASYNC HANDLING
-// ============================================================================
-
 describe("Async Handling", () => {
   describe("Promise Infection Rules", () => {
     it("Option<T> + sync mapper → Option<U>", () => {
@@ -592,10 +557,6 @@ describe("Async Handling", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 8: EDGE CASES & INVARIANTS
-// ============================================================================
 
 describe("Edge Cases & Invariants", () => {
   describe("Monad Laws", () => {
@@ -730,10 +691,6 @@ describe("Edge Cases & Invariants", () => {
   });
 });
 
-// ============================================================================
-// SECTION 9: BRANCHING (IMMUTABILITY)
-// ============================================================================
-
 describe("Branching and Immutability", () => {
   it("multiple branches from same Option should be independent", () => {
     const original = Option.Some(2);
@@ -757,10 +714,6 @@ describe("Branching and Immutability", () => {
     expect(branch2.unwrap()).toBe(6);
   });
 });
-
-// ============================================================================
-// SECTION 10: FLUENT API - COMPLEX MIXED OPERATION CHAINS
-// ============================================================================
 
 describe("Fluent API - Complex Mixed Operation Chains", () => {
   describe("map → flatMap → zip chains", () => {

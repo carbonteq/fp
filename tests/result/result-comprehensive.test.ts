@@ -2,17 +2,6 @@ import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@/result.js";
 import { UNIT } from "@/unit.js";
 
-/**
- * Comprehensive Result<T, E> Test Suite
- *
- * Based on docs/result-spec.md specification.
- * Tests are organized by spec section for exhaustive coverage.
- */
-
-// ============================================================================
-// SECTION 1: CONSTRUCTORS
-// ============================================================================
-
 describe("Constructors", () => {
   describe("Result.Ok()", () => {
     it("should create Ok containing the value", () => {
@@ -168,10 +157,6 @@ describe("Constructors", () => {
   });
 });
 
-// ============================================================================
-// SECTION 2: STATE INSPECTION
-// ============================================================================
-
 describe("State Inspection", () => {
   describe("isOk()", () => {
     it("should return true for Ok", () => {
@@ -211,10 +196,6 @@ describe("State Inspection", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 3: VALUE EXTRACTION
-// ============================================================================
 
 describe("Value Extraction", () => {
   describe("unwrap()", () => {
@@ -299,10 +280,6 @@ describe("Value Extraction", () => {
   });
 });
 
-// ============================================================================
-// SECTION 4: TRANSFORMATION METHODS (OK TRACK)
-// ============================================================================
-
 describe("Transformation Methods (Ok Track)", () => {
   describe("map()", () => {
     it("should transform value for Ok", () => {
@@ -378,10 +355,6 @@ describe("Transformation Methods (Ok Track)", () => {
   });
 });
 
-// ============================================================================
-// SECTION 5: TRANSFORMATION METHODS (ERR TRACK)
-// ============================================================================
-
 describe("Transformation Methods (Err Track)", () => {
   describe("mapErr()", () => {
     it("should transform error for Err", () => {
@@ -448,10 +421,6 @@ describe("Transformation Methods (Err Track)", () => {
   });
 });
 
-// ============================================================================
-// SECTION 6: VALIDATION
-// ============================================================================
-
 describe("Validation", () => {
   describe("validate()", () => {
     it("should return Ok if all validators pass", () => {
@@ -485,10 +454,6 @@ describe("Validation", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 7: AGGREGATION
-// ============================================================================
 
 describe("Aggregation", () => {
   describe("Result.all()", () => {
@@ -535,10 +500,6 @@ describe("Aggregation", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 8: UTILITY METHODS
-// ============================================================================
 
 describe("Utility Methods", () => {
   describe("tap()", () => {
@@ -639,10 +600,6 @@ describe("Utility Methods", () => {
   });
 });
 
-// ============================================================================
-// SECTION 9: ASYNC HANDLING
-// ============================================================================
-
 describe("Async Handling", () => {
   describe("Promise Infection Rules", () => {
     it("Result<T, E> + sync mapper → Result<U, E>", () => {
@@ -693,10 +650,6 @@ describe("Async Handling", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 10: EDGE CASES & INVARIANTS
-// ============================================================================
 
 describe("Edge Cases & Invariants", () => {
   describe("Monad Laws", () => {
@@ -749,10 +702,6 @@ describe("Edge Cases & Invariants", () => {
     });
   });
 });
-
-// ============================================================================
-// SECTION 11: FLUENT API - COMPLEX MIXED OPERATION CHAINS
-// ============================================================================
 
 describe("Fluent API - Complex Mixed Operation Chains", () => {
   describe("map → flatMap → zip chains", () => {
@@ -837,10 +786,6 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
   });
 });
 
-// ============================================================================
-// SECTION 12: BRANCHING (IMMUTABILITY)
-// ============================================================================
-
 describe("Branching and Immutability", () => {
   it("multiple branches from same Result should be independent", () => {
     const original = Result.Ok(2);
@@ -864,10 +809,6 @@ describe("Branching and Immutability", () => {
     expect(branch2.unwrap()).toBe(6);
   });
 });
-
-// ============================================================================
-// SECTION 12: _TAG DISCRIMINANT (Spec Compliance)
-// ============================================================================
 
 describe("_tag Discriminant", () => {
   it("should have _tag 'Ok' for Ok result", () => {
@@ -899,10 +840,6 @@ describe("_tag Discriminant", () => {
     expect(Result.Ok(null)._tag).toBe("Ok");
   });
 });
-
-// ============================================================================
-// SECTION 13: ASYNC-AWARE EXTRACTION METHODS
-// ============================================================================
 
 describe("Async-Aware Extraction Methods", () => {
   describe("unwrapOr with async Result", () => {
