@@ -5,10 +5,16 @@
 {
   "languages": {
     "TypeScript": {
+      "formatter": {
+        "language_server": {
+          "name": "oxfmt"
+        }
+      },
       "language_servers": [
-        "!tsgo",
-        "vtsls",
-        "oxc",
+        "tsgo",
+        "!vtsls",
+        "oxfmt",
+        "oxlint",
         "biome"
       ]
     }

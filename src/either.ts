@@ -217,19 +217,11 @@ type LeftValue<T> = T extends EitherState<infer L, any> ? L : never;
 type RightValue<T> = T extends EitherState<any, infer R> ? R : never;
 
 // Export types
-export type LeftOf<T extends Either<unknown, unknown>> = T extends Either<
-  infer L,
-  unknown
->
-  ? L
-  : never;
+export type LeftOf<T extends Either<unknown, unknown>> =
+  T extends Either<infer L, unknown> ? L : never;
 
-export type RightOf<T extends Either<unknown, unknown>> = T extends Either<
-  unknown,
-  infer R
->
-  ? R
-  : never;
+export type RightOf<T extends Either<unknown, unknown>> =
+  T extends Either<unknown, infer R> ? R : never;
 
 export type UnwrapEither<T extends Either<unknown, unknown>> = {
   left: LeftOf<T>;

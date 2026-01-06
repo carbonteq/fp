@@ -25,12 +25,8 @@ const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
 const errPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isErr();
 const preds = [okPred, errPred];
 
-export type UnwrapResult<T extends Result<unknown, unknown>> = T extends Result<
-  infer U,
-  infer E
->
-  ? { ok: U; err: E }
-  : never;
+export type UnwrapResult<T extends Result<unknown, unknown>> =
+  T extends Result<infer U, infer E> ? { ok: U; err: E } : never;
 
 type CombinedResultOk<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["ok"];
@@ -44,13 +40,11 @@ export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
   CombinedResultErr<T>
 >;
 
-type InnerMapMapper<T, U> = T extends Array<infer Inner>
-  ? (val: Inner) => U
-  : never;
+type InnerMapMapper<T, U> =
+  T extends Array<infer Inner> ? (val: Inner) => U : never;
 
-type InnerMapReturn<T, E, U> = T extends Array<unknown>
-  ? Result<Array<U>, E>
-  : never;
+type InnerMapReturn<T, E, U> =
+  T extends Array<unknown> ? Result<Array<U>, E> : never;
 
 /** Sentinel value */
 const Sentinel = Symbol.for("ResultSentinel");

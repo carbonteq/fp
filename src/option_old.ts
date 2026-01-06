@@ -6,13 +6,11 @@ type AsyncMapper<T, U> = (val: T) => Promise<U>;
 type OptMapper<T, U> = (val: T) => OptionOld<U>;
 type AsyncOptMapper<T, U> = (val: T) => Promise<OptionOld<U>>;
 
-type InnerMapMapper<T, U> = T extends Array<infer Inner>
-  ? (val: Inner) => U
-  : never;
+type InnerMapMapper<T, U> =
+  T extends Array<infer Inner> ? (val: Inner) => U : never;
 
-type InnerMapReturn<T, U> = T extends Array<unknown>
-  ? OptionOld<Array<U>>
-  : never;
+type InnerMapReturn<T, U> =
+  T extends Array<unknown> ? OptionOld<Array<U>> : never;
 // type ArrayInner<T> = T extends Array<infer R> ? R : never;
 // type ArrayOpt<Opt extends Option<unknown>> = Opt extends Option<infer T>
 // 	? T extends Array<infer Inner>

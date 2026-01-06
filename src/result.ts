@@ -35,12 +35,8 @@ const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
 const errPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isErr();
 const _preds = [okPred, errPred];
 
-export type UnwrapResult<T extends Result<unknown, unknown>> = T extends Result<
-  infer U,
-  infer E
->
-  ? { ok: U; err: E }
-  : never;
+export type UnwrapResult<T extends Result<unknown, unknown>> =
+  T extends Result<infer U, infer E> ? { ok: U; err: E } : never;
 
 type CombinedResultOk<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["ok"];

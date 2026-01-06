@@ -22,13 +22,13 @@ yarn add @carbonteq/fp
 bun add @carbonteq/fp
 ```
 
-# But why fp?
+## But why fp?
 
 In JavaScript and TypeScript, dealing with `null`, `undefined`, and errors can lead to verbose, error-prone code. `fp` introduces functional paradigms that make handling these cases cleaner and more reliable. By leveraging `fp`, you can reduce boilerplate, improve readability, and create more maintainable applications.
 
 To demonstrate the utility of `fp`, let us consider a use case where we need to retrieve a user's email and address.
 
-### Without using the `fp` library
+## Without using the `fp` library
 
 ```typescript
 function getUserByEmail(user: { email?: string }): string | null {
@@ -83,7 +83,7 @@ matchOpt(res, {
 // Output: User test@test.com has address: Some Address
 ```
 
-# Table of Contents
+## Table of Contents
 
 - [Usage](#usage)
   - [The `Result` type](#the-result-type)
@@ -109,7 +109,7 @@ matchOpt(res, {
   - [Synchronous Pipeline](#synchronous-pipeline)
   - [Asynchronous Pipeline](#asynchronous-pipeline)
 
-# Usage
+## Usage
 
 ## The `Result` type
 
@@ -137,7 +137,7 @@ const opt2: Option<number> = Option.None; // Contains no value (None)
 
 ## Cheatsheet
 
-#### `map`
+### `map`
 
 Transforms the `Some` or `Ok` value inside `Option` or `Result`.
 
@@ -625,7 +625,7 @@ console.log(errorResult.unwrapErr()); // unwrapErr: Error: Something went wrong 
 
 Let's build a pipeline for processing an e-commerce order. This example demonstrates handling user input validation, inventory checks, and order processing.
 
-#### Synchronous Pipeline
+### Synchronous Pipeline
 
 ```typescript
 import { Result, matchRes } from "@carbonteq/fp";

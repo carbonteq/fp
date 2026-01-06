@@ -24,9 +24,8 @@ let globalErrorMapper: ErrorMapper = (err) => err;
 
 export type UnitResult<E = never> = ExperimentalResult<UNIT, E>;
 
-type UnwrapResult<R> = R extends ExperimentalResult<infer T, infer E>
-  ? { ok: T; err: E }
-  : never;
+type UnwrapResult<R> =
+  R extends ExperimentalResult<infer T, infer E> ? { ok: T; err: E } : never;
 
 type CombinedResultOk<T extends ExperimentalResult<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["ok"];
@@ -841,13 +840,11 @@ export class ExperimentalResult<T, E = unknown> {
     );
   }
 
-  validate<VE extends unknown[]>(
-    validators: {
-      [K in keyof VE]: (
-        value: T,
-      ) => MaybeAsync<ExperimentalResult<unknown, VE[K]>>;
-    },
-  ): ExperimentalResult<T, E | VE[number][]> {
+  validate<VE extends unknown[]>(validators: {
+    [K in keyof VE]: (
+      value: T,
+    ) => MaybeAsync<ExperimentalResult<unknown, VE[K]>>;
+  }): ExperimentalResult<T, E | VE[number][]> {
     const runValidators = (
       value: T,
     ):

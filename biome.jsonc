@@ -39,6 +39,7 @@
   "json": {},
   "javascript": {
     "formatter": {
+      "enabled": false,
       "quoteStyle": "double",
       "semicolons": "always",
       "trailingCommas": "all",
