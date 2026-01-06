@@ -1,6 +1,6 @@
-import { isPromise } from "node:util/types";
 import { Result } from "./result.js";
 import { UNIT } from "./unit.js";
+import { isPromiseLike } from "./utils.js";
 
 // ============================================================================
 // Types
@@ -165,7 +165,7 @@ export class Option<T> {
     return (
       this._tag === "None" ||
       this.#val === NONE_VAL ||
-      (isPromise(this.#val) && this.#ctx.promiseNoneSlot)
+      (isPromiseLike(this.#val) && this.#ctx.promiseNoneSlot)
     );
   }
 
@@ -237,7 +237,7 @@ export class Option<T> {
 
     const curr = this.#val;
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const p = curr as Promise<Curr>;
       // Create a NEW context for this branch to avoid cross-branch mutation
       const newCtx: OptionCtx = { promiseNoneSlot: false };
@@ -246,7 +246,7 @@ export class Option<T> {
     }
 
     const transformed = mapper(curr as unknown as Curr);
-    if (isPromise(transformed)) {
+    if (isPromiseLike(transformed)) {
       return new Option(transformed, { promiseNoneSlot: false }, "Some");
     }
     // Sync operations can share context since there's no async mutation
@@ -300,7 +300,7 @@ export class Option<T> {
 
     const curr = this.#val;
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const p = curr as Promise<Curr>;
       // Create a NEW context for this branch to avoid cross-branch mutation
       const newCtx: OptionCtx = { promiseNoneSlot: false };
@@ -312,7 +312,7 @@ export class Option<T> {
             resolve(castedNone);
           } else {
             const r = mapper(innerVal);
-            if (isPromise(r)) {
+            if (isPromiseLike(r)) {
               r.then((innerOpt) => {
                 if (innerOpt.isNone()) {
                   newCtx.promiseNoneSlot = true;
@@ -334,7 +334,7 @@ export class Option<T> {
     }
 
     const mapped = mapper(curr as unknown as Curr);
-    if (isPromise(mapped)) {
+    if (isPromiseLike(mapped)) {
       return Option.fromPromise(mapped);
     }
     return mapped;
@@ -353,7 +353,7 @@ export class Option<T> {
 
     const result = pred(this.#val);
 
-    if (isPromise(result)) {
+    if (isPromiseLike(result)) {
       const p = result.then((passed) => {
         if (passed) return this.#val;
         return NONE_VAL;
@@ -382,7 +382,7 @@ export class Option<T> {
 
     const curr = this.#val;
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const val = curr as Promise<Curr>;
       // Create a NEW context for this branch to avoid cross-branch mutation
       const newCtx: OptionCtx = { promiseNoneSlot: false };
@@ -402,7 +402,7 @@ export class Option<T> {
 
     const value = curr as unknown as Curr;
     const u = fn(value);
-    if (isPromise(u)) {
+    if (isPromiseLike(u)) {
       const p = u.then((uu) => [value, uu] as [Curr, Awaited<U>]);
       return new Option(p, { promiseNoneSlot: false }, "Some");
     }
@@ -437,7 +437,7 @@ export class Option<T> {
 
     const curr = this.#val;
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const val = curr as Promise<Curr>;
       // Create a NEW context for this branch to avoid cross-branch mutation
       const newCtx: OptionCtx = { promiseNoneSlot: false };
@@ -461,7 +461,7 @@ export class Option<T> {
 
     const c = curr as unknown as Curr;
     const u = fn(c);
-    if (isPromise(u)) {
+    if (isPromiseLike(u)) {
       const newCtx: OptionCtx = { promiseNoneSlot: false };
       const p = u.then((uu) => {
         if (uu.isNone()) {
@@ -505,7 +505,7 @@ export class Option<T> {
     const curr = this.#val;
 
     let inner: Curr;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const awaited = await curr;
       if (awaited === NONE_VAL) {
         return Option.None;

@@ -1,8 +1,8 @@
 import assert from "node:assert";
-import { isPromise } from "node:util/types";
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
+import { isPromiseLike } from "./utils.js";
 
 // export class UnwrappedErrWithOk extends Error {
 //   constructor(r: Result<unknown, unknown>) {
@@ -127,7 +127,7 @@ export class Result<T, E> {
       throw new UnwrappedOkWithErr(this.toString());
     }
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       return new Promise((resolve, reject) => {
         curr.then((v) => {
           if (v === Sentinel) {
@@ -159,7 +159,7 @@ export class Result<T, E> {
     // Only way to get to error state is if val is promise at this point
 
     const curr = this.#val;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       return new Promise((resolve, reject) => {
         curr.then((v) => {
           if (v !== Sentinel) {
@@ -214,7 +214,7 @@ export class Result<T, E> {
     const immutableCtx = this.#ctx;
     const mutableCtx: ResultCtx<E> = { errSlot: Sentinel };
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const p = curr as Promise<In | Sentinel>;
       const out = p.then((v) => {
         if (v === Sentinel) {
@@ -247,7 +247,7 @@ export class Result<T, E> {
     const curr = this.#val;
     const newCtx: ResultCtx<U> = { errSlot: Sentinel };
     const ctx = this.#ctx;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       // Can eventually lead to Err state
       const p = curr.then((v) => {
         // Could have fallen into this state by now
@@ -284,7 +284,7 @@ export class Result<T, E> {
       return this.mapErr(fnErr);
     }
 
-    if (isPromise(this.#val)) {
+    if (isPromiseLike(this.#val)) {
       return this.map(fnOk as AsyncMapper<T, In>);
     }
 
@@ -356,7 +356,7 @@ export class Result<T, E> {
     const immutableCtx = this.#ctx;
     const mutableCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const newP = new Promise<U>((resolve, reject) => {
         curr.then((v) => {
           if (v === Sentinel) {
@@ -385,7 +385,7 @@ export class Result<T, E> {
     mutableCtx: ResultCtx<E | E2>,
     mapped: FlatZipInput<T, U, E | E2>,
   ) {
-    if (isPromise(mapped)) {
+    if (isPromiseLike(mapped)) {
       return mapped.then((r) => Result.flatMapInnerHelper(mutableCtx, r));
     }
 
@@ -396,7 +396,7 @@ export class Result<T, E> {
     mutableCtx: ResultCtx<E | E2>,
     r: Result<Promise<U>, E | E2> | Result<U, E | E2>,
   ) {
-    if (isPromise(r.#val)) {
+    if (isPromiseLike(r.#val)) {
       return r.#val.then((v) => {
         if (v === Sentinel) {
           mutableCtx.errSlot = r.#ctx.errSlot;
@@ -450,7 +450,7 @@ export class Result<T, E> {
     const curr = this.#val as Promise<In> | In;
     const immutableCtx = this.#ctx;
     const mutableCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       // Only branch that can led to a non-Ok state in the future
       const newP = curr.then((v) => {
         // Check if returned value is Sentinel
@@ -478,7 +478,7 @@ export class Result<T, E> {
     r: Result<unknown, E> | Promise<Result<unknown, E>>,
     newCtx: ResultCtx<E>,
   ): In | Promise<In> {
-    if (isPromise(r)) {
+    if (isPromiseLike(r)) {
       const finalPromise = r.then((newResult) => {
         if (newResult.#ctx.errSlot !== Sentinel)
           newCtx.errSlot = newResult.#ctx.errSlot;
@@ -515,7 +515,7 @@ export class Result<T, E> {
     const immutableCtx = this.#ctx;
     const mutableCtx: ResultCtx<E> = { errSlot: Sentinel };
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const newP = curr.then((v) => {
         if (v === Sentinel) {
           mutableCtx.errSlot = immutableCtx.errSlot;
@@ -523,7 +523,7 @@ export class Result<T, E> {
         }
 
         const u = fn(v);
-        if (isPromise(u)) return u.then((uu) => [v, uu]);
+        if (isPromiseLike(u)) return u.then((uu) => [v, uu]);
 
         return [v, u];
       }) as Promise<[In, U]>;
@@ -532,7 +532,7 @@ export class Result<T, E> {
     }
 
     const u = fn(curr);
-    if (isPromise(u)) {
+    if (isPromiseLike(u)) {
       return new Result(
         u.then((uu) => [curr, uu]) as Promise<[In, U]>,
         mutableCtx,
@@ -575,7 +575,7 @@ export class Result<T, E> {
     const immutableCtx = this.#ctx;
     const mutableCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
 
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       const newP = curr.then((v) => {
         if (v === Sentinel) {
           mutableCtx.errSlot = immutableCtx.errSlot;
@@ -606,7 +606,7 @@ export class Result<T, E> {
       | Result<Promise<U>, E | E2>
       | Result<U, E | E2>,
   ) {
-    if (isPromise(mapped)) {
+    if (isPromiseLike(mapped)) {
       return mapped.then((r) =>
         Result.flatZipInnerHelper(mutableCtx, originalVal, r),
       );
@@ -620,7 +620,7 @@ export class Result<T, E> {
     originalVal: T,
     r: Result<Promise<U>, E | E2> | Result<U, E | E2>,
   ) {
-    if (isPromise(r.#val)) {
+    if (isPromiseLike(r.#val)) {
       return r.#val.then((v) => {
         if (v === Sentinel) {
           mutableCtx.errSlot = r.#ctx.errSlot;
@@ -693,7 +693,7 @@ export class Result<T, E> {
     const currCtx = this.#ctx;
     const mutableCtx = { errSlot: Sentinel } as ResultCtx<E>;
 
-    if (isPromise(currVal)) {
+    if (isPromiseLike(currVal)) {
       return new Result(
         currVal.then(async (c) => {
           if (currCtx.errSlot !== Sentinel) {
@@ -718,7 +718,7 @@ export class Result<T, E> {
     const baseVal: T = currVal as T;
     const results = validators.map((v) => v(baseVal));
 
-    if (results.some(isPromise)) {
+    if (results.some(isPromiseLike)) {
       return new Result(
         Promise.all(results).then((resolved) =>
           Result.validateHelper(
@@ -738,7 +738,7 @@ export class Result<T, E> {
       )[]
     ).map((r) => r.#val);
 
-    if (values.some(isPromise)) {
+    if (values.some(isPromiseLike)) {
       return new Result(
         Result.validateHelper<any, E>(
           results as Result<unknown, unknown>[],
@@ -761,7 +761,7 @@ export class Result<T, E> {
   ) {
     const combinedRes = Result.all(...results);
 
-    if (isPromise(combinedRes)) {
+    if (isPromiseLike(combinedRes)) {
       return (combinedRes as Promise<Result<Val, unknown[]>>).then((cRes) => {
         if (cRes.isErr()) {
           currCtx.errSlot = cRes.#ctx.errSlot as Err;
@@ -788,7 +788,7 @@ export class Result<T, E> {
 
     const mutableCtx = { errSlot: Sentinel } as ResultCtx<unknown>;
 
-    if (vals.some(isPromise)) {
+    if (vals.some(isPromiseLike)) {
       return new Result(
         Promise.all(vals).then((v) => {
           if (results.some((r) => r.isErr())) {
@@ -843,7 +843,7 @@ export class Result<T, E> {
     if (this.isErr()) return this;
 
     const curr = this.#val;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       // Schedule side effect after promise resolves
       const newPromise = curr.then((v) => {
         if (v !== Sentinel) {
@@ -890,7 +890,7 @@ export class Result<T, E> {
     if (this.isErr()) return defaultValue as T;
 
     const curr = this.#val;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       return curr.then((v) => {
         if (v === Sentinel) return defaultValue;
         return v;
@@ -911,7 +911,7 @@ export class Result<T, E> {
 
     const curr = this.#val;
     const ctx = this.#ctx;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       return curr.then((v) => {
         if (v === Sentinel) return fn(ctx.errSlot as E);
         return v;
@@ -931,7 +931,7 @@ export class Result<T, E> {
     if (this.isErr()) return null;
 
     const curr = this.#val;
-    if (isPromise(curr)) {
+    if (isPromiseLike(curr)) {
       return curr.then((v) => {
         if (v === Sentinel) return null;
         return v;
