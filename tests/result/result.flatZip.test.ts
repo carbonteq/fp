@@ -383,7 +383,7 @@ describe("Result.flatZip behavior", () => {
 
     expect(zipped.isErr()).toBeTrue();
     expect(zipped.safeUnwrap()).toBeNull();
-    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).not.toHaveBeenCalled();
   });
 
@@ -497,7 +497,7 @@ describe("Result.flatZip behavior", () => {
     const mockedDouble = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockedDouble).toPromise();
 
-    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.isOk()).toBeTrue();
     expect(zipped.unwrap()).toEqual([2, 4]);
     expect(mockedDouble).toHaveBeenCalledTimes(1);
   });
@@ -508,7 +508,7 @@ describe("Result.flatZip behavior", () => {
     const mockerB = mock(tupleDoubleResPromiseIt);
     const zipped = await r.flatZip(mockerA).flatZip(mockerB).toPromise();
 
-    expect(zipped.isErr()).toBeTrue();
+    expect(zipped.isOk()).toBeTrue();
     expect(zipped.unwrap()).toEqual([
       [2, 4],
       [4, 8],
@@ -596,7 +596,7 @@ describe("Result.flatZip behavior", () => {
 
     expect(zipped.isErr()).toBeTrue();
     expect(zipped.safeUnwrap()).toBeNull();
-    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { isPromise } from "node:util/types";
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
+import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
 
 // export class UnwrappedErrWithOk extends Error {
@@ -29,11 +30,6 @@ type FlatZipInput<_T, U, E> =
   | Result<Promise<U>, E>
   | Promise<Result<U, E>>
   | Promise<Result<Promise<U>, E>>;
-
-type OkOrErr = "ok" | "err";
-const okPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isOk();
-const errPred = <T, E extends Error>(el: Result<T, E>): boolean => el.isErr();
-const _preds = [okPred, errPred];
 
 export type UnwrapResult<T extends Result<unknown, unknown>> =
   T extends Result<infer U, infer E> ? { ok: U; err: E } : never;
@@ -76,6 +72,9 @@ export class Result<T, E> {
     errSlot: Sentinel,
   }) as UnitResult;
 
+  /** Discriminant for pattern matching */
+  readonly _tag: "Ok" | "Err";
+
   // Actual value holder. In async ops, will be used to chain. Cannot go back to normal after promise chain starts, although that could be looked into
   readonly #val: T | Sentinel;
 
@@ -85,6 +84,7 @@ export class Result<T, E> {
   protected constructor(val: T | Sentinel, ctx: ResultCtx<E>) {
     this.#val = val;
     this.#ctx = ctx;
+    this._tag = ctx.errSlot === Sentinel ? "Ok" : "Err";
   }
 
   static Ok<T, E = never>(val: T): Result<T, E> {
@@ -146,20 +146,6 @@ export class Result<T, E> {
     return curr;
   }
 
-  // unwrapOr(def: T): T {
-  //   if (this.isErr()) return def;
-  //
-  //   return this.val as T;
-  // }
-  //
-  // unwrapOrElse(def: () => T): T;
-  // unwrapOrElse(def: () => Promise<T>): Promise<T>;
-  // unwrapOrElse(def: () => T | Promise<T>): T | Promise<T> {
-  //   if (this.isErr()) return def();
-  //
-  //   return this.val as T;
-  // }
-
   unwrapErr<T, E>(this: Result<T, E>): E;
   unwrapErr<T, E>(this: Result<Promise<T>, E>): Promise<E>;
   unwrapErr() {
@@ -190,10 +176,6 @@ export class Result<T, E> {
     assert(curr !== Sentinel, "value must not be Sentinel at this point");
 
     throw new UnwrappedErrWithOk(this.toString());
-  }
-
-  safeUnwrap(): T | null {
-    return this.#val === Sentinel ? null : this.#val;
   }
 
   /**
@@ -813,10 +795,214 @@ export class Result<T, E> {
     return Result.Ok(vals) as Result<CombinedResultOk<T>, CombinedErrs<T>>;
   }
 
+  /** Returns first Ok, or collects all errors */
+  static any<U, F>(...results: Result<U, F>[]): Result<U, F[]> {
+    for (const r of results) {
+      if (r.isOk()) return r as Result<U, F[]>;
+    }
+    return Result.Err(results.map((r) => r.#ctx.errSlot as F));
+  }
+
   flip(): Result<E, T> {
     const val = this.#val;
     const errSlot = this.#ctx.errSlot;
 
     return new Result(errSlot, { errSlot: val });
   }
+
+  // ==========================================================================
+  // Missing Methods Added Per Spec
+  // ==========================================================================
+
+  /** Execute side effect for Ok, receive resolved value for async */
+  tap<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+    fn: (val: Curr) => void,
+  ): Result<Promise<Curr>, E>;
+  tap(this: Result<T, E>, fn: (val: T) => void): Result<T, E>;
+  tap(fn: (val: unknown) => void): Result<T, E> {
+    if (this.isErr()) return this;
+
+    const curr = this.#val;
+    if (isPromise(curr)) {
+      // Schedule side effect after promise resolves
+      const newPromise = curr.then((v) => {
+        if (v !== Sentinel) {
+          fn(v);
+        }
+        return v;
+      });
+      return new Result(newPromise, this.#ctx) as Result<T, E>;
+    }
+
+    fn(curr as T);
+    return this;
+  }
+
+  /** Execute side effect for Err, return self */
+  tapErr(fn: (err: E) => void): Result<T, E> {
+    if (this.isErr()) {
+      fn(this.#ctx.errSlot as E);
+    }
+    return this;
+  }
+
+  /** Convert Result to Option (discards error info) */
+  toOption(): Option<T> {
+    if (this.isErr()) return Option.None;
+    return Option.Some(this.#val as T);
+  }
+
+  /** Pattern match on Result state */
+  match<U>(cases: { Ok: (val: T) => U; Err: (err: E) => U }): U {
+    if (this.isErr()) {
+      return cases.Err(this.#ctx.errSlot as E);
+    }
+    return cases.Ok(this.#val as T);
+  }
+
+  /** Returns value or the provided default - async returns Promise */
+  unwrapOr<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+    defaultValue: Curr,
+  ): Promise<Curr>;
+  unwrapOr(this: Result<T, E>, defaultValue: T): T;
+  unwrapOr(defaultValue: unknown): T | Promise<unknown> {
+    if (this.isErr()) return defaultValue as T;
+
+    const curr = this.#val;
+    if (isPromise(curr)) {
+      return curr.then((v) => {
+        if (v === Sentinel) return defaultValue;
+        return v;
+      });
+    }
+
+    return curr as T;
+  }
+
+  /** Returns value or calls factory with error to get default - async returns Promise */
+  unwrapOrElse<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+    fn: (err: E) => Curr,
+  ): Promise<Curr>;
+  unwrapOrElse(this: Result<T, E>, fn: (err: E) => T): T;
+  unwrapOrElse(fn: (err: E) => unknown): T | Promise<unknown> {
+    if (this.isErr()) return fn(this.#ctx.errSlot as E) as T;
+
+    const curr = this.#val;
+    const ctx = this.#ctx;
+    if (isPromise(curr)) {
+      return curr.then((v) => {
+        if (v === Sentinel) return fn(ctx.errSlot as E);
+        return v;
+      });
+    }
+
+    return curr as T;
+  }
+
+  /** Safe unwrap - returns null for Err, handles async */
+  safeUnwrap<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+  ): Promise<Curr | null>;
+  safeUnwrap(this: Result<T, E>): T | null;
+  safeUnwrap(): T | null | Promise<unknown> {
+    if (this.isErr()) return null;
+
+    const curr = this.#val;
+    if (isPromise(curr)) {
+      return curr.then((v) => {
+        if (v === Sentinel) return null;
+        return v;
+      });
+    }
+
+    return curr === Sentinel ? null : (curr as T);
+  }
+
+  /** Recover from error by providing fallback Result */
+  orElse<T2, E2>(fn: (err: E) => Result<T2, E2>): Result<T | T2, E2> {
+    if (this.isOk()) return this as unknown as Result<T | T2, E2>;
+    return fn(this.#ctx.errSlot as E);
+  }
 }
+
+// ==========================================================================
+// Static Constructors (added to Result namespace)
+// ==========================================================================
+
+// Extend Result with static constructors
+export namespace Result {
+  /** Create Result from nullable value - returns Err for null/undefined */
+  export function fromNullable<T, E>(
+    val: T | null | undefined,
+    error: E,
+  ): Result<NonNullable<T>, E> {
+    return val === null || val === undefined
+      ? Result.Err(error)
+      : Result.Ok(val as NonNullable<T>);
+  }
+
+  /** Create Result based on predicate result */
+  export function fromPredicate<T, E>(
+    val: T,
+    pred: (v: T) => boolean,
+    error: E,
+  ): Result<T, E> {
+    return pred(val) ? Result.Ok(val) : Result.Err(error);
+  }
+
+  /** Wrap Promise<Result<T, E>> as Result<Promise<T>, E> */
+  export function fromPromise<U, F>(
+    promise: Promise<Result<U, F>>,
+  ): Result<Promise<U>, F> {
+    // We need to create a Result that wraps the promise and properly propagates Err
+    // The approach: wrap in a promise that resolves Sentinel on Err
+    const ctx: { errSlot: F | typeof Sentinel } = { errSlot: Sentinel };
+    const p = promise.then((innerResult) => {
+      if (innerResult.isErr()) {
+        ctx.errSlot = innerResult.unwrapErr();
+        return Sentinel as unknown as U;
+      }
+      return innerResult.unwrap();
+    });
+
+    // Access protected constructor via workaround
+    return new (Result as any)(p, ctx) as Result<Promise<U>, F>;
+  }
+
+  /** Catches sync exceptions */
+  export function tryCatch<T, E = unknown>(
+    fn: () => T,
+    errorMapper?: (e: unknown) => E,
+  ): Result<T, E> {
+    try {
+      return Result.Ok(fn());
+    } catch (e) {
+      return Result.Err(errorMapper ? errorMapper(e) : (e as E));
+    }
+  }
+
+  /** Catches async exceptions */
+  export function tryAsyncCatch<T, E = unknown>(
+    fn: () => Promise<T>,
+    errorMapper?: (e: unknown) => E,
+  ): Result<Promise<T>, E> {
+    // Create mutable context to capture error
+    const ctx: { errSlot: E | typeof Sentinel } = { errSlot: Sentinel };
+    const p = fn()
+      .then((v) => v)
+      .catch((e) => {
+        ctx.errSlot = errorMapper ? errorMapper(e) : (e as E);
+        return Sentinel as unknown as T;
+      });
+
+    return new (Result as any)(p, ctx) as Result<Promise<T>, E>;
+  }
+}
+
+// Alias 'try' to 'tryCatch' using quoted access (reserved keyword workaround)
+(Result as unknown as { try: typeof Result.tryCatch }).try = Result.tryCatch;
+(Result as unknown as { tryAsync: typeof Result.tryAsyncCatch }).tryAsync =
+  Result.tryAsyncCatch;

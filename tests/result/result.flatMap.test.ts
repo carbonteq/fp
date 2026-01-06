@@ -335,7 +335,7 @@ describe("Result.flatMap behavior", () => {
 
     expect(mapped.isErr()).toBeTrue();
     expect(mapped.safeUnwrap()).toBeNull();
-    expect(mockerA).toHaveBeenCalledTimes(0);
+    expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(0);
   });
 

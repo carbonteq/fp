@@ -24,8 +24,8 @@
         "default": "./dist/index.cjs"
       },
       "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
       }
     },
     "./result": {
@@ -34,18 +34,8 @@
         "default": "./dist/result.cjs"
       },
       "import": {
-        "types": "./dist/result.d.ts",
-        "default": "./dist/result.js"
-      }
-    },
-    "./result.experimental": {
-      "require": {
-        "types": "./dist/result.experimental.d.cts",
-        "default": "./dist/result.experimental.cjs"
-      },
-      "import": {
-        "types": "./dist/result.experimental.d.ts",
-        "default": "./dist/result.experimental.js"
+        "types": "./dist/result.d.mts",
+        "default": "./dist/result.mjs"
       }
     },
     "./option": {
@@ -54,8 +44,8 @@
         "default": "./dist/option.cjs"
       },
       "import": {
-        "types": "./dist/option.d.ts",
-        "default": "./dist/option.js"
+        "types": "./dist/option.d.mts",
+        "default": "./dist/option.mjs"
       }
     },
     "./match": {
@@ -64,8 +54,8 @@
         "default": "./dist/match.cjs"
       },
       "import": {
-        "types": "./dist/match.d.ts",
-        "default": "./dist/match.js"
+        "types": "./dist/match.d.mts",
+        "default": "./dist/match.mjs"
       }
     },
     "./errors": {
@@ -74,8 +64,8 @@
         "default": "./dist/errors.cjs"
       },
       "import": {
-        "types": "./dist/errors.d.ts",
-        "default": "./dist/errors.js"
+        "types": "./dist/errors.d.mts",
+        "default": "./dist/errors.mjs"
       }
     },
     "./either": {
@@ -84,11 +74,10 @@
         "default": "./dist/either.cjs"
       },
       "import": {
-        "types": "./dist/either.d.ts",
-        "default": "./dist/either.js"
+        "types": "./dist/either.d.mts",
+        "default": "./dist/either.mjs"
       }
-    },
-    "./package.json": "./package.json"
+    }
   },
   "homepage": "https://github.com/carbonteq/fp#readme",
   "sideEffects": false,
@@ -102,8 +91,8 @@
     "fmt:dry": "biome format src tests",
     "fmt": "biome format src tests --write",
     "tc": "tsc --pretty --noEmit",
-    "build": "NODE_ENV=production bunup",
-    "dev": "bunup --watch",
+    "build": "NODE_ENV=production tsdown",
+    "dev": "tsdown --watch",
     "test": "bun test",
     "test:node": "tsx --test tests/*.test.ts",
     "test:dbg": "bun test --inspect",
@@ -116,6 +105,7 @@
     "@changesets/cli": "^2.29.8",
     "@microsoft/api-extractor": "^7.55.2",
     "@swc/core": "^1.15.8",
+    "@tsconfig/bun": "^1.0.10",
     "@tsconfig/node22": "^22.0.5",
     "@types/bun": "^1.3.5",
     "@types/node": "^24.10.1",
@@ -127,6 +117,7 @@
     "oxfmt": "^0.23.0",
     "oxlint": "^1.38.0",
     "oxlint-tsgolint": "^0.10.1",
+    "tsdown": "^0.19.0-beta.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

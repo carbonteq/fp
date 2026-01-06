@@ -1,5 +1,5 @@
 import { setTimeout } from "node:timers/promises";
-import { Option } from "./dist/option.js";
+import { Option } from "./dist/option.mjs";
 
 const print = console.debug;
 
@@ -21,7 +21,9 @@ const _gen = async (n: number) => n;
 // });
 // print(noComp);
 
-const leadsToNone = async (_: number): Promise<Option<number>> => {
+const leadsToNone = async <T extends string | number>(
+  _: T,
+): Promise<Option<number>> => {
   print("leading to none");
   return Option.None;
 };
