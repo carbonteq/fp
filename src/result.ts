@@ -1,22 +1,7 @@
-import assert from "node:assert";
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
 import { isPromiseLike } from "./utils.js";
-
-// export class UnwrappedErrWithOk extends Error {
-//   constructor(r: Result<unknown, unknown>) {
-//     super(`Attempted to call unwrapErr on an okay value: <${r}>`);
-//   }
-// }
-
-// export class UnwrappedOkWithErr extends Error {
-//   constructor(r: Result<unknown, unknown>) {
-//     super(`Attempted to call unwrap on an Err value: <${r}>`);
-//   }
-// }
-
-export type UnitResult<E = never> = Result<UNIT, E>;
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -31,6 +16,8 @@ type FlatZipInput<_T, U, E> =
   | Promise<Result<U, E>>
   | Promise<Result<Promise<U>, E>>;
 
+export type UnitResult<E = never> = Result<UNIT, E>;
+
 export type UnwrapResult<T extends Result<unknown, unknown>> =
   T extends Result<infer U, infer E> ? { ok: U; err: E } : never;
 
@@ -40,9 +27,6 @@ type CombinedResultOk<T extends Result<unknown, unknown>[]> = {
 type CombinedResultErr<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["err"];
 }[number];
-type CombinedErrs<T extends Result<unknown, unknown>[]> = {
-  [K in keyof T]: UnwrapResult<T[K]>["err"];
-};
 
 export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
   CombinedResultOk<T>,
@@ -61,48 +45,93 @@ type HasPromise<T extends readonly Result<unknown, unknown>[]> = true extends {
   ? true
   : false;
 
-/** Sentinel value */
-const Sentinel = Symbol.for("ResultSentinel");
-type Sentinel = typeof Sentinel;
+/** Sentinel value stored in #val when Result is Err */
+const ERR_VAL = Symbol.for("Result::Err");
 
-type ResultCtx<E> = { errSlot: E | Sentinel };
+/** NO_ERR sentinel indicates no async error has occurred */
+const NO_ERR = Symbol.for("Result::NoErr");
+
+/** Internal symbol for accessing private factory - not exported */
+const RESULT_INTERNAL = Symbol.for("Result::Internal");
+type NO_ERR = typeof NO_ERR;
+
+type ResultCtx<E> = { asyncErr: E | NO_ERR };
+
+interface MatchCases<T, E, U> {
+  Ok: (val: T) => U;
+  Err: (err: E) => U;
+}
 
 export class Result<T, E> {
-  static readonly UNIT_RESULT = new Result(UNIT, {
-    errSlot: Sentinel,
-  }) as UnitResult;
-
-  /** Discriminant for pattern matching */
+  /** Discriminant tag for type-level identification */
   readonly _tag: "Ok" | "Err";
 
-  // Actual value holder. In async ops, will be used to chain. Cannot go back to normal after promise chain starts, although that could be looked into
-  readonly #val: T | Sentinel;
+  /** Value when Ok; ERR_VAL sentinel when Err */
+  readonly #val: T;
 
-  // to prevent unnecessary chaining - no other purpose. Should be modifiable only within the creating method
+  /** Error when Err (sync); undefined when Ok */
+  readonly #err: E;
+
+  /** Context for async error tracking - stores actual error value when async chain fails */
   readonly #ctx: ResultCtx<E>;
 
-  protected constructor(val: T | Sentinel, ctx: ResultCtx<E>) {
+  private constructor(val: T, err: E, ctx: ResultCtx<E>, tag: "Ok" | "Err") {
     this.#val = val;
+    this.#err = err;
     this.#ctx = ctx;
-    this._tag = ctx.errSlot === Sentinel ? "Ok" : "Err";
+    this._tag = tag;
   }
 
+  /** Internal factory for namespace functions - not part of public API */
+  static [RESULT_INTERNAL] = {
+    create<T, E>(
+      val: T,
+      err: E,
+      ctx: ResultCtx<E>,
+      tag: "Ok" | "Err",
+    ): Result<T, E> {
+      return new Result(val, err, ctx, tag);
+    },
+  };
+
+  /** Get the actual error value (from async context or sync field) */
+  private getErr(): E {
+    return this.#ctx.asyncErr !== NO_ERR ? this.#ctx.asyncErr : this.#err;
+  }
+
+  /** Singleton UNIT_RESULT for void-success operations */
+  static readonly UNIT_RESULT: Result<UNIT, never> = new Result(
+    UNIT,
+    undefined as never,
+    { asyncErr: NO_ERR },
+    "Ok",
+  );
+
+  /** Create an Ok containing the given value */
   static Ok<T, E = never>(val: T): Result<T, E> {
-    return new Result(val, { errSlot: Sentinel }) as Result<T, E>;
+    return new Result(val, undefined as E, { asyncErr: NO_ERR }, "Ok");
   }
 
+  /** Create an Err containing the given error */
   static Err<E, T = never>(err: E): Result<T, E> {
-    return new Result(Sentinel as T, { errSlot: err });
+    return new Result(ERR_VAL as T, err, { asyncErr: NO_ERR }, "Err");
   }
 
+  /** Type guard for Ok state */
   isOk(): this is Result<T, never> {
-    return this.#ctx.errSlot === Sentinel;
+    return this._tag === "Ok" && this.#ctx.asyncErr === NO_ERR;
   }
 
+  /** Type guard for Err state */
   isErr(): this is Result<never, E> {
-    return this.#ctx.errSlot !== Sentinel;
+    return (
+      this._tag === "Err" ||
+      this.#ctx.asyncErr !== NO_ERR ||
+      (this._tag === "Ok" && this.#val === ERR_VAL)
+    );
   }
 
+  /** Type guard for Unit value */
   isUnit(): this is Result<UNIT, never> {
     return this.#val === UNIT;
   }
@@ -111,34 +140,33 @@ export class Result<T, E> {
     if (this.isOk()) {
       return `Result::Ok<${String(this.#val)}>`;
     }
-
-    return `Result::Err<${String(this.#ctx.errSlot)}>`;
+    return `Result::Err<${String(this.getErr())}>`;
   }
 
+  /** Returns value or throws (re-throws if E extends Error) */
   unwrap(this: Result<Promise<T>, E>): Promise<T>;
   unwrap(this: Result<T, E>): T;
   unwrap() {
-    const curr = this.#val;
     if (this.isErr()) {
-      const err = this.#ctx.errSlot;
-
+      const err = this.getErr();
       if (err instanceof Error) throw err;
-
       throw new UnwrappedOkWithErr(this.toString());
     }
 
+    const curr = this.#val;
     if (isPromiseLike(curr)) {
+      const ctx = this.#ctx;
       return new Promise((resolve, reject) => {
         curr.then((v) => {
-          if (v === Sentinel) {
-            let e: Error;
-            if (this.#ctx.errSlot instanceof Error) e = this.#ctx.errSlot;
-            else e = new UnwrappedOkWithErr(this.toString());
-
+          if (v === ERR_VAL || ctx.asyncErr !== NO_ERR) {
+            const e =
+              ctx.asyncErr !== NO_ERR && ctx.asyncErr instanceof Error
+                ? ctx.asyncErr
+                : new UnwrappedOkWithErr(this.toString());
             reject(e);
+          } else {
+            resolve(v);
           }
-
-          resolve(v);
         }, reject);
       });
     }
@@ -146,49 +174,114 @@ export class Result<T, E> {
     return curr;
   }
 
+  /** Returns error or throws UnwrapError */
   unwrapErr<T, E>(this: Result<T, E>): E;
   unwrapErr<T, E>(this: Result<Promise<T>, E>): Promise<E>;
   unwrapErr() {
-    const errSlot = this.#ctx.errSlot;
-
-    if (errSlot !== Sentinel) {
-      return errSlot;
+    if (this._tag === "Err") {
+      return this.getErr();
     }
 
-    // Either we are in okay result, or haven't gotten to error state yet
-    // Only way to get to error state is if val is promise at this point
-
     const curr = this.#val;
+    const ctx = this.#ctx;
+
     if (isPromiseLike(curr)) {
       return new Promise((resolve, reject) => {
         curr.then((v) => {
-          if (v !== Sentinel) {
-            // Is okay
+          if (v === ERR_VAL || ctx.asyncErr !== NO_ERR) {
+            resolve(ctx.asyncErr !== NO_ERR ? ctx.asyncErr : this.#err);
+          } else {
             reject(new UnwrappedErrWithOk(this.toString()));
           }
-
-          resolve(this.#ctx.errSlot);
         }, reject);
       });
     }
 
-    // val is not promise, which means val must contain a valid value, add sanity check
-    assert(curr !== Sentinel, "value must not be Sentinel at this point");
-
+    // Sync Ok - cannot unwrapErr
     throw new UnwrappedErrWithOk(this.toString());
   }
 
-  /**
-   *
-   * @param {Mapper<T, U>} fn The mapping/endofunctor to apply to the internal Ok value (T -> U)
-   * @returns Result<U, E> containing the mapped value
-   * @example
-   * const r = Result.Ok({data: 42})
-   * const r2 = Result.Err(new Error("something went wrong"))
-   * const mapper = (d: {data: 42}) => d.data * 2
-   * const result1 = r.map(mapper) // Result containing 64 as the ok value
-   * const result2 = r2.map(mapper) // mapper won't be applied, as r2 was in error state
-   */
+  /** Returns value or the provided default */
+  unwrapOr<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+    defaultValue: Curr,
+  ): Promise<Curr>;
+  unwrapOr(this: Result<T, E>, defaultValue: T): T;
+  unwrapOr(defaultValue: unknown): T | Promise<unknown> {
+    if (this.isErr()) return defaultValue as T;
+
+    const curr = this.#val;
+    const ctx = this.#ctx;
+
+    if (isPromiseLike(curr)) {
+      return curr.then((v) => {
+        if (v === ERR_VAL || ctx.asyncErr !== NO_ERR) return defaultValue;
+        return v;
+      });
+    }
+
+    return curr as T;
+  }
+
+  /** Returns value or calls factory with error to get default */
+  unwrapOrElse<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+    fn: (err: E) => Curr,
+  ): Promise<Curr>;
+  unwrapOrElse(this: Result<T, E>, fn: (err: E) => T): T;
+  unwrapOrElse(fn: (err: E) => unknown): T | Promise<unknown> {
+    if (this.isErr()) return fn(this.getErr()) as T;
+
+    const curr = this.#val;
+    const ctx = this.#ctx;
+
+    if (isPromiseLike(curr)) {
+      return curr.then((v) => {
+        if (v === ERR_VAL || ctx.asyncErr !== NO_ERR) {
+          const errVal = ctx.asyncErr !== NO_ERR ? ctx.asyncErr : this.#err;
+          return fn(errVal);
+        }
+        return v;
+      });
+    }
+
+    return curr as T;
+  }
+
+  /** Safe unwrap - returns null for Err */
+  safeUnwrap(this: Result<never, E>): null;
+  safeUnwrap<Curr = Awaited<T>>(
+    this: Result<Promise<Curr>, E>,
+  ): Promise<Curr | null> | null;
+  safeUnwrap(this: Result<T, E>): T | null;
+  safeUnwrap(): T | null | Promise<unknown> {
+    if (this.isErr()) return null;
+
+    const curr = this.#val;
+    const ctx = this.#ctx;
+
+    if (isPromiseLike(curr)) {
+      return curr.then((v) => {
+        if (v === ERR_VAL || ctx.asyncErr !== NO_ERR) return null;
+        return v;
+      });
+    }
+
+    return curr === ERR_VAL ? null : (curr as T);
+  }
+
+  /** Pattern match on Result state */
+  match<U>(cases: MatchCases<T, E, U>): U {
+    if (this.isErr()) {
+      return cases.Err(this.getErr());
+    }
+    return cases.Ok(this.#val);
+  }
+
+  // -------------------------------------------------------------------------
+  // map() - with async overloads per spec
+  // -------------------------------------------------------------------------
+
   map<T, U, E>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<U>,
@@ -205,66 +298,81 @@ export class Result<T, E> {
   map<U, In = Awaited<T>>(
     fn: Mapper<In, U> | AsyncMapper<In, U>,
   ): Result<Promise<U>, E> | Result<U, E> {
-    // No computation if in Err track
-    // if (this.isErr() || this.val === Sentinel)
-    if (this.isErr()) return Result.Err(this.#ctx.errSlot) as Result<U, E>;
-    assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
-
-    const curr = this.#val; // should not be sentinel, only promise or proper value
-    const immutableCtx = this.#ctx;
-    const mutableCtx: ResultCtx<E> = { errSlot: Sentinel };
-
-    if (isPromiseLike(curr)) {
-      const p = curr as Promise<In | Sentinel>;
-      const out = p.then((v) => {
-        if (v === Sentinel) {
-          mutableCtx.errSlot = immutableCtx.errSlot;
-          return Sentinel;
-        }
-
-        const mapped = fn(v);
-        return mapped;
-      }) as Promise<U>;
-
-      // Using mutable ctx as we cannot modify immutableCtx in the op above
-      return new Result(out, mutableCtx);
-    }
-
-    //@ts-expect-error
-    const next = fn(curr);
-
-    return new Result(next, mutableCtx) as Result<U, E>;
-  }
-
-  /** Same as map, but for the error value instead of the Ok value */
-  mapErr<U>(fn: Mapper<E, U>): Result<T, U> {
+    // Short-circuit if in Err track
     if (this.isErr()) {
-      // Easy case
-      const mappedErr = fn(this.#ctx.errSlot as E);
-      return Result.Err(mappedErr); // no need to retain context anymore
+      return new Result(
+        ERR_VAL as U,
+        this.getErr(),
+        { asyncErr: NO_ERR },
+        "Err",
+      );
     }
 
     const curr = this.#val;
-    const newCtx: ResultCtx<U> = { errSlot: Sentinel };
-    const ctx = this.#ctx;
+    const parentErr = this.#err;
+
     if (isPromiseLike(curr)) {
-      // Can eventually lead to Err state
-      const p = curr.then((v) => {
-        // Could have fallen into this state by now
-        if (ctx.errSlot !== Sentinel) {
-          const mappedErr = fn(ctx.errSlot);
-          newCtx.errSlot = mappedErr;
-        }
-
-        return v;
-      });
-
-      return new Result(p, newCtx) as Result<T, U>;
+      const p = curr as Promise<In | typeof ERR_VAL>;
+      const newCtx: ResultCtx<E> = { asyncErr: NO_ERR };
+      const out = Result.safeMap(p, fn, newCtx, this.#ctx);
+      return new Result(out, parentErr, newCtx, "Ok");
     }
 
-    // we don't need to propagate the previous ctx, as closure will ensure the changes there are reflected in newCtx
-    return new Result(this.#val, newCtx);
+    const next = fn(curr as unknown as In);
+    if (isPromiseLike(next)) {
+      return new Result(next, parentErr, { asyncErr: NO_ERR }, "Ok");
+    }
+    return new Result(next, parentErr, { asyncErr: NO_ERR }, "Ok");
   }
+
+  private static safeMap<In, U, E>(
+    p: Promise<In | typeof ERR_VAL>,
+    mapper: (val: In) => U | Promise<U>,
+    ctx: ResultCtx<E>,
+    parentCtx: ResultCtx<E>,
+  ): Promise<U> {
+    return p.then((v) => {
+      if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+        ctx.asyncErr = parentCtx.asyncErr as E;
+        return ERR_VAL as unknown as U;
+      }
+      return mapper(v as In);
+    }) as Promise<U>;
+  }
+
+  // -------------------------------------------------------------------------
+  // mapErr() - transforms error while preserving success value
+  // -------------------------------------------------------------------------
+
+  mapErr<U>(fn: Mapper<E, U>): Result<T, U> {
+    if (this._tag === "Err") {
+      const mappedErr = fn(this.getErr());
+      return Result.Err(mappedErr);
+    }
+
+    const curr = this.#val;
+    const parentCtx = this.#ctx;
+
+    if (isPromiseLike(curr)) {
+      const newCtx: ResultCtx<U> = { asyncErr: NO_ERR };
+      const p = curr.then((v) => {
+        if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+          // Transform the error
+          const origErr =
+            parentCtx.asyncErr !== NO_ERR ? parentCtx.asyncErr : this.#err;
+          newCtx.asyncErr = fn(origErr);
+        }
+        return v;
+      });
+      return new Result(p as unknown as T, undefined as U, newCtx, "Ok");
+    }
+
+    return new Result(this.#val, undefined as U, { asyncErr: NO_ERR }, "Ok");
+  }
+
+  // -------------------------------------------------------------------------
+  // mapBoth() - transforms both tracks simultaneously
+  // -------------------------------------------------------------------------
 
   mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (val: E) => E2): Result<T2, E2>;
   mapBoth<T2, E2, In = Awaited<T2>>(
@@ -291,20 +399,10 @@ export class Result<T, E> {
     return this.map(fnOk as Mapper<T, In>);
   }
 
-  /**
-   * Also known as `andThen`, `bind` or `fmap`
-   * Like Result.map but used in cases where the mapper func returns a Result instead of a containable value
-   * @example
-   * const r: Result<string, SomeError> = Result.Ok("42")
-   * const mapper = (d: string) => {
-   *   const n = Number.parseInt(d)
-   *   if(Number.isNumber(n) && !Number.isNaN(n)) return Result.Ok(n)
-   *
-   *   return Result.Err(new InvalidNumStringError(d))
-   * }
-   * const result1 = r.map(mapper) // Type is Result<Result<number, InvalidNumStringError>, SomeError>
-   * const result2 = r.flatMap(mapper) // Type is Result<number, SomeError | InvalidNumStringError>
-   */
+  // -------------------------------------------------------------------------
+  // flatMap() - chains Result-returning functions
+  // -------------------------------------------------------------------------
+
   flatMap<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Result<Promise<U>, E2>,
@@ -348,149 +446,99 @@ export class Result<T, E> {
       | AsyncFlatMapper<In, U, E2>
       | AsyncFlatPMapper<In, U, E2>,
   ) {
-    if (this.isErr()) return Result.Err<E | E2>(this.#ctx.errSlot as E | E2);
-
-    assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
+    if (this.isErr()) {
+      return new Result(
+        ERR_VAL as U,
+        this.getErr() as E | E2,
+        { asyncErr: NO_ERR },
+        "Err",
+      );
+    }
 
     const curr = this.#val as unknown as Promise<In> | In;
-    const immutableCtx = this.#ctx;
-    const mutableCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
+    const parentErr = this.#err;
+    const parentCtx = this.#ctx;
+    const newCtx: ResultCtx<E | E2> = { asyncErr: NO_ERR };
 
     if (isPromiseLike(curr)) {
       const newP = new Promise<U>((resolve, reject) => {
         curr.then((v) => {
-          if (v === Sentinel) {
-            // the only place where previous ctx can have an effect in this method
-            mutableCtx.errSlot = immutableCtx.errSlot;
-            return resolve(Sentinel as U);
+          if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+            newCtx.asyncErr =
+              parentCtx.asyncErr !== NO_ERR
+                ? (parentCtx.asyncErr as E | E2)
+                : (parentErr as E | E2);
+            return resolve(ERR_VAL as U);
           }
 
-          const mapped = fn(v);
-          const p = Result.flatMapHelper<U, E, E2, T>(mutableCtx, mapped);
-
+          const mapped = fn(v as In);
+          const p = Result.flatMapHelper<U, E, E2, T>(newCtx, mapped);
           resolve(p);
         }, reject);
       });
 
-      return new Result(newP, mutableCtx);
+      return new Result(newP, parentErr as E | E2, newCtx, "Ok");
     }
 
-    const mapped = fn(curr);
-    const p = Result.flatMapHelper<U, E, E2, T>(mutableCtx, mapped);
+    const mapped = fn(curr as In);
+    if (isPromiseLike(mapped)) {
+      const p = mapped.then((r) => Result.flatMapInnerHelper(newCtx, r));
+      return new Result(p, parentErr as E | E2, newCtx, "Ok");
+    }
 
-    return new Result(p, mutableCtx);
+    // Sync flatMap - return the inner result directly
+    if (mapped._tag === "Err") {
+      return new Result(
+        ERR_VAL as U,
+        mapped.getErr() as E | E2,
+        { asyncErr: NO_ERR },
+        "Err",
+      );
+    }
+    return new Result(
+      mapped.#val as U,
+      parentErr as E | E2,
+      { asyncErr: NO_ERR },
+      "Ok",
+    );
   }
 
   private static flatMapHelper<U, E, E2, T>(
     mutableCtx: ResultCtx<E | E2>,
     mapped: FlatZipInput<T, U, E | E2>,
-  ) {
+  ): U | Promise<U> {
     if (isPromiseLike(mapped)) {
       return mapped.then((r) => Result.flatMapInnerHelper(mutableCtx, r));
     }
-
     return Result.flatMapInnerHelper(mutableCtx, mapped);
   }
 
   private static flatMapInnerHelper<U, E, E2>(
     mutableCtx: ResultCtx<E | E2>,
     r: Result<Promise<U>, E | E2> | Result<U, E | E2>,
-  ) {
-    if (isPromiseLike(r.#val)) {
-      return r.#val.then((v) => {
-        if (v === Sentinel) {
-          mutableCtx.errSlot = r.#ctx.errSlot;
-        }
+  ): U | Promise<U> {
+    if (r._tag === "Err") {
+      mutableCtx.asyncErr = r.getErr();
+      return ERR_VAL as U;
+    }
 
+    const innerVal = r.#val;
+    if (isPromiseLike(innerVal)) {
+      return innerVal.then((v) => {
+        if (v === ERR_VAL || r.#ctx.asyncErr !== NO_ERR) {
+          mutableCtx.asyncErr =
+            r.#ctx.asyncErr !== NO_ERR ? r.#ctx.asyncErr : r.#err;
+        }
         return v;
       });
     }
 
-    if (r.#val === Sentinel) {
-      mutableCtx.errSlot = r.#ctx.errSlot;
-      return Sentinel as U;
+    if (innerVal === ERR_VAL) {
+      mutableCtx.asyncErr = r.getErr();
+      return ERR_VAL as U;
     }
 
-    return r.#val;
-  }
-
-  /**
-   * For combining the errors only while retaining the original value.
-   * @example
-   * const r: Result<string, SomeError> = Result.Ok('42')
-   * const binderOk = (d: string) => Result.Ok<number, SomeOtherError>(0909)
-   * const binderErr = (d: string) => Result.Err<number, SomeOtherError>(new SomeOtherError())
-   * const binderErrAsync = async (d: string) => Result.Err<number, SomeOtherError>(new SomeOtherError())
-   *
-   * const res1 = r.zipErr(binderOk) // Result<string, SomeError | SomeOtherError> - Value: Result.Ok('42') - No change in Ok type
-   * const res2 = r.zipErr(binderErr) // Result<string, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
-   * const res3 = r.zipErr(binderErrAsync) // Result<Promise<string>, SomeError | SomeOtherError> - Value: Result.Err(new SomeOtherError())
-   */
-  zipErr<E2>(
-    this: Result<Promise<T>, E>,
-    fn: (val: T) => Promise<Result<unknown, E2>>,
-  ): Result<Promise<T>, E | E2>;
-  zipErr<E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Promise<Result<unknown, E2>>,
-  ): Result<Promise<T>, E | E2>;
-  zipErr<E2>(
-    this: Result<T, E>,
-    fn: (val: T) => Result<unknown, E2>,
-  ): Result<T, E | E2>;
-  zipErr<E2, In = Awaited<T>>(
-    fn: FlatMapper<In, unknown, E | E2> | AsyncFlatMapper<In, unknown, E | E2>,
-  ) {
-    if (this.isErr()) {
-      // Already in error state, zip should not compute as there's no T
-      return Result.Err(this.#ctx.errSlot);
-    }
-    assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
-
-    const curr = this.#val as Promise<In> | In;
-    const immutableCtx = this.#ctx;
-    const mutableCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
-    if (isPromiseLike(curr)) {
-      // Only branch that can led to a non-Ok state in the future
-      const newP = curr.then((v) => {
-        // Check if returned value is Sentinel
-        if (v === Sentinel) {
-          // fallen into error slot
-          mutableCtx.errSlot = immutableCtx.errSlot;
-          return Sentinel as In;
-        }
-
-        const r = fn(v);
-        return Result.zipErrHelper(v, r, mutableCtx);
-      });
-
-      return new Result(newP, mutableCtx);
-    }
-
-    // There is no computation in the chain, so let's resolve it directly with the value
-    const r = fn(curr);
-    const newP = Result.zipErrHelper(curr, r, mutableCtx);
-    return new Result(newP, mutableCtx);
-  }
-
-  private static zipErrHelper<In, E>(
-    v: In,
-    r: Result<unknown, E> | Promise<Result<unknown, E>>,
-    newCtx: ResultCtx<E>,
-  ): In | Promise<In> {
-    if (isPromiseLike(r)) {
-      const finalPromise = r.then((newResult) => {
-        if (newResult.#ctx.errSlot !== Sentinel)
-          newCtx.errSlot = newResult.#ctx.errSlot;
-
-        return v;
-      });
-      return finalPromise;
-    }
-
-    if (r.#ctx.errSlot !== Sentinel) newCtx.errSlot = r.#ctx.errSlot;
-
-    return v;
+    return innerVal;
   }
 
   zip<T, U, In = Awaited<T>>(
@@ -507,42 +555,58 @@ export class Result<T, E> {
   ): Result<Promise<[T, U]>, E>;
   zip<T, U>(this: Result<T, E>, fn: (val: T) => U): Result<[T, U], E>;
   zip<T, U, In = Awaited<T>>(fn: Mapper<In, U> | AsyncMapper<In, U>) {
-    if (this.isErr()) return Result.Err(this.#ctx.errSlot);
-
-    const curr = this.#val as Promise<In> | In;
-    assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
-
-    const immutableCtx = this.#ctx;
-    const mutableCtx: ResultCtx<E> = { errSlot: Sentinel };
-
-    if (isPromiseLike(curr)) {
-      const newP = curr.then((v) => {
-        if (v === Sentinel) {
-          mutableCtx.errSlot = immutableCtx.errSlot;
-          return Sentinel;
-        }
-
-        const u = fn(v);
-        if (isPromiseLike(u)) return u.then((uu) => [v, uu]);
-
-        return [v, u];
-      }) as Promise<[In, U]>;
-
-      return new Result(newP, mutableCtx);
-    }
-
-    const u = fn(curr);
-    if (isPromiseLike(u)) {
+    if (this.isErr()) {
       return new Result(
-        u.then((uu) => [curr, uu]) as Promise<[In, U]>,
-        mutableCtx,
+        ERR_VAL as unknown as [In, U],
+        this.getErr(),
+        { asyncErr: NO_ERR },
+        "Err",
       );
     }
 
-    return new Result([curr, u] as [In, U], mutableCtx);
+    const curr = this.#val as Promise<In> | In;
+    const parentErr = this.#err;
+    const parentCtx = this.#ctx;
+    const newCtx: ResultCtx<E> = { asyncErr: NO_ERR };
+
+    if (isPromiseLike(curr)) {
+      const newP = curr.then((v) => {
+        if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+          newCtx.asyncErr =
+            parentCtx.asyncErr !== NO_ERR
+              ? parentCtx.asyncErr
+              : (parentErr as E);
+          return ERR_VAL as unknown as [In, U];
+        }
+
+        const u = fn(v as In);
+        if (isPromiseLike(u)) {
+          return u.then((uu) => [v, uu] as [In, U]);
+        }
+        return [v, u] as [In, U];
+      }) as Promise<[In, U]>;
+
+      return new Result(newP, parentErr, newCtx, "Ok");
+    }
+
+    const u = fn(curr as In);
+    if (isPromiseLike(u)) {
+      const p = u.then((uu) => [curr, uu] as [In, U]);
+      return new Result(p, parentErr, { asyncErr: NO_ERR }, "Ok");
+    }
+
+    return new Result(
+      [curr, u] as [In, U],
+      parentErr,
+      { asyncErr: NO_ERR },
+      "Ok",
+    );
   }
 
-  /** For combining two results lazily. For the eager eval version, see {@link and} */
+  // -------------------------------------------------------------------------
+  // flatZip() - pairs original value with value from another Result
+  // -------------------------------------------------------------------------
+
   flatZip<U, E2, In = Awaited<T>>(
     this: Result<Promise<In>, E>,
     fn: (val: In) => FlatZipInput<In, U, E | E2>,
@@ -563,100 +627,200 @@ export class Result<T, E> {
   flatZip<U, E2, In = T>(
     fn: (val: In) => FlatZipInput<In, U, E | E2>,
   ): Result<[In, Awaited<U>] | Promise<[In, Awaited<U>]>, E | E2> {
-    if (this.isErr())
+    if (this.isErr()) {
       return new Result(
-        Sentinel as unknown as [In, Awaited<U>] | Promise<[In, Awaited<U>]>,
-        { errSlot: this.#ctx.errSlot },
+        ERR_VAL as unknown as [In, Awaited<U>] | Promise<[In, Awaited<U>]>,
+        this.getErr(),
+        { asyncErr: NO_ERR },
+        "Err",
       );
+    }
 
     const curr = this.#val as Promise<In> | In;
-    assert(this.#val !== Sentinel, "cannot be Sentinel at this point");
-
-    const immutableCtx = this.#ctx;
-    const mutableCtx: ResultCtx<E | E2> = { errSlot: Sentinel };
+    const parentErr = this.#err;
+    const parentCtx = this.#ctx;
+    const newCtx: ResultCtx<E | E2> = { asyncErr: NO_ERR };
 
     if (isPromiseLike(curr)) {
       const newP = curr.then((v) => {
-        if (v === Sentinel) {
-          mutableCtx.errSlot = immutableCtx.errSlot;
-          return v;
+        if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+          newCtx.asyncErr =
+            parentCtx.asyncErr !== NO_ERR
+              ? (parentCtx.asyncErr as E | E2)
+              : (parentErr as E | E2);
+          return ERR_VAL as unknown as [In, Awaited<U>];
         }
 
-        const mapped = fn(v);
-        return Result.flatZipHelper(mutableCtx, v, mapped);
-      });
-      return new Result(newP as Promise<[In, Awaited<U>]>, mutableCtx);
+        const mapped = fn(v as In);
+        return Result.flatZipHelper(newCtx, v as In, mapped);
+      }) as Promise<[In, Awaited<U>]>;
+
+      return new Result(newP, parentErr as E | E2, newCtx, "Ok");
     }
 
-    const mapped = fn(curr);
-    const p = Result.flatZipHelper(mutableCtx, curr, mapped);
+    const mapped = fn(curr as In);
+    const p = Result.flatZipHelper(newCtx, curr as In, mapped);
 
-    return new Result(
-      p as [In, Awaited<U>] | Promise<[In, Awaited<U>]>,
-      mutableCtx,
-    );
+    if (isPromiseLike(p)) {
+      return new Result(
+        p as Promise<[In, Awaited<U>]>,
+        parentErr as E | E2,
+        newCtx,
+        "Ok",
+      );
+    }
+
+    if (p === ERR_VAL) {
+      return new Result(
+        ERR_VAL as unknown as [In, Awaited<U>],
+        newCtx.asyncErr !== NO_ERR ? newCtx.asyncErr : (parentErr as E | E2),
+        newCtx,
+        "Err",
+      );
+    }
+
+    return new Result(p as [In, Awaited<U>], parentErr as E | E2, newCtx, "Ok");
   }
 
-  private static flatZipHelper<U, E, E2, T>(
+  private static flatZipHelper<U, E, E2, In>(
     mutableCtx: ResultCtx<E | E2>,
-    originalVal: T,
+    originalVal: In,
     mapped:
       | Promise<Result<Promise<U>, E | E2>>
       | Promise<Result<U, E | E2>>
       | Result<Promise<U>, E | E2>
       | Result<U, E | E2>,
-  ) {
+  ): [In, Awaited<U>] | Promise<[In, Awaited<U>]> | typeof ERR_VAL {
     if (isPromiseLike(mapped)) {
       return mapped.then((r) =>
         Result.flatZipInnerHelper(mutableCtx, originalVal, r),
-      );
+      ) as Promise<[In, Awaited<U>]> | typeof ERR_VAL;
     }
-
     return Result.flatZipInnerHelper(mutableCtx, originalVal, mapped);
   }
 
-  private static flatZipInnerHelper<U, E, E2, T>(
+  private static flatZipInnerHelper<U, E, E2, In>(
     mutableCtx: ResultCtx<E | E2>,
-    originalVal: T,
+    originalVal: In,
     r: Result<Promise<U>, E | E2> | Result<U, E | E2>,
-  ) {
-    if (isPromiseLike(r.#val)) {
-      return r.#val.then((v) => {
-        if (v === Sentinel) {
-          mutableCtx.errSlot = r.#ctx.errSlot;
+  ): [In, Awaited<U>] | Promise<[In, Awaited<U>]> | typeof ERR_VAL {
+    if (r._tag === "Err") {
+      mutableCtx.asyncErr = r.getErr();
+      return ERR_VAL;
+    }
+
+    const innerVal = r.#val;
+    if (isPromiseLike(innerVal)) {
+      return innerVal.then((v) => {
+        if (v === ERR_VAL || r.#ctx.asyncErr !== NO_ERR) {
+          mutableCtx.asyncErr =
+            r.#ctx.asyncErr !== NO_ERR ? r.#ctx.asyncErr : r.#err;
+          return ERR_VAL as unknown as [In, Awaited<U>];
         }
-        return [originalVal, v] as [T, Awaited<U>];
+        return [originalVal, v] as [In, Awaited<U>];
       });
     }
 
-    if (r.#val === Sentinel) {
-      mutableCtx.errSlot = r.#ctx.errSlot;
-      return Sentinel;
+    if (innerVal === ERR_VAL) {
+      mutableCtx.asyncErr = r.getErr();
+      return ERR_VAL;
     }
 
-    return [originalVal, r.#val] as [T, Awaited<U>];
+    return [originalVal, innerVal] as [In, Awaited<U>];
   }
 
-  //#endregion
+  // -------------------------------------------------------------------------
+  // zipErr() - combines errors while retaining original value
+  // -------------------------------------------------------------------------
 
-  innerMap<In, E, Out>(
-    this: Result<Array<In>, E>,
-    mapper: (val: NoInfer<In>) => Out,
-  ): Result<Array<Out>, E> {
-    if (this.isErr()) return this;
-
-    if (Array.isArray(this.#val)) {
-      return new Result(this.#val.map(mapper), this.#ctx);
+  zipErr<E2>(
+    this: Result<Promise<T>, E>,
+    fn: (val: T) => Promise<Result<unknown, E2>>,
+  ): Result<Promise<T>, E | E2>;
+  zipErr<E2>(
+    this: Result<T, E>,
+    fn: (val: T) => Promise<Result<unknown, E2>>,
+  ): Result<Promise<T>, E | E2>;
+  zipErr<E2>(
+    this: Result<T, E>,
+    fn: (val: T) => Result<unknown, E2>,
+  ): Result<T, E | E2>;
+  zipErr<E2, In = Awaited<T>>(
+    fn: FlatMapper<In, unknown, E | E2> | AsyncFlatMapper<In, unknown, E | E2>,
+  ) {
+    if (this.isErr()) {
+      return new Result(
+        ERR_VAL as T,
+        this.getErr(),
+        { asyncErr: NO_ERR },
+        "Err",
+      );
     }
 
-    throw new Error("Can only be called for Result<Array<T>, E>");
+    const curr = this.#val as Promise<In> | In;
+    const parentErr = this.#err;
+    const parentCtx = this.#ctx;
+    const newCtx: ResultCtx<E | E2> = { asyncErr: NO_ERR };
+
+    if (isPromiseLike(curr)) {
+      const newP = curr.then((v) => {
+        if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+          newCtx.asyncErr =
+            parentCtx.asyncErr !== NO_ERR
+              ? (parentCtx.asyncErr as E | E2)
+              : (parentErr as E | E2);
+          return ERR_VAL as In;
+        }
+
+        const r = fn(v as In);
+        return Result.zipErrHelper(v as In, r, newCtx);
+      });
+
+      return new Result(newP, parentErr as E | E2, newCtx, "Ok");
+    }
+
+    const r = fn(curr as In);
+    const newP = Result.zipErrHelper(curr as In, r, newCtx);
+
+    if (isPromiseLike(newP)) {
+      return new Result(
+        newP as unknown as T,
+        parentErr as E | E2,
+        newCtx,
+        "Ok",
+      );
+    }
+
+    if (newCtx.asyncErr !== NO_ERR) {
+      return new Result(ERR_VAL as T, newCtx.asyncErr, newCtx, "Err");
+    }
+
+    return new Result(newP as unknown as T, parentErr as E | E2, newCtx, "Ok");
   }
 
-  async toPromise(): Promise<Result<Awaited<T>, E>> {
-    const v = await this.#val;
+  private static zipErrHelper<In, E>(
+    v: In,
+    r: Result<unknown, E> | Promise<Result<unknown, E>>,
+    newCtx: ResultCtx<E>,
+  ): In | Promise<In> {
+    if (isPromiseLike(r)) {
+      return r.then((newResult) => {
+        if (newResult._tag === "Err") {
+          newCtx.asyncErr = newResult.getErr() as E;
+        }
+        return v;
+      });
+    }
 
-    return new Result(v, this.#ctx);
+    if (r._tag === "Err") {
+      newCtx.asyncErr = r.getErr() as E;
+    }
+    return v;
   }
+
+  // ==========================================================================
+  // Validation
+  // ==========================================================================
 
   validate<VE extends unknown[]>(
     this: Result<T, E>,
@@ -690,15 +854,19 @@ export class Result<T, E> {
     if (this.isErr()) return this as Result<T, E[]>;
 
     const currVal = this.#val;
-    const currCtx = this.#ctx;
-    const mutableCtx = { errSlot: Sentinel } as ResultCtx<E>;
+    const parentErr = this.#err;
+    const parentCtx = this.#ctx;
+    const mutableCtx: ResultCtx<E | VE[number][]> = { asyncErr: NO_ERR };
 
     if (isPromiseLike(currVal)) {
       return new Result(
         currVal.then(async (c) => {
-          if (currCtx.errSlot !== Sentinel) {
-            mutableCtx.errSlot = currCtx.errSlot as E;
-            return Sentinel;
+          if (c === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+            mutableCtx.asyncErr =
+              parentCtx.asyncErr !== NO_ERR
+                ? (parentCtx.asyncErr as E | VE[number][])
+                : (parentErr as E | VE[number][]);
+            return ERR_VAL;
           }
 
           const awaitedVal = c as T;
@@ -711,7 +879,9 @@ export class Result<T, E> {
             ),
           );
         }),
+        parentErr,
         mutableCtx,
+        "Ok",
       ) as Result<Promise<T>, E[]>;
     }
 
@@ -727,29 +897,29 @@ export class Result<T, E> {
             baseVal,
           ),
         ),
+        parentErr,
         mutableCtx,
+        "Ok",
       ) as Result<Promise<T>, E[]>;
     }
 
-    const values = (
-      results as (
-        | Result<unknown, unknown>
-        | Result<Promise<unknown>, unknown>
-      )[]
-    ).map((r) => r.#val);
+    const syncResults = results as Result<unknown, unknown>[];
+    const hasPromiseVal = syncResults.some((r) => isPromiseLike(r.#val));
 
-    if (values.some(isPromiseLike)) {
+    if (hasPromiseVal) {
       return new Result(
-        Result.validateHelper<any, E>(
-          results as Result<unknown, unknown>[],
+        Result.validateHelper<T, E | VE[number][]>(
+          syncResults,
           mutableCtx,
-          baseVal as unknown as T,
+          baseVal as T,
         ),
+        parentErr,
         mutableCtx,
+        "Ok",
       ) as Result<Promise<T>, E>;
     }
 
-    const combinedRes = Result.all(...(results as Result<unknown, E>[]));
+    const combinedRes = Result.all(...(syncResults as Result<unknown, E>[]));
 
     return combinedRes.isErr() ? combinedRes : this;
   }
@@ -758,58 +928,88 @@ export class Result<T, E> {
     results: Result<unknown, unknown>[],
     currCtx: ResultCtx<Err>,
     currVal: Val | Promise<Val>,
-  ) {
+  ): Val | Promise<Val> | typeof ERR_VAL {
     const combinedRes = Result.all(...results);
 
-    if (isPromiseLike(combinedRes)) {
-      return (combinedRes as Promise<Result<Val, unknown[]>>).then((cRes) => {
-        if (cRes.isErr()) {
-          currCtx.errSlot = cRes.#ctx.errSlot as Err;
-          return Sentinel;
+    if (isPromiseLike(combinedRes.#val)) {
+      return combinedRes.#val.then((v) => {
+        if (v === ERR_VAL || combinedRes.#ctx.asyncErr !== NO_ERR) {
+          currCtx.asyncErr = combinedRes.getErr() as Err;
+          return ERR_VAL as unknown as Val;
         }
         return currVal as Val;
       }) as Promise<Val>;
     }
 
     if (combinedRes.isErr()) {
-      currCtx.errSlot = combinedRes.#ctx.errSlot as Err;
-      return Sentinel;
+      currCtx.asyncErr = combinedRes.getErr() as Err;
+      return ERR_VAL as unknown as Val;
     }
     return currVal as Val;
   }
+
+  // ==========================================================================
+  // Aggregation
+  // ==========================================================================
 
   static all<T extends Result<unknown, unknown>[]>(
     ...results: T
   ): HasPromise<T> extends true
     ? Result<Promise<UnwrapPromises<T>>, CombinedResultErr<T>[]>
     : Result<CombinedResultOk<T>, CombinedResultErr<T>[]>;
-  static all<T extends Result<unknown, unknown>[]>(...results: T) {
+  static all<T extends Result<unknown, unknown>[]>(
+    ...results: T
+  ):
+    | Result<Promise<UnwrapPromises<T>>, CombinedResultErr<T>[]>
+    | Result<CombinedResultOk<T>, CombinedResultErr<T>[]> {
     const vals = results.map((r) => r.#val);
-
-    const mutableCtx = { errSlot: Sentinel } as ResultCtx<unknown>;
+    const newCtx: ResultCtx<CombinedResultErr<T>[]> = { asyncErr: NO_ERR };
 
     if (vals.some(isPromiseLike)) {
-      return new Result(
-        Promise.all(vals).then((v) => {
-          if (results.some((r) => r.isErr())) {
-            mutableCtx.errSlot = results
-              .filter((r) => r.isErr())
-              .map((r) => r.#ctx.errSlot);
-            return Sentinel;
+      const p = Promise.all(vals).then((resolvedVals) => {
+        const errs: unknown[] = [];
+        for (let i = 0; i < results.length; i++) {
+          if (
+            results[i]._tag === "Err" ||
+            results[i].#ctx.asyncErr !== NO_ERR ||
+            resolvedVals[i] === ERR_VAL
+          ) {
+            errs.push(results[i].getErr());
           }
-          return v;
-        }),
-        mutableCtx,
-      );
+        }
+        if (errs.length > 0) {
+          newCtx.asyncErr = errs as CombinedResultErr<T>[];
+          return ERR_VAL;
+        }
+        return resolvedVals;
+      });
+
+      return new Result(
+        p,
+        [] as CombinedResultErr<T>[],
+        newCtx,
+        "Ok",
+      ) as Result<Promise<UnwrapPromises<T>>, CombinedResultErr<T>[]>;
     }
 
-    if (results.some((r) => r.isErr())) {
-      return Result.Err(
-        results.filter((r) => r.isErr()).map((r) => r.#ctx.errSlot),
-      ) as Result<CombinedResultOk<T>, CombinedResultErr<T>[]>;
+    const errs: unknown[] = [];
+    for (const r of results) {
+      if (r._tag === "Err") {
+        errs.push(r.getErr());
+      }
     }
 
-    return Result.Ok(vals) as Result<CombinedResultOk<T>, CombinedErrs<T>>;
+    if (errs.length > 0) {
+      return Result.Err(errs as CombinedResultErr<T>[]) as Result<
+        CombinedResultOk<T>,
+        CombinedResultErr<T>[]
+      >;
+    }
+
+    return Result.Ok(vals as CombinedResultOk<T>) as Result<
+      CombinedResultOk<T>,
+      CombinedResultErr<T>[]
+    >;
   }
 
   /** Returns first Ok, or collects all errors */
@@ -817,21 +1017,14 @@ export class Result<T, E> {
     for (const r of results) {
       if (r.isOk()) return r as Result<U, F[]>;
     }
-    return Result.Err(results.map((r) => r.#ctx.errSlot as F));
-  }
-
-  flip(): Result<E, T> {
-    const val = this.#val;
-    const errSlot = this.#ctx.errSlot;
-
-    return new Result(errSlot, { errSlot: val });
+    return Result.Err(results.map((r) => r.getErr()));
   }
 
   // ==========================================================================
-  // Missing Methods Added Per Spec
+  // Utility Methods
   // ==========================================================================
 
-  /** Execute side effect for Ok, receive resolved value for async */
+  /** Execute side effect for Ok, return self */
   tap<Curr = Awaited<T>>(
     this: Result<Promise<Curr>, E>,
     fn: (val: Curr) => void,
@@ -843,15 +1036,19 @@ export class Result<T, E> {
     if (this.isErr()) return this;
 
     const curr = this.#val;
+    const parentCtx = this.#ctx;
     if (isPromiseLike(curr)) {
-      // Schedule side effect after promise resolves
+      const newCtx: ResultCtx<E> = { asyncErr: NO_ERR };
       const newPromise = curr.then((v) => {
-        if (v !== Sentinel) {
+        if (v !== ERR_VAL && parentCtx.asyncErr === NO_ERR) {
           fn(v as Curr);
+        } else {
+          newCtx.asyncErr =
+            parentCtx.asyncErr !== NO_ERR ? parentCtx.asyncErr : this.#err;
         }
         return v;
       });
-      return new Result(newPromise, this.#ctx) as Result<T, E>;
+      return new Result(newPromise as T, this.#err, newCtx, "Ok");
     }
 
     fn(curr as T);
@@ -861,90 +1058,71 @@ export class Result<T, E> {
   /** Execute side effect for Err, return self */
   tapErr(fn: (err: E) => void): Result<T, E> {
     if (this.isErr()) {
-      fn(this.#ctx.errSlot as E);
+      fn(this.#err);
     }
     return this;
+  }
+
+  /** Swap Ok and Err */
+  flip(): Result<E, T> {
+    if (this._tag === "Err") {
+      return new Result(
+        this.getErr(),
+        undefined as T,
+        { asyncErr: NO_ERR },
+        "Ok",
+      );
+    }
+    return new Result(
+      ERR_VAL as E,
+      this.#val as T,
+      { asyncErr: NO_ERR },
+      "Err",
+    );
   }
 
   /** Convert Result to Option (discards error info) */
   toOption(): Option<T> {
     if (this.isErr()) return Option.None;
-    return Option.Some(this.#val as T);
+    return Option.Some(this.#val);
   }
 
-  /** Pattern match on Result state */
-  match<U>(cases: { Ok: (val: T) => U; Err: (err: E) => U }): U {
-    if (this.isErr()) {
-      return cases.Err(this.#ctx.errSlot as E);
+  /** Resolve inner Promise and maintain Result structure */
+  async toPromise(): Promise<Result<Awaited<T>, E>> {
+    const v = await this.#val;
+
+    if (v === ERR_VAL || this.#ctx.asyncErr !== NO_ERR) {
+      const errVal =
+        this.#ctx.asyncErr !== NO_ERR ? this.#ctx.asyncErr : this.#err;
+      return new Result(
+        ERR_VAL as Awaited<T>,
+        errVal,
+        { asyncErr: NO_ERR },
+        "Err",
+      );
     }
-    return cases.Ok(this.#val as T);
+
+    return new Result(v as Awaited<T>, this.#err, { asyncErr: NO_ERR }, "Ok");
   }
 
-  /** Returns value or the provided default - async returns Promise */
-  unwrapOr<Curr = Awaited<T>>(
-    this: Result<Promise<Curr>, E>,
-    defaultValue: Curr,
-  ): Promise<Curr>;
-  unwrapOr(this: Result<T, E>, defaultValue: T): T;
-  unwrapOr(defaultValue: unknown): T | Promise<unknown> {
-    if (this.isErr()) return defaultValue as T;
+  /** Map over array elements inside Result */
+  innerMap<In, E, Out>(
+    this: Result<Array<In>, E>,
+    mapper: (val: NoInfer<In>) => Out,
+  ): Result<Array<Out>, E> {
+    if (this.isErr()) return this as unknown as Result<Array<Out>, E>;
 
-    const curr = this.#val;
-    if (isPromiseLike(curr)) {
-      return curr.then((v) => {
-        if (v === Sentinel) return defaultValue;
-        return v;
-      });
+    if (Array.isArray(this.#val)) {
+      return new Result(this.#val.map(mapper), this.#err, this.#ctx, "Ok");
     }
 
-    return curr as T;
-  }
-
-  /** Returns value or calls factory with error to get default - async returns Promise */
-  unwrapOrElse<Curr = Awaited<T>>(
-    this: Result<Promise<Curr>, E>,
-    fn: (err: E) => Curr,
-  ): Promise<Curr>;
-  unwrapOrElse(this: Result<T, E>, fn: (err: E) => T): T;
-  unwrapOrElse(fn: (err: E) => unknown): T | Promise<unknown> {
-    if (this.isErr()) return fn(this.#ctx.errSlot as E) as T;
-
-    const curr = this.#val;
-    const ctx = this.#ctx;
-    if (isPromiseLike(curr)) {
-      return curr.then((v) => {
-        if (v === Sentinel) return fn(ctx.errSlot as E);
-        return v;
-      });
-    }
-
-    return curr as T;
-  }
-
-  /** Safe unwrap - returns null for Err, handles async */
-  safeUnwrap(this: Result<never, E>): null;
-  safeUnwrap<Curr = Awaited<T>>(
-    this: Result<Promise<Curr>, E>,
-  ): Promise<Curr | null> | null;
-  safeUnwrap(this: Result<T, E>): T | null;
-  safeUnwrap(): T | null | Promise<unknown> {
-    if (this.isErr()) return null;
-
-    const curr = this.#val;
-    if (isPromiseLike(curr)) {
-      return curr.then((v) => {
-        if (v === Sentinel) return null;
-        return v;
-      });
-    }
-
-    return curr === Sentinel ? null : (curr as T);
+    throw new Error("Can only be called for Result<Array<T>, E>");
   }
 
   /** Recover from error by providing fallback Result */
   orElse<T2, E2>(fn: (err: E) => Result<T2, E2>): Result<T | T2, E2> {
     if (this.isOk()) return this as unknown as Result<T | T2, E2>;
-    return fn(this.#ctx.errSlot as E);
+    return fn(this.getErr());
   }
 }
 
@@ -952,7 +1130,6 @@ export class Result<T, E> {
 // Static Constructors (added to Result namespace)
 // ==========================================================================
 
-// Extend Result with static constructors
 export namespace Result {
   /** Create Result from nullable value - returns Err for null/undefined */
   export function fromNullable<T, E>(
@@ -977,19 +1154,26 @@ export namespace Result {
   export function fromPromise<U, F>(
     promise: Promise<Result<U, F>>,
   ): Result<Promise<U>, F> {
-    // We need to create a Result that wraps the promise and properly propagates Err
-    // The approach: wrap in a promise that resolves Sentinel on Err
-    const ctx: { errSlot: F | typeof Sentinel } = { errSlot: Sentinel };
+    const ctx: ResultCtx<F> = { asyncErr: NO_ERR };
     const p = promise.then((innerResult) => {
       if (innerResult.isErr()) {
-        ctx.errSlot = innerResult.unwrapErr();
-        return Sentinel as unknown as U;
+        // Access error via unwrapErr since getErr is private
+        try {
+          ctx.asyncErr = innerResult.unwrapErr();
+        } catch {
+          // Should not happen for Err result
+        }
+        return ERR_VAL as unknown as U;
       }
       return innerResult.unwrap();
     });
 
-    // Access protected constructor via workaround
-    return new (Result as any)(p, ctx) as Result<Promise<U>, F>;
+    return Result[RESULT_INTERNAL].create<Promise<U>, F>(
+      p,
+      undefined as F,
+      ctx,
+      "Ok",
+    );
   }
 
   /** Catches sync exceptions */
@@ -1009,20 +1193,20 @@ export namespace Result {
     fn: () => Promise<T>,
     errorMapper?: (e: unknown) => E,
   ): Result<Promise<T>, E> {
-    // Create mutable context to capture error
-    const ctx: { errSlot: E | typeof Sentinel } = { errSlot: Sentinel };
-    const p = fn()
+    const ctx: ResultCtx<E> = { asyncErr: NO_ERR };
+
+    const pWithErr = fn()
       .then((v) => v)
       .catch((e) => {
-        ctx.errSlot = errorMapper ? errorMapper(e) : (e as E);
-        return Sentinel as unknown as T;
+        ctx.asyncErr = errorMapper ? errorMapper(e) : (e as E);
+        return ERR_VAL as unknown as T;
       });
 
-    return new (Result as any)(p, ctx) as Result<Promise<T>, E>;
+    return Result[RESULT_INTERNAL].create<Promise<T>, E>(
+      pWithErr,
+      undefined as E,
+      ctx,
+      "Ok",
+    );
   }
 }
-
-// Alias 'try' to 'tryCatch' using quoted access (reserved keyword workaround)
-(Result as unknown as { try: typeof Result.tryCatch }).try = Result.tryCatch;
-(Result as unknown as { tryAsync: typeof Result.tryAsyncCatch }).tryAsync =
-  Result.tryAsyncCatch;

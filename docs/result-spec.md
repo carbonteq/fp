@@ -90,8 +90,10 @@ interface Err<T, E> {
 | `fromNullable` | `<T, E>(value: T \| null \| undefined, error: E): Result<NonNullable<T>, E>` | Ok if non-nullish |
 | `fromPredicate` | `<T, E>(value: T, pred: (v: T) => boolean, error: E): Result<T, E>` | Ok if predicate passes |
 | `fromPromise` | `<T, E>(promise: Promise<Result<T, E>>): Result<Promise<T>, E>` | Wraps async Result |
-| `try` | `<T, E>(fn: () => T, errorMapper?: (e: unknown) => E): Result<T, E>` | Catches sync exceptions |
-| `tryAsync` | `<T, E>(fn: () => Promise<T>, errorMapper?: (e: unknown) => E): Result<Promise<T>, E>` | Catches async exceptions |
+| `tryCatch` | `<T, E>(fn: () => T, errorMapper?: (e: unknown) => E): Result<T, E>` | Catches sync exceptions |
+| `tryAsyncCatch` | `<T, E>(fn: () => Promise<T>, errorMapper?: (e: unknown) => E): Result<Promise<T>, E>` | Catches async exceptions |
+
+> **Note:** `tryCatch` and `tryAsyncCatch` are named this way because `try` is a reserved keyword in JavaScript/TypeScript and cannot be used as a method name directly.
 
 **Special Values:**
 
@@ -114,10 +116,10 @@ Result.fromNullable(null, "Not found");       // Err("Not found")
 Result.fromPredicate(age, x => x >= 18, "Must be adult");  // Ok or Err
 
 // From throwing function
-Result.try(() => JSON.parse(data), e => new ParseError(e));
+Result.tryCatch(() => JSON.parse(data), e => new ParseError(e));
 
 // From async throwing function
-Result.tryAsync(
+Result.tryAsyncCatch(
   () => fetch(url).then(r => r.json()),
   e => new NetworkError(e)
 );
@@ -697,12 +699,12 @@ Ok(5)
   .toPromise()  // Promise rejects with Error("negative")
 ```
 
-To capture async errors as `Err` values, use `Result.tryAsync` or handle at the boundary:
+To capture async errors as `Err` values, use `Result.tryAsyncCatch` or handle at the boundary:
 
 ```typescript
-// Option 1: Use tryAsync for individual operations
+// Option 1: Use tryAsyncCatch for individual operations
 Ok(5)
-  .flatMap(x => Result.tryAsync(
+  .flatMap(x => Result.tryAsyncCatch(
     async () => riskyOperation(x),
     e => new OperationError(e)
   ))
@@ -861,7 +863,7 @@ function parseJson(s: string): Data {
 
 // After
 function parseJson(s: string): Result<Data, ParseError> {
-  return Result.try(
+  return Result.tryCatch(
     () => JSON.parse(s),
     e => new ParseError(e)
   );
@@ -908,7 +910,7 @@ const username = Result.Ok(user)
 
 ```typescript
 async function fetchUserData(userId: string): Promise<Result<User, ApiError>> {
-  return Result.tryAsync(
+  return Result.tryAsyncCatch(
     async () => {
       const response = await fetch(`/api/users/${userId}`);
       if (!response.ok) {
@@ -962,7 +964,7 @@ async function processOrder(orderId: string): Promise<Result<Confirmation, Order
 
 | Category | Methods |
 |----------|---------|
-| Constructors | `Ok`, `Err`, `fromNullable`, `fromPredicate`, `fromPromise`, `try`, `tryAsync`, `UNIT_RESULT` |
+| Constructors | `Ok`, `Err`, `fromNullable`, `fromPredicate`, `fromPromise`, `tryCatch`, `tryAsyncCatch`, `UNIT_RESULT` |
 | State | `isOk`, `isErr`, `isUnit` |
 | Extract | `unwrap`, `unwrapOr`, `unwrapOrElse`, `unwrapErr`, `safeUnwrap`, `match` |
 | Transform Ok | `map`, `flatMap`, `zip`, `flatZip` |

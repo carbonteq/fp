@@ -652,6 +652,34 @@ describe("Result.flatMap behavior", () => {
       expect(mockerA).toHaveBeenCalledTimes(1);
       expect(mockerB).toHaveBeenCalledTimes(1);
     });
+
+    it("should short-circuit map after flatMap returns sync Err in async chain", async () => {
+      const mapperAfterErr = mock((y: number) => y * 2);
+      const errFn = (): Result<number, string> => Result.Err("mid-chain error");
+      const result = await Result.Ok(5)
+        .map(async (x) => x * 2)
+        .flatMap(errFn)
+        .map(mapperAfterErr)
+        .toPromise();
+      expect(result.isErr()).toBe(true);
+      expect(result.unwrapErr()).toBe("mid-chain error");
+      // The mapper after the error should not be called
+      expect(mapperAfterErr).toHaveBeenCalledTimes(0);
+    });
+
+    it("should short-circuit subsequent operations after async flatMap returns Err", async () => {
+      const mapperAfterErr = mock((y: number) => y * 2);
+      const asyncErrFn = async (): Promise<Result<number, string>> =>
+        Result.Err("async-mid-chain error");
+      const result = await Result.Ok(5)
+        .map(async (x) => x * 2)
+        .flatMap(asyncErrFn)
+        .map(mapperAfterErr)
+        .toPromise();
+      expect(result.isErr()).toBe(true);
+      expect(result.unwrapErr()).toBe("async-mid-chain error");
+      expect(mapperAfterErr).toHaveBeenCalledTimes(0);
+    });
   });
 
   describe("permutations", () => {
