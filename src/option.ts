@@ -346,7 +346,9 @@ export class Option<T> {
 
   filter(pred: Predicate<T>): Option<T>;
   filter(pred: AsyncPredicate<T>): Option<Promise<T>>;
-  filter(pred: Predicate<T> | AsyncPredicate<T>) {
+  filter(
+    pred: Predicate<T> | AsyncPredicate<T>,
+  ): Option<T> | Option<Promise<T>> {
     if (this.isNone()) return Option.None;
 
     const result = pred(this.#val);
@@ -355,7 +357,7 @@ export class Option<T> {
       const p = result.then((passed) => {
         if (passed) return this.#val;
         return NONE_VAL;
-      });
+      }) as Promise<T>;
       return new Option(p, { promiseNoneSlot: false }, "Some");
     }
 

@@ -494,11 +494,11 @@ export class Result<T, E> {
   }
 
   zip<T, U, In = Awaited<T>>(
-    this: Result<T, E>,
+    this: Result<Promise<In>, E>,
     fn: (val: In) => Promise<U>,
   ): Result<Promise<[In, U]>, E>;
   zip<T, U, In = Awaited<T>>(
-    this: Result<T, E>,
+    this: Result<Promise<In>, E>,
     fn: (val: In) => U,
   ): Result<Promise<[In, U]>, E>;
   zip<T, U>(
@@ -543,6 +543,23 @@ export class Result<T, E> {
   }
 
   /** For combining two results lazily. For the eager eval version, see {@link and} */
+  flatZip<U, E2, In = Awaited<T>>(
+    this: Result<Promise<In>, E>,
+    fn: (val: In) => FlatZipInput<In, U, E | E2>,
+  ): Result<Promise<[In, Awaited<U>]>, E | E2>;
+  flatZip<U, E2, In = Awaited<T>>(
+    this: Result<In, E>,
+    fn: (
+      val: In,
+    ) =>
+      | Promise<Result<U, E2>>
+      | Promise<Result<Promise<U>, E2>>
+      | Result<Promise<U>, E2>,
+  ): Result<Promise<[In, Awaited<U>]>, E | E2>;
+  flatZip<U, E2, In = Awaited<T>>(
+    this: Result<In, E>,
+    fn: (val: In) => Result<U, E2>,
+  ): Result<[In, U], E | E2>;
   flatZip<U, E2, In = T>(
     fn: (val: In) => FlatZipInput<In, U, E | E2>,
   ): Result<[In, Awaited<U>] | Promise<[In, Awaited<U>]>, E | E2> {
@@ -820,7 +837,9 @@ export class Result<T, E> {
     fn: (val: Curr) => void,
   ): Result<Promise<Curr>, E>;
   tap(this: Result<T, E>, fn: (val: T) => void): Result<T, E>;
-  tap(fn: (val: unknown) => void): Result<T, E> {
+  tap<Curr = Awaited<T>>(
+    fn: (val: T | Curr) => void,
+  ): Result<T, E> | Result<Promise<Curr>, E> {
     if (this.isErr()) return this;
 
     const curr = this.#val;
@@ -828,7 +847,7 @@ export class Result<T, E> {
       // Schedule side effect after promise resolves
       const newPromise = curr.then((v) => {
         if (v !== Sentinel) {
-          fn(v);
+          fn(v as Curr);
         }
         return v;
       });
@@ -903,9 +922,10 @@ export class Result<T, E> {
   }
 
   /** Safe unwrap - returns null for Err, handles async */
+  safeUnwrap(this: Result<never, E>): null;
   safeUnwrap<Curr = Awaited<T>>(
     this: Result<Promise<Curr>, E>,
-  ): Promise<Curr | null>;
+  ): Promise<Curr | null> | null;
   safeUnwrap(this: Result<T, E>): T | null;
   safeUnwrap(): T | null | Promise<unknown> {
     if (this.isErr()) return null;

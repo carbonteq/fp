@@ -10,16 +10,19 @@ class DummyError extends Error {
 
 const doubleIt = (n: number) => n * 2;
 
-const errResIt = <A>(_n: number): Result<A, DummyError> =>
+const errResIt = <A = NestedTuple<number>>(_n: number): Result<A, DummyError> =>
   Result.Err(new DummyError());
 
-const asyncErrResIt = async <A>(_n: number): Promise<Result<A, DummyError>> =>
-  Result.Err(new DummyError());
+const asyncErrResIt = async <A = NestedTuple<number>>(
+  _n: number,
+): Promise<Result<A, DummyError>> => Result.Err(new DummyError());
 
-const errResPromiseIt = <A>(_n: number): Result<A, Promise<DummyError>> =>
+const errResPromiseIt = <A = NestedTuple<number>>(
+  _n: number,
+): Result<A, Promise<DummyError>> =>
   Result.Err(Promise.resolve(new DummyError()));
 
-const asyncErrResPromiseIt = async <A>(
+const asyncErrResPromiseIt = async <A = NestedTuple<number>>(
   _n: number,
 ): Promise<Result<A, Promise<DummyError>>> =>
   Result.Err(Promise.resolve(new DummyError()));
@@ -38,7 +41,7 @@ const recursivelyTransform = <T, R>(
   return [
     recursivelyTransform(first, transform),
     recursivelyTransform(second, transform),
-  ];
+  ] as [NestedTuple<R>, NestedTuple<R>];
 };
 
 const tupleDoubleResIt = (
@@ -705,7 +708,7 @@ describe("Result.flatZip behavior", () => {
   });
 
   describe("permutations", () => {
-    const permResult = [
+    const permResult: any = [
       [
         [
           [2, 4],

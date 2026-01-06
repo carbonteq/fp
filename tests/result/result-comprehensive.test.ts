@@ -952,7 +952,7 @@ describe("Async-Aware Extraction Methods", () => {
 
     it("should return Promise resolving to null for Err", async () => {
       const result: Result<Promise<number>, string> = Result.Err("error");
-      const value = result.safeUnwrap();
+      const value = await result.safeUnwrap();
       expect(value).toBe(null);
     });
   });

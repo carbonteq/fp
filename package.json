@@ -67,16 +67,6 @@
         "types": "./dist/errors.d.mts",
         "default": "./dist/errors.mjs"
       }
-    },
-    "./either": {
-      "require": {
-        "types": "./dist/either.d.cts",
-        "default": "./dist/either.cjs"
-      },
-      "import": {
-        "types": "./dist/either.d.mts",
-        "default": "./dist/either.mjs"
-      }
     }
   },
   "homepage": "https://github.com/carbonteq/fp#readme",

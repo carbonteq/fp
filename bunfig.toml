@@ -4,3 +4,4 @@ linker = "isolated"
 [test]
 ## TODO: add custom matchers for option and result
 # preload = []
+root = "tests"
