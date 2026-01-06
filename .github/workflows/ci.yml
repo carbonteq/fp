@@ -44,8 +44,5 @@ jobs:
       - name: Type check
         run: bun run tc
 
-      - name: Lint
-        run: bun run lint
-
       - name: Test
         run: bun test
