@@ -26,9 +26,10 @@ jobs:
           bun-version: latest
 
       - name: Setup Node 22 for NPM publishing
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install Dependencies
         run: bun install
@@ -40,3 +41,4 @@ jobs:
         run: npm publish --provenance --access public
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ""

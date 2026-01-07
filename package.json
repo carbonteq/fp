@@ -7,7 +7,7 @@
   "scope": "@carbonteq",
   "repository": {
     "type": "git",
-    "url": "https://github.com/carbonteq/fp"
+    "url": "git+https://github.com/carbonteq/fp.git"
   },
   "bugs": {
     "url": "https://github.com/carbonteq/fp/issues"
