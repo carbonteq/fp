@@ -14,10 +14,6 @@ on:
       - opened
       - synchronize
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
   build:
     name: Build and Test
