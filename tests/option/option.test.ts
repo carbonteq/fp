@@ -453,7 +453,7 @@ describe("Option type inference", () => {
     });
 
     it("should correctly type fromFalsy", () => {
-      const val: string | "" = "hello";
+      const val: string = "hello";
       expectTypeOf(Option.fromFalsy(val)).toEqualTypeOf<Option<string>>();
     });
 

@@ -110,7 +110,7 @@ describe("Constructors", () => {
     it("should return Err when function throws", () => {
       const result = Result.tryCatch(
         () => JSON.parse("invalid json"),
-        (e: unknown) => `Parse error: ${e}`,
+        (e: unknown) => `Parse error: ${String(e)}`,
       );
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toMatch(/Parse error/);
@@ -137,7 +137,7 @@ describe("Constructors", () => {
         async () => {
           throw new Error("async error");
         },
-        (e: unknown) => `Caught: ${e}`,
+        (e: unknown) => `Caught: ${String(e)}`,
       );
       const resolved = await result.toPromise();
       expect(resolved.isErr()).toBe(true);
@@ -262,7 +262,7 @@ describe("Value Extraction", () => {
 
   describe("match()", () => {
     it("should call Ok handler for Ok", () => {
-      const result = Result.Ok(42).match({
+      const result = Result.Ok<number, string>(42).match({
         Ok: (v) => `Value: ${v}`,
         Err: (e) => `Error: ${e}`,
       });
@@ -372,7 +372,7 @@ describe("Transformation Methods (Err Track)", () => {
 
   describe("mapBoth()", () => {
     it("should apply Ok mapper for Ok", () => {
-      const result = Result.Ok(42).mapBoth(
+      const result = Result.Ok<number, string>(42).mapBoth(
         (v) => `Value: ${v}`,
         (e) => `Error: ${e}`,
       );

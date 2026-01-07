@@ -108,12 +108,12 @@ export class Result<T, E> {
   );
 
   /** Create an Ok containing the given value */
-  static Ok<T, E = never>(val: T): Result<T, E> {
+  static Ok<T, E = never>(this: void, val: T): Result<T, E> {
     return new Result(val, undefined as E, { asyncErr: NO_ERR }, "Ok");
   }
 
   /** Create an Err containing the given error */
-  static Err<E, T = never>(err: E): Result<T, E> {
+  static Err<E, T = never>(this: void, err: E): Result<T, E> {
     return new Result(ERR_VAL as T, err, { asyncErr: NO_ERR }, "Err");
   }
 

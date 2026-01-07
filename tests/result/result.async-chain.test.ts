@@ -9,7 +9,7 @@ describe("Result async chain short-circuiting", () => {
     const result = Result.Ok(1)
       .flatMap(async () => {
         await delay(10);
-        return Result.Err("boom");
+        return Result.Err<string, number>("boom");
       })
       .map(sideEffect);
 
@@ -25,7 +25,7 @@ describe("Result async chain short-circuiting", () => {
     const result = Result.Ok(1)
       .flatMap(async () => {
         await delay(10);
-        return Result.Err("boom");
+        return Result.Err<string, number>("boom");
       })
       .zip(sideEffect);
 
@@ -41,7 +41,7 @@ describe("Result async chain short-circuiting", () => {
     const result = Result.Ok(1)
       .flatMap(async () => {
         await delay(10);
-        return Result.Err("boom");
+        return Result.Err<string, number>("boom");
       })
       .flatZip(sideEffect);
 

@@ -98,7 +98,7 @@ describe("Result.zip behavior", () => {
     expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should transform an Ok value synchronously", async () => {
+  it("should transform an Ok value synchronously", () => {
     const r = Result.Ok(2);
     const mockerA = mock(doubleIt);
     const mockerB = mock(tupleDoubleIt);
@@ -106,7 +106,7 @@ describe("Result.zip behavior", () => {
 
     expect(zipped.isOk()).toBeTrue();
 
-    const out = await zipped.unwrap();
+    const out = zipped.unwrap();
     expect(out).toEqual([
       [2, 4],
       [4, 8],

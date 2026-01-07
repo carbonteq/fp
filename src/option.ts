@@ -2,21 +2,14 @@ import { Result } from "./result.js";
 import { UNIT } from "./unit.js";
 import { isPromiseLike } from "./utils.js";
 
-// ============================================================================
-// Types
-// ============================================================================
-
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
 type FlatMapper<T, U> = (val: T) => Option<U>;
 type AsyncFlatMapper<T, U> = (val: T) => Promise<Option<U>>;
 type Predicate<T> = (val: T) => boolean;
-type AsyncPredicate<T> = (val: T) => Promise<boolean>;
+type FilterPredicate<T> = (val: Awaited<T>) => boolean;
+type AsyncPredicate<T> = (val: Awaited<T>) => Promise<boolean>;
 type Falsy = false | 0 | "" | null | undefined;
-
-// ============================================================================
-// Error Types
-// ============================================================================
 
 export class UnwrappedNone extends Error {
   readonly name = "UnwrapError";
@@ -28,15 +21,7 @@ export class UnwrappedNone extends Error {
 
 const UNWRAPPED_NONE_ERR = new UnwrappedNone();
 
-// ============================================================================
-// Internal Sentinel
-// ============================================================================
-
 const NONE_VAL = Symbol("Option::None");
-
-// ============================================================================
-// Exported Types
-// ============================================================================
 
 export type UnitOption = Option<UNIT>;
 export type UnwrapOption<T> = T extends Option<infer R> ? R : never;
@@ -45,24 +30,12 @@ type CombinedOptions<T extends Option<unknown>[]> = {
   [K in keyof T]: UnwrapOption<T[K]>;
 };
 
-// ============================================================================
-// Context for async tracking
-// ============================================================================
-
 type OptionCtx = { promiseNoneSlot: boolean };
-
-// ============================================================================
-// Match Cases Type
-// ============================================================================
 
 interface MatchCases<T, U> {
   Some: (val: T) => U;
   None: () => U;
 }
-
-// ============================================================================
-// Option Class
-// ============================================================================
 
 export class Option<T> {
   /** Discriminant tag for type-level identification */
@@ -77,10 +50,6 @@ export class Option<T> {
     this._tag = tag;
   }
 
-  // ==========================================================================
-  // Static Constructors
-  // ==========================================================================
-
   /** Singleton None instance */
   static readonly None: Option<never> = new Option(
     NONE_VAL as never,
@@ -89,7 +58,7 @@ export class Option<T> {
   );
 
   /** Create a Some containing the given value */
-  static Some<Inner>(val: Inner): Option<Inner> {
+  static Some<Inner>(this: void, val: Inner): Option<Inner> {
     return new Option(val, { promiseNoneSlot: false }, "Some");
   }
 
@@ -125,10 +94,6 @@ export class Option<T> {
     return new Option(p, ctx, "Some");
   }
 
-  // ==========================================================================
-  // Static Combinators
-  // ==========================================================================
-
   /** Combine multiple Options - returns Some array if all are Some, else None */
   static all<T extends Option<unknown>[]>(
     ...options: T
@@ -151,10 +116,6 @@ export class Option<T> {
     return Option.None;
   }
 
-  // ==========================================================================
-  // State Inspection
-  // ==========================================================================
-
   /** Type guard for Some state */
   isSome(): this is Option<T> & { readonly _tag: "Some" } {
     return this._tag === "Some" && !this.isNone();
@@ -173,10 +134,6 @@ export class Option<T> {
   isUnit(): this is Option<UNIT> {
     return this.#val === UNIT;
   }
-
-  // ==========================================================================
-  // Value Extraction
-  // ==========================================================================
 
   /** Returns value or throws UnwrapError */
   unwrap(): T {
@@ -211,10 +168,6 @@ export class Option<T> {
     }
     return cases.Some(this.#val);
   }
-
-  // ==========================================================================
-  // Transformation Methods
-  // ==========================================================================
 
   // -------------------------------------------------------------------------
   // map() - with async overloads per spec
@@ -372,24 +325,24 @@ export class Option<T> {
   // filter() - with async predicate support
   // -------------------------------------------------------------------------
 
-  filter(pred: Predicate<T>): Option<T>;
+  filter(pred: FilterPredicate<T>): Option<T>;
   filter(pred: AsyncPredicate<T>): Option<Promise<T>>;
   filter(
-    pred: Predicate<T> | AsyncPredicate<T>,
+    pred: FilterPredicate<T> | AsyncPredicate<T>,
   ): Option<T> | Option<Promise<T>> {
     if (this.isNone()) return Option.None;
 
     const curr = this.#val;
 
     if (isPromiseLike(curr)) {
-      const p = curr as Promise<T>;
+      const p = curr as Promise<Awaited<T>>;
       const newCtx: OptionCtx = { promiseNoneSlot: false };
       const next = p.then(async (v) => {
         if (v === NONE_VAL) {
           newCtx.promiseNoneSlot = true;
           return NONE_VAL;
         }
-        const passed = await pred(v);
+        const passed = await pred(v as Awaited<T>);
         if (!passed) {
           newCtx.promiseNoneSlot = true;
           return NONE_VAL;
@@ -399,7 +352,7 @@ export class Option<T> {
       return new Option(next, newCtx, "Some");
     }
 
-    const result = pred(curr as T);
+    const result = pred(curr as Awaited<T>);
 
     if (isPromiseLike(result)) {
       const newCtx: OptionCtx = { promiseNoneSlot: false };
@@ -526,10 +479,6 @@ export class Option<T> {
     return u.map((inner) => [c, inner]);
   }
 
-  // ==========================================================================
-  // Utility Methods
-  // ==========================================================================
-
   /** Execute side effect for Some, return self */
   tap(fn: (val: T) => void): Option<T> {
     if (this.isSome()) {
@@ -585,6 +534,6 @@ export class Option<T> {
   /** String representation */
   toString(): string {
     if (this.isNone()) return "Option::None";
-    return `Option::Some(${this.#val})`;
+    return `Option::Some(${String(this.#val)})`;
   }
 }
