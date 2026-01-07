@@ -95,16 +95,12 @@ matchOpt(res, {
     - [flatZip](#flatzip)
     - [Comparison of map and zip](#comparison-of-map-flatmap-zip-and-flatzip)
     - [Some Other Useful Functions](#some-other-useful-functions)
-      - [mapErr](#maperr)
-      - [mapOr](#mapor) <!-- - [tap](#tap) -->
-      - [all](#all)
-      - [validate](#validate)
-      - [unwrap](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
-      - [safeUnwrapErr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
-      - [unwrapOr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
-      - [unwrapOrElse](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
-      - [safeUnwrap](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
-      - [unwrapErr](#unwrap-safeunwraperr-unwrapor-unwraporelse-safeunwrap-and-unwraperr)
+    - [Creating Values from Existing Data](#creating-values-from-existing-data)
+    - [Exception Handling](#exception-handling)
+    - [Transforming Inner Values](#transforming-inner-values)
+    - [Combining & Converting](#combining--converting)
+    - [Error Recovery & Side Effects](#error-recovery--side-effects)
+    - [Aggregation Helpers](#aggregation-helpers)
 - [Build Your First Pipeline](#build-your-first-pipeline)
   - [Synchronous Pipeline](#synchronous-pipeline)
   - [Asynchronous Pipeline](#asynchronous-pipeline)
@@ -356,40 +352,6 @@ console.log(await safeFindUserById(10)); // Some(User: 10)
 console.log(await safeFindUserById(0)); // Some(User not found)
 ```
 
-<!-- #### `tap`
-
-`tap` is used to perform side effects on the `Result`/`Option` value without altering its contents. It is useful for logging, auditing, debugging complex chains of operations etc.
-
-```typescript
-import { Result } from "@carbonteq/fp";
-
-// Simulated database functions
-async function findUserById(userId: number): Promise<Result<Record<string, number>, string>> {
-  // Simulate a database lookup
-  await Promise.resolve(userId);
-  if (userId === 0) {
-    return Result.Err("User not found");
-  }
-  return Result.Ok({ id: userId, balance: 100 });
-}
-
-function updateBalance(user: Record<string, number>, amount: number): Result<Record<string, number>, string> {
-  if (user.balance < amount) {
-    return Result.Err("Insufficient funds");
-  }
-  return Result.Ok({ ...user, balance: user.balance - amount });
-}
-
-// Process withdrawal with logging
-const res = (await findUserById(1))
-  .tap((user) => console.log(`[Audit] User found: ${user.id}`))
-  .flatMap((user) => updateBalance(user, 10))
-  .tap((updated) => console.log(`[Transaction] New balance: $${updated.balance}`))
-  .mapErr((error) => console.error(`[Alert] Transaction failed: ${error}`));
-
-console.log(res); // Result.Ok({ id: 1, balance: 90 })
-``` -->
-
 #### `all`
 
 `all` is used to combine an array of Results. If any errors exist they are accumulated, else the values are accumulated.
@@ -619,6 +581,428 @@ console.log(result.safeUnwrap()); // safeUnwrap: null (Safely unwraps the value,
 
 const errorResult = Result.Err(new Error("Something went wrong"));
 console.log(errorResult.unwrapErr()); // unwrapErr: Error: Something went wrong (Extracts the error from Result.Err, throwing an error if it's Ok)
+```
+
+---
+
+### Creating Values from Existing Data
+
+#### `Option.fromNullable`
+
+Creates an `Option` from a value that might be `null` or `undefined`, returning `None` for those values.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+function findUser(id: string): { name: string } | null {
+  return id === "1" ? { name: "Alice" } : null;
+}
+
+const user = Option.fromNullable(findUser("1"));
+console.log(user); // Some({ name: "Alice" })
+
+const missing = Option.fromNullable(findUser("999"));
+console.log(missing); // None
+```
+
+#### `Option.fromFalsy`
+
+Creates an `Option` from a value, returning `None` for any falsy value (`false`, `0`, `""`, `null`, `undefined`).
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+const valid = Option.fromFalsy("hello");
+console.log(valid); // Some("hello")
+
+const empty = Option.fromFalsy("");
+console.log(empty); // None
+
+const zero = Option.fromFalsy(0);
+console.log(zero); // None
+```
+
+#### `Option.fromPredicate`
+
+Creates an `Option` based on a predicate function - returns `Some` if the predicate returns `true`, else `None`.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+const age = 25;
+const adult = Option.fromPredicate(age, (a) => a >= 18);
+console.log(adult); // Some(25)
+
+const minor = Option.fromPredicate(15, (a) => a >= 18);
+console.log(minor); // None
+```
+
+#### `Result.fromNullable`
+
+Creates a `Result` from a nullable value, returning `Err` with the provided error for `null` or `undefined`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+function getConfig(key: string): string | undefined {
+  return process.env[key];
+}
+
+const config = Result.fromNullable(getConfig("API_KEY"), "API_KEY not set");
+console.log(config); // Ok("...") or Err("API_KEY not set")
+```
+
+#### `Result.fromPredicate`
+
+Creates a `Result` based on a predicate function - returns `Ok` with the value if the predicate returns `true`, else `Err` with the provided error.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const score = 85;
+const passed = Result.fromPredicate(
+  score,
+  (s) => s >= 60,
+  "Score too low",
+);
+console.log(passed); // Ok(85)
+
+const failed = Result.fromPredicate(45, (s) => s >= 60, "Score too low");
+console.log(failed); // Err("Score too low")
+```
+
+---
+
+### Exception Handling
+
+#### `Result.tryCatch`
+
+Wraps a synchronous operation in a `Result`, catching any exceptions and converting them to `Err`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+function parseJson(json: string): Result<unknown, Error> {
+  return Result.tryCatch(
+    () => JSON.parse(json),
+    (e) => e instanceof Error ? e : new Error(String(e)),
+  );
+}
+
+console.log(parseJson('{"name":"Alice"}')); // Ok({ name: "Alice" })
+console.log(parseJson("invalid json")); // Err(SyntaxError: ...)
+```
+
+#### `Result.tryAsyncCatch`
+
+Wraps an asynchronous operation in a `Result`, catching any exceptions and converting them to `Err`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+async function fetchUserData(id: string): Result<Promise<{ name: string }>, Error> {
+  return Result.tryAsyncCatch(
+    async () => {
+      const response = await fetch(`/api/users/${id}`);
+      return response.json();
+    },
+    (e) => e instanceof Error ? e : new Error(String(e)),
+  );
+}
+
+const user = await fetchUserData("123").toPromise();
+console.log(user); // Ok({ name: "..." }) or Err(Error: ...)
+```
+
+---
+
+### Transforming Inner Values
+
+#### `Option.filter`
+
+Filters the value inside an `Option` based on a predicate, returning `None` if the predicate returns `false`.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+const age = Option.Some(25);
+const adult = age.filter((a) => a >= 18);
+console.log(adult); // Some(25)
+
+const minor = Option.Some(15).filter((a) => a >= 18);
+console.log(minor); // None
+```
+
+#### `Option.innerMap`
+
+Transforms array elements inside an `Option<Array<T>>`.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+const numbers = Option.Some([1, 2, 3, 4, 5]);
+const doubled = numbers.innerMap((n) => n * 2);
+console.log(doubled); // Some([2, 4, 6, 8, 10])
+```
+
+#### `Result.innerMap`
+
+Transforms array elements inside a `Result<Array<T>, E>`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const numbers = Result.Ok([1, 2, 3, 4, 5]);
+const squared = numbers.innerMap((n) => n * n);
+console.log(squared); // Ok([1, 4, 9, 16, 25])
+```
+
+#### `Result.mapBoth`
+
+Transforms both the success value and the error value simultaneously.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const result = Result.Ok(42);
+const decorated = result.mapBoth(
+  (val) => `Success: ${val}`,
+  (err) => `Error: ${err}`,
+);
+console.log(decorated); // Ok("Success: 42")
+
+const error = Result.Err("Something failed");
+const decoratedError = error.mapBoth(
+  (val) => `Success: ${val}`,
+  (err) => `Error: ${err}`,
+);
+console.log(decoratedError); // Err("Error: Something failed")
+```
+
+---
+
+### Combining & Converting
+
+#### `Option.toResult`
+
+Converts an `Option` to a `Result`, using the provided error for `None`.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+const user = Option.Some({ name: "Alice" });
+const userResult = user.toResult("User not found");
+console.log(userResult); // Ok({ name: "Alice" })
+
+const missing = Option.None.toResult("User not found");
+console.log(missing); // Err("User not found")
+```
+
+#### `Result.toOption`
+
+Converts a `Result` to an `Option`, discarding error information.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const success = Result.Ok(42);
+const opt = success.toOption();
+console.log(opt); // Some(42)
+
+const failure = Result.Err("Failed");
+const optFromErr = failure.toOption();
+console.log(optFromErr); // None
+```
+
+#### `Option.fromPromise`
+
+Wraps a `Promise<Option<T>>` as an `Option<Promise<T>>`, enabling async chaining.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+async function fetchUser(id: string): Promise<Option<{ name: string }>> {
+  return id === "1" ? Option.Some({ name: "Alice" }) : Option.None;
+}
+
+const userOpt = Option.fromPromise(fetchUser("1"));
+console.log(userOpt); // Some(Promise<{ name: "Alice" }>)
+```
+
+#### `Result.fromPromise`
+
+Wraps a `Promise<Result<T, E>>` as a `Result<Promise<T>, E>`, enabling async chaining.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+async function fetchData(id: string): Promise<Result<string, Error>> {
+  return id === "1" ? Result.Ok("Data") : Result.Err(new Error("Not found"));
+}
+
+const dataRes = Result.fromPromise(fetchData("1"));
+console.log(dataRes); // Ok(Promise<"Data">)
+```
+
+#### `Result.zipErr`
+
+Runs a validation function that can produce a new error, but preserves the original value. If the validation function returns an `Err`, that error is returned. If the initial result is already `Err`, it short-circuits and returns that error.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const checkPermissions = (userId: string) =>
+  Result.Ok(userId).zipErr((id) =>
+    id === "guest" ? Result.Err("Guest users have limited access") : Result.Ok(undefined)
+  );
+
+const admin = checkPermissions("admin-123");
+console.log(admin); // Ok("admin-123")
+
+const guest = checkPermissions("guest");
+console.log(guest); // Err("Guest users have limited access")
+
+const alreadyFailed = Result.Err<string, string>("Network error")
+  .zipErr(() => Result.Err("Validation error"));
+console.log(alreadyFailed); // Err("Network error") - short-circuits
+```
+
+#### `Result.flip`
+
+Swaps the `Ok` and `Err` states, turning success into failure and vice versa.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const success = Result.Ok("Success value");
+const flipped = success.flip();
+console.log(flipped); // Err("Success value")
+
+const failure = Result.Err("Error value");
+const flippedError = failure.flip();
+console.log(flippedError); // Ok("Error value")
+```
+
+---
+
+### Error Recovery & Side Effects
+
+#### `tap`
+
+Executes a side effect function for `Some` or `Ok` values, then returns the original `Option` or `Result`. Useful for logging, debugging, or executing effects without changing the value.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+// Simulated database functions
+async function findUserById(userId: number): Promise<Result<Record<string, number>, string>> {
+  // Simulate a database lookup
+  await Promise.resolve(userId);
+  if (userId === 0) {
+    return Result.Err("User not found");
+  }
+  return Result.Ok({ id: userId, balance: 100 });
+}
+
+function updateBalance(user: Record<string, number>, amount: number): Result<Record<string, number>, string> {
+  if (user.balance < amount) {
+    return Result.Err("Insufficient funds");
+  }
+  return Result.Ok({ ...user, balance: user.balance - amount });
+}
+
+// Process withdrawal with logging
+const res = (await findUserById(1))
+  .tap((user) => console.log(`[Audit] User found: ${user.id}`))
+  .flatMap((user) => updateBalance(user, 10))
+  .tap((updated) => console.log(`[Transaction] New balance: $${updated.balance}`))
+  .tapErr((error) => console.error(`[Alert] Transaction failed: ${error}`));
+
+console.log(res); // Result.Ok({ id: 1, balance: 90 })
+```
+
+#### `Result.tapErr`
+
+Executes a side effect function for `Err` values, then returns the original `Result`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const result = Result.Err("Connection failed");
+const logged = result.tapErr((err) => {
+  console.error(`[Error Log] ${new Date().toISOString()}: ${err}`);
+});
+console.log(logged); // Err("Connection failed")
+// Output: [Error Log] 2025-01-07T...: Connection failed
+```
+
+#### `Result.orElse`
+
+Recovers from an error by providing a fallback `Result`. If the current result is `Err`, the function is called with the error to produce a new result.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+function fetchFromCache(id: string): Result<string, Error> {
+  return id === "cached" ? Result.Ok("Cached data") : Result.Err(new Error("Not in cache"));
+}
+
+function fetchFromAPI(id: string): Result<string, Error> {
+  return id === "1" ? Result.Ok("API data") : Result.Err(new Error("Not found"));
+}
+
+const cached = fetchFromCache("cached").orElse((err) => fetchFromAPI("1"));
+console.log(cached); // Ok("Cached data")
+
+const fromAPI = fetchFromCache("123").orElse((err) => fetchFromAPI("1"));
+console.log(fromAPI); // Ok("API data")
+
+const failed = fetchFromCache("123").orElse((err) => fetchFromAPI("999"));
+console.log(failed); // Err(Error: Not found)
+```
+
+---
+
+### Aggregation Helpers
+
+#### `Option.any`
+
+Returns the first `Some` from a list of `Option`s, or `None` if all are `None`.
+
+```typescript
+import { Option } from "@carbonteq/fp";
+
+const first = Option.any(
+  Option.None,
+  Option.Some("First value"),
+  Option.Some("Second value"),
+);
+console.log(first); // Some("First value")
+
+const allNone = Option.any(Option.None, Option.None, Option.None);
+console.log(allNone); // None
+```
+
+#### `Result.any`
+
+Returns the first `Ok` from a list of `Result`s, or collects all errors if all are `Err`.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const firstSuccess = Result.any(
+  Result.Err("Error 1"),
+  Result.Ok("First success"),
+  Result.Ok("Second success"),
+);
+console.log(firstSuccess); // Ok("First success")
+
+const allErrors = Result.any(
+  Result.Err("Error 1"),
+  Result.Err("Error 2"),
+  Result.Err("Error 3"),
+);
+console.log(allErrors); // Err(["Error 1", "Error 2", "Error 3"])
 ```
 
 ## Build Your First Pipeline
