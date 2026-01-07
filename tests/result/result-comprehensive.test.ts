@@ -426,7 +426,8 @@ describe("Transformation Methods (Err Track)", () => {
     });
 
     it("should short-circuit on Err", () => {
-      const result = Result.Err<number, string>("initial").zipErr(() =>
+      // Err<E, T> signature has E (error) first, T (success) second
+      const result = Result.Err<string, number>("initial").zipErr(() =>
         Result.Err("second"),
       );
       expect(result.isErr()).toBe(true);
