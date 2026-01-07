@@ -400,7 +400,8 @@ Err("not found").orElse(e => Err(new NotFoundError(e)));
 
 ### `zipErr<E2>(fn): Result<T, E | E2>`
 
-Combines errors (useful for validation accumulation patterns).
+Allows a validation/binding step on the Ok track that can introduce a new error
+while preserving the original Ok value.
 
 **Signature:**
 
@@ -411,8 +412,9 @@ zipErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
 **Examples:**
 
 ```typescript
+Ok(42).zipErr(x => Ok(x * 10));            // Ok(42)
 Ok(42).zipErr(x => Err("validation"));     // Err("validation")
-Err("initial").zipErr(x => Err("second")); // Err("initial") or implementation-specific
+Err("initial").zipErr(x => Err("second")); // Err("initial")
 ```
 
 ---

@@ -414,9 +414,23 @@ describe("Transformation Methods (Err Track)", () => {
   });
 
   describe("zipErr()", () => {
-    it("should combine errors", () => {
+    it("should return Err when binder returns Err", () => {
       const result = Result.Ok(42).zipErr(() => Result.Err("validation error"));
       expect(result.isErr()).toBe(true);
+    });
+
+    it("should preserve Ok value when binder returns Ok", () => {
+      const result = Result.Ok(42).zipErr((v) => Result.Ok(v * 10));
+      expect(result.isOk()).toBe(true);
+      expect(result.unwrap()).toBe(42);
+    });
+
+    it("should short-circuit on Err", () => {
+      const result = Result.Err<number, string>("initial").zipErr(() =>
+        Result.Err("second"),
+      );
+      expect(result.isErr()).toBe(true);
+      expect(result.unwrapErr()).toBe("initial");
     });
   });
 });

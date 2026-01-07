@@ -213,7 +213,7 @@ console.log(await processUser("Alice", 30)); // Output: Result.Ok("User Alice sa
 
 #### `zip`
 
-Creates a tuple `[T, U]` where the second value `U` is _derived_ from the first value `T` using a function `f`.
+Creates a tuple `[T, U]` where the second value `U` is *derived* from the first value `T` using a function `f`.
 For example, suppose we want to pair the product's original price `T` and discounted price `U`.
 
 ```typescript
@@ -846,7 +846,7 @@ console.log(dataRes); // Ok(Promise<"Data">)
 
 #### `Result.zipErr`
 
-Runs a validation function that can produce a new error, but preserves the original value. If the validation function returns an `Err`, that error is returned. If the initial result is already `Err`, it short-circuits and returns that error.
+Runs a validation/binding function on the Ok value that can produce a new error, while preserving the original Ok value. If the function returns an `Err`, that error is returned. If the initial result is already `Err`, it short-circuits and returns that error.
 
 ```typescript
 import { Result } from "@carbonteq/fp";
@@ -862,9 +862,34 @@ console.log(admin); // Ok("admin-123")
 const guest = checkPermissions("guest");
 console.log(guest); // Err("Guest users have limited access")
 
+const okNoChange = Result.Ok("42").zipErr((id) => Result.Ok(id.length));
+console.log(okNoChange); // Ok("42")
+
 const alreadyFailed = Result.Err<string, string>("Network error")
   .zipErr(() => Result.Err("Validation error"));
 console.log(alreadyFailed); // Err("Network error") - short-circuits
+```
+
+##### `mapErr` vs `zipErr`
+
+`mapErr` transforms the error value only; it never runs on `Ok`. `zipErr` runs a binder on the `Ok` value that can *introduce* a new error, while preserving the original `Ok` value on success.
+
+```typescript
+import { Result } from "@carbonteq/fp";
+
+const res = Result.Err<number, Error>(new Error("boom"))
+  .mapErr((e) => e.message);
+console.log(res); // Err("boom")
+
+const ok = Result.Ok("42").zipErr((value) =>
+  value === "0" ? Result.Err("invalid") : Result.Ok(value.length)
+);
+console.log(ok); // Ok("42")
+
+const err = Result.Ok("0").zipErr((value) =>
+  value === "0" ? Result.Err("invalid") : Result.Ok(value.length)
+);
+console.log(err); // Err("invalid")
 ```
 
 #### `Result.flip`
