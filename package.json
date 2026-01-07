@@ -1,7 +1,7 @@
 {
   "name": "@carbonteq/fp",
   "description": "FP utils",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "author": "Arslan <rslnkrmt2552@gmail.com>",
   "license": "MIT",
   "scope": "@carbonteq",
@@ -13,7 +13,10 @@
     "url": "https://github.com/carbonteq/fp/issues"
   },
   "type": "module",
-  "files": ["/dist", "dist"],
+  "files": [
+    "/dist",
+    "dist"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

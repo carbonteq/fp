@@ -1,5 +1,33 @@
 # @carbonteq/fp
 
+## 0.9.0
+
+### Minor Changes
+
+- 3868f2a: Major Result type rewrite with improved architecture:
+
+  - Add discriminant-based state tracking with `_tag` property for compile-time type narrowing
+  - Improve context isolation - async operations now create separate contexts to prevent cross-branch mutation
+  - Enhance error type unification through `Result.Err` union semantics
+  - Add new methods: `mapBoth`, `innerMap`, `zipErr`, `flatZip`, `tap`, `tapErr`
+  - Improve async overloads with precise type inference for sync/async chains
+  - Simplify constructor pattern with `Result.Ok()` and `Result.Err()` static methods
+  - Add `fromNullable()`, `fromPredicate()`, `tryCatch()`, `tryAsyncCatch()` constructors
+  - Update minimum Node version to 22
+
+- 98e1ff0: Major Option type rewrite and infrastructure improvements:
+
+  - Add discriminant tags (`"Some"` | `"None"`) for better type narrowing
+  - Add new constructors: `fromFalsy()`, `fromPredicate()`, `fromPromise()`
+  - Add new methods: `filter()`, `match()`, `all()`, `any()`, `innerMap()`
+  - Implement context isolation fixes for async chaining
+  - Replace `node:util/types` dependency with custom `isPromiseLike()` for cross-platform compatibility
+  - Reorganize test suite into `tests/result/` and `tests/option/` subdirectories
+  - Add comprehensive spec documentation in `docs/result-spec.md` and `docs/option-spec.md`
+  - Migrate test runner to Bun for consistency
+  - Update toolchain: tsdown (bundling), oxlint/oxfmt (linting/formatting), treefmt
+  - Update CI workflows to use Bun and target Node 22/24
+
 ## 0.8.2
 
 ### Patch Changes
