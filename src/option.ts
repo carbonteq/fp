@@ -32,7 +32,7 @@ const UNWRAPPED_NONE_ERR = new UnwrappedNone();
 // Internal Sentinel
 // ============================================================================
 
-const NONE_VAL = Symbol.for("Option::None");
+const NONE_VAL = Symbol("Option::None");
 
 // ============================================================================
 // Exported Types
@@ -157,7 +157,7 @@ export class Option<T> {
 
   /** Type guard for Some state */
   isSome(): this is Option<T> & { readonly _tag: "Some" } {
-    return this._tag === "Some" && this.#val !== NONE_VAL;
+    return this._tag === "Some" && !this.isNone();
   }
 
   /** Type guard for None state */
@@ -271,9 +271,37 @@ export class Option<T> {
   // mapOr() - maps value or returns default (returns U, not Option<U>)
   // -------------------------------------------------------------------------
 
-  mapOr<U, Curr = Awaited<T>>(defaultVal: U, fn: Mapper<Curr, U>): U {
-    if (this.isNone()) return defaultVal;
-    return fn(this.#val as unknown as Curr);
+  mapOr<U, Curr = Awaited<T>>(
+    this: Option<Promise<Curr>>,
+    defaultVal: U,
+    fn: Mapper<Curr, U>,
+  ): Promise<U>;
+  mapOr<U, Curr = Awaited<T>>(
+    this: Option<Promise<Curr>>,
+    defaultVal: U,
+    fn: AsyncMapper<Curr, U>,
+  ): Promise<U>;
+  mapOr<U>(this: Option<T>, defaultVal: U, fn: Mapper<T, U>): U;
+  mapOr<U, Curr = Awaited<T>>(
+    defaultVal: U,
+    fn: Mapper<NoInfer<Curr>, U> | AsyncMapper<NoInfer<Curr>, U>,
+  ): U | Promise<U> {
+    if (this.isNone()) {
+      return isPromiseLike(this.#val)
+        ? Promise.resolve(defaultVal)
+        : defaultVal;
+    }
+
+    const curr = this.#val;
+    if (isPromiseLike(curr)) {
+      const p = curr as Promise<Curr>;
+      return p.then(async (v) => {
+        if (v === NONE_VAL) return defaultVal;
+        return fn(v);
+      });
+    }
+
+    return fn(curr as unknown as Curr);
   }
 
   // -------------------------------------------------------------------------
@@ -351,14 +379,36 @@ export class Option<T> {
   ): Option<T> | Option<Promise<T>> {
     if (this.isNone()) return Option.None;
 
-    const result = pred(this.#val);
+    const curr = this.#val;
+
+    if (isPromiseLike(curr)) {
+      const p = curr as Promise<T>;
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
+      const next = p.then(async (v) => {
+        if (v === NONE_VAL) {
+          newCtx.promiseNoneSlot = true;
+          return NONE_VAL;
+        }
+        const passed = await pred(v);
+        if (!passed) {
+          newCtx.promiseNoneSlot = true;
+          return NONE_VAL;
+        }
+        return v;
+      }) as Promise<T>;
+      return new Option(next, newCtx, "Some");
+    }
+
+    const result = pred(curr as T);
 
     if (isPromiseLike(result)) {
+      const newCtx: OptionCtx = { promiseNoneSlot: false };
       const p = result.then((passed) => {
-        if (passed) return this.#val;
+        if (passed) return curr as T;
+        newCtx.promiseNoneSlot = true;
         return NONE_VAL;
       }) as Promise<T>;
-      return new Option(p, { promiseNoneSlot: false }, "Some");
+      return new Option(p, newCtx, "Some");
     }
 
     return result ? this : Option.None;

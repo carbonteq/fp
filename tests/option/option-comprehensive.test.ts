@@ -603,7 +603,7 @@ describe("Edge Cases & Invariants", () => {
 
   describe("Edge Cases from Spec Table", () => {
     it("None is singleton", () => {
-      expect(Option.None === Option.None).toBe(true);
+      expect(Option.None).toBe(Option.None);
     });
 
     it("null in Some is valid", () => {

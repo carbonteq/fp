@@ -708,6 +708,7 @@ describe("Result.flatZip behavior", () => {
   });
 
   describe("permutations", () => {
+    // biome-ignore lint/suspicious/noExplicitAny: simple type checks later
     const permResult: any = [
       [
         [

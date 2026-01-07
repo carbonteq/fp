@@ -533,6 +533,21 @@ describe("Utility Methods", () => {
       Result.Ok(42).tapErr(sideEffect);
       expect(sideEffect).not.toHaveBeenCalled();
     });
+
+    it("should execute side effect for async Err after resolution", async () => {
+      const sideEffect = mock((e: string) => console.error(e));
+      const result = Result.tryAsyncCatch(
+        async () => {
+          throw new Error("boom");
+        },
+        (e) => (e as Error).message,
+      );
+
+      await result.toPromise();
+      result.tapErr(sideEffect);
+
+      expect(sideEffect).toHaveBeenCalledWith("boom");
+    });
   });
 
   describe("flip()", () => {
@@ -546,6 +561,21 @@ describe("Utility Methods", () => {
       const result = Result.Err("error").flip();
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe("error");
+    });
+
+    it("should flip async Err to Ok after resolution", async () => {
+      const result = Result.tryAsyncCatch(
+        async () => {
+          throw new Error("boom");
+        },
+        (e) => (e as Error).message,
+      );
+
+      await result.toPromise();
+      const flipped = result.flip();
+
+      expect(flipped.isOk()).toBe(true);
+      expect(flipped.unwrap()).toBe("boom");
     });
   });
 

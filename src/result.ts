@@ -46,13 +46,13 @@ type HasPromise<T extends readonly Result<unknown, unknown>[]> = true extends {
   : false;
 
 /** Sentinel value stored in #val when Result is Err */
-const ERR_VAL = Symbol.for("Result::Err");
+const ERR_VAL = Symbol("Result::Err");
 
 /** NO_ERR sentinel indicates no async error has occurred */
-const NO_ERR = Symbol.for("Result::NoErr");
+const NO_ERR = Symbol("Result::NoErr");
 
 /** Internal symbol for accessing private factory - not exported */
-const RESULT_INTERNAL = Symbol.for("Result::Internal");
+const RESULT_INTERNAL = Symbol("Result::Internal");
 type NO_ERR = typeof NO_ERR;
 
 type ResultCtx<E> = { asyncErr: E | NO_ERR };
@@ -1058,14 +1058,14 @@ export class Result<T, E> {
   /** Execute side effect for Err, return self */
   tapErr(fn: (err: E) => void): Result<T, E> {
     if (this.isErr()) {
-      fn(this.#err);
+      fn(this.getErr());
     }
     return this;
   }
 
   /** Swap Ok and Err */
   flip(): Result<E, T> {
-    if (this._tag === "Err") {
+    if (this.isErr()) {
       return new Result(
         this.getErr(),
         undefined as T,

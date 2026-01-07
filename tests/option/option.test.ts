@@ -117,6 +117,18 @@ describe("flatMap behavior", () => {
   });
 });
 
+describe("filter behavior", () => {
+  it("should propagate async filter None state", async () => {
+    const opt = Option.Some(Promise.resolve(2));
+    const filtered = opt.filter(async (n) => n > 10);
+    const resolved = await filtered.toPromise();
+
+    expect(filtered.isNone()).toBeTrue();
+    expect(filtered.isSome()).toBeFalse();
+    expect(resolved.isNone()).toBeTrue();
+  });
+});
+
 describe("branching map", () => {
   it("two chained branches of computation should not affect parent or each other", () => {
     const o = Option.Some(2);
@@ -586,6 +598,15 @@ describe("Option type inference", () => {
       expectTypeOf(
         opt.mapOr("default", (n) => n.toString()),
       ).toEqualTypeOf<string>();
+    });
+
+    it("should correctly type mapOr on async Option", () => {
+      const opt = Option.Some(Promise.resolve(42));
+
+      // mapOr on async Option returns Promise<U>
+      expectTypeOf(opt.mapOr("default", (n) => n.toString())).toEqualTypeOf<
+        Promise<string>
+      >();
     });
   });
 
