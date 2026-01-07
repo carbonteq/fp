@@ -37,6 +37,15 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: log npm version
+        run: npm --version
+
+      - name: Update npm for publishing
+        run: npm install -g npm@latest
+
+      - name: log updated npm version
+        run: npm --version
+
       # https://gist.github.com/jaywcjlove/a178278521a6f72c74525d3f1d9c4bf9
       - name: Publish
         run: NODE_AUTH_TOKEN="" npm publish --provenance --access public
