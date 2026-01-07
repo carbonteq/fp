@@ -15,7 +15,11 @@ jobs:
     name: Publish to JSR
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:

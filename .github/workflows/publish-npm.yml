@@ -15,7 +15,11 @@ jobs:
     name: Publish to NPM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -36,5 +40,4 @@ jobs:
       - name: Publish
         run: npm publish --provenance --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

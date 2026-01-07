@@ -16,7 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true # required for later commit
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -44,9 +47,11 @@ jobs:
         run: node sync_versions.mjs
       - name: Format deno.jsonc
         if: steps.changesets.outputs.published == 'true'
-        run: bun run fmt
+        run: bun run biome format deno.jsonc --write
       - name: Commit updated deno.jsonc
         if: steps.changesets.outputs.published == 'true'
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: Update version deno.jsonc
+          commit_options: "--no-verify --signoff"
+          file_pattern: deno.jsonc
