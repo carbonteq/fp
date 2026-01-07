@@ -35,24 +35,24 @@ The most significant change is how asynchronous operations are handled. Methods 
 **Before (0.7.0):**
 
 ```ts
-const asyncFun = async () => 1
-const anotherAsyncFun = async () => 2
+const asyncFun = async () => 1;
+const anotherAsyncFun = async () => 2;
 
-const r1 = OldResult.Ok(1)
+const r1 = OldResult.Ok(1);
 // Notice the awkward double await and nesting
-const res1 = await(await r1.map(asyncFun)).map(anotherAsyncFun)
+const res1 = await (await r1.map(asyncFun)).map(anotherAsyncFun);
 ```
 
 **After (0.8.0):**
 
 ```ts
-const asyncFun = async () => 1
-const anotherAsyncFun = async () => 2
+const asyncFun = async () => 1;
+const anotherAsyncFun = async () => 2;
 
-const r2 = Result.Ok(1)
+const r2 = Result.Ok(1);
 // We can chain async computations normally without nesting
 // Just append .toPromise() at the end of your chain
-const res2 = await r2.map(asyncFun).map(anotherAsyncFun).toPromise()
+const res2 = await r2.map(asyncFun).map(anotherAsyncFun).toPromise();
 ```
 
 > [!IMPORTANT]
@@ -69,13 +69,13 @@ const res1 = OldResult.all("ok", [
   OldResult.Ok(1),
   OldResult.Err(2),
   OldResult.Ok(3),
-]) // false
+]); // false
 ```
 
 **After (0.8.0):**
 
 ```ts
-const res2 = [Result.Ok(1), Result.Err(2), Result.Ok(3)].every((r) => r.isOk()) // false
+const res2 = [Result.Ok(1), Result.Err(2), Result.Ok(3)].every((r) => r.isOk()); // false
 ```
 
 ### 3. Replacing `sequence` with the New `all`
@@ -90,9 +90,9 @@ const res1 = OldResult.sequence(
   OldResult.Err(2),
   OldResult.Ok(3),
   OldResult.Err("4"),
-)
+);
 // res1: OldResult<[number, never, number, never], string | number>
-res1.unwrapErr() // 2 (only the first error)
+res1.unwrapErr(); // 2 (only the first error)
 ```
 
 **After (0.8.0):**
@@ -103,9 +103,9 @@ const res2 = Result.all(
   Result.Err(2),
   Result.Ok(3),
   Result.Err("4"),
-)
+);
 // res2: Result<[number, never, number, never], (string | number)[]>
-res2.unwrapErr() // [2, "4"] (all errors are returned)
+res2.unwrapErr(); // [2, "4"] (all errors are returned)
 ```
 
 ### 4. Migration Guide for Removed Methods

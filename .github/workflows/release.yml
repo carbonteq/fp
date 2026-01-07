@@ -32,8 +32,8 @@ jobs:
         uses: changesets/action@v1
         id: changesets
         with:
-          title: '🦋 Changeset release'
-          commit: 'chore(changeset): release'
+          title: "🦋 Changeset release"
+          commit: "chore(changeset): release"
           publish: bun run tag
           createGithubReleases: true
         env:

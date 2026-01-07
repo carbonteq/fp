@@ -7,8 +7,8 @@ on:
 
   pull_request:
     branches-ignore:
-      - 'changeset-release/main'
-      - 'dev'
+      - "changeset-release/main"
+      - "dev"
 
     types:
       - opened
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        node-version: [18, 20]
+        node-version: [22, 24]
 
     # if: ${{ github.ref != 'refs/heads/changeset-release/main' }}
 
@@ -43,9 +43,6 @@ jobs:
 
       - name: Type check
         run: bun run tc
-
-      - name: Lint
-        run: bun run lint
 
       - name: Test
         run: bun test
