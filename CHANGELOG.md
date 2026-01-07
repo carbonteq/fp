@@ -1,5 +1,11 @@
 # @carbonteq/fp
 
+## 0.9.1
+
+### Patch Changes
+
+- a6fc559: Update deployment pipeline
+
 ## 0.9.0
 
 ### Minor Changes

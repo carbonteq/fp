@@ -1,7 +1,7 @@
 {
   "name": "@carbonteq/fp",
   "description": "FP utils",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "author": "Arslan <rslnkrmt2552@gmail.com>",
   "license": "MIT",
   "scope": "@carbonteq",
