@@ -3,5 +3,5 @@ linker = "isolated"
 
 [test]
 ## TODO: add custom matchers for option and result
-# preload = []
+preload = ["./tests/custom-matchers.ts"]
 root = "tests"
