@@ -1,3 +1,4 @@
+/* oxlint-disable typescript-eslint/restrict-template-expressions */
 import { describe, expect, it } from "bun:test";
 import { Result } from "@/result.js";
 

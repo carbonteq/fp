@@ -62,6 +62,24 @@ interface MatchCases<T, E, U> {
   Err: (err: E) => U;
 }
 
+/**
+ * Wrapper that makes Result yieldable with proper type tracking.
+ * The Generator signature ensures TypeScript tracks the inner type T.
+ *
+ * @internal
+ */
+class ResultYieldWrap<T, E> {
+  constructor(readonly result: Result<T, E>) {}
+
+  *[Symbol.iterator](): Generator<ResultYieldWrap<T, E>, T, unknown> {
+    return (yield this) as T;
+  }
+}
+
+/** Extract error type from yielded values */
+type ExtractResultError<T> =
+  T extends ResultYieldWrap<any, infer E> ? E : never;
+
 export class Result<T, E> {
   /** Discriminant tag for type-level identification */
   readonly _tag: "Ok" | "Err";
@@ -1124,6 +1142,22 @@ export class Result<T, E> {
     if (this.isOk()) return this as unknown as Result<T | T2, E2>;
     return fn(this.getErr());
   }
+
+  /**
+   * Makes Result iterable for use with generator-based syntax.
+   * Yields self and returns the unwrapped value when resumed.
+   *
+   * @example
+   * ```ts
+   * const result = Result.genSimple(function* () {
+   *   const value = yield* Result.Ok(42);
+   *   return value * 2;
+   * });
+   * ```
+   */
+  *[Symbol.iterator](): Generator<Result<T, E>, T, unknown> {
+    return (yield this) as T;
+  }
 }
 
 // ==========================================================================
@@ -1208,5 +1242,113 @@ export namespace Result {
       ctx,
       "Ok",
     );
+  }
+
+  /**
+   * Generator-based syntax for chaining Result operations (simplified, no adapter).
+   * Provides imperative-style code while maintaining functional error handling.
+   *
+   * Short-circuits on first Err, returning that error. Uses iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const result = Result.genSimple(function* () {
+   *   const a = yield* Result.Ok(1);
+   *   const b = yield* Result.Ok(2);
+   *   return a + b;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  export function genSimple<T, E>(
+    genFn: () => Generator<Result<unknown, E>, T, unknown>,
+  ): Result<T, E> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, E>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is the Result that was yielded
+      const yielded = next.value as Result<unknown, E>;
+
+      if (yielded.isErr()) {
+        // Early termination on error - return the Err result
+        currentResult = yielded as Result<T, E>;
+        break;
+      }
+
+      // Unwrap the Ok value and pass it back to the generator
+      nextArg = yielded.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Generator-based syntax for chaining Result operations (with adapter).
+   * Uses an adapter function ($) for improved type inference.
+   *
+   * Short-circuits on first Err, returning that error. Uses iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const result = Result.gen(function* ($) {
+   *   const a = yield* $(Result.Ok(1));
+   *   const b = yield* $(Result.Ok(2));
+   *   return a + b;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  export function gen<Eff extends ResultYieldWrap<any, any>, T>(
+    genFn: (
+      adapter: <A, E>(result: Result<A, E>) => ResultYieldWrap<A, E>,
+    ) => Generator<Eff, T, any>,
+  ): Result<T, ExtractResultError<Eff>> {
+    const adapter = <A, E>(result: Result<A, E>): ResultYieldWrap<A, E> =>
+      new ResultYieldWrap(result);
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractResultError<Eff>>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is the ResultYieldWrap that was yielded
+      const wrapped = next.value as ResultYieldWrap<unknown, unknown>;
+      const result = wrapped.result;
+
+      if (result.isErr()) {
+        // Early termination on error - return the Err result
+        currentResult = result as unknown as Result<T, ExtractResultError<Eff>>;
+        break;
+      }
+
+      // Unwrap the Ok value and pass it back to the generator
+      nextArg = result.unwrap();
+    }
+
+    return currentResult;
   }
 }

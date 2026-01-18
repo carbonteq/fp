@@ -1,7 +1,9 @@
-import { expect } from "bun:test";
-import { Result } from "@/result.js";
-import { Option } from "@/option.js";
+/* oxlint-disable typescript-eslint/restrict-template-expressions */
+
 import type { CustomMatcher } from "bun:test";
+import { expect } from "bun:test";
+import type { Option } from "@/option.js";
+import { Result } from "@/result.js";
 
 // Type helpers to constrain matchers to their intended types
 // These ensure that the matchers can only be called with the correct types at compile time

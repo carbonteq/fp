@@ -37,6 +37,19 @@ interface MatchCases<T, U> {
   None: () => U;
 }
 
+/**
+ * Wrapper that makes Option yieldable with proper type tracking.
+ *
+ * @internal
+ */
+class OptionYieldWrap<T> {
+  constructor(readonly option: Option<T>) {}
+
+  *[Symbol.iterator](): Generator<OptionYieldWrap<T>, T, unknown> {
+    return (yield this) as T;
+  }
+}
+
 export class Option<T> {
   /** Discriminant tag for type-level identification */
   readonly _tag: "Some" | "None";
@@ -114,6 +127,113 @@ export class Option<T> {
       if (opt.isSome()) return opt;
     }
     return Option.None;
+  }
+
+  /**
+   * Generator-based syntax for chaining Option operations (simplified, no adapter).
+   *
+   * Short-circuits on first None, returning Option.None. Uses iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const result = Option.genSimple(function* () {
+   *   const a = yield* Option.Some(1);
+   *   const b = yield* Option.Some(2);
+   *   return a + b;
+   * });
+   * // Option<number>
+   * ```
+   */
+  static genSimple<T>(
+    genFn: () => Generator<Option<unknown>, T, unknown>,
+  ): Option<T> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Option<T>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Some
+        currentResult = Option.Some(next.value);
+        break;
+      }
+
+      // next.value is the Option that was yielded
+      const yielded = next.value as Option<unknown>;
+
+      if (yielded.isNone()) {
+        // Early termination on None - return singleton None
+        currentResult = Option.None;
+        break;
+      }
+
+      // Unwrap the Some value and pass it back to the generator
+      nextArg = yielded.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Generator-based syntax for chaining Option operations (with adapter).
+   * Uses an adapter function ($) for improved type inference.
+   *
+   * Short-circuits on first None, returning Option.None. Uses iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const result = Option.gen(function* ($) {
+   *   const a = yield* $(Option.Some(1));
+   *   const b = yield* $(Option.Some(2));
+   *   return a + b;
+   * });
+   * // Option<number>
+   * ```
+   */
+  static gen<Eff extends OptionYieldWrap<any>, T>(
+    genFn: (
+      adapter: <A>(option: Option<A>) => OptionYieldWrap<A>,
+    ) => Generator<Eff, T, any>,
+  ): Option<T> {
+    const adapter = <A>(option: Option<A>): OptionYieldWrap<A> =>
+      new OptionYieldWrap(option);
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Option<T>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Some
+        currentResult = Option.Some(next.value);
+        break;
+      }
+
+      // next.value is the OptionYieldWrap that was yielded
+      const wrapped = next.value as OptionYieldWrap<unknown>;
+      const option = wrapped.option;
+
+      if (option.isNone()) {
+        // Early termination on None - return singleton None
+        currentResult = Option.None;
+        break;
+      }
+
+      // Unwrap the Some value and pass it back to the generator
+      nextArg = option.unwrap();
+    }
+
+    return currentResult;
   }
 
   /** Type guard for Some state */
@@ -535,5 +655,21 @@ export class Option<T> {
   toString(): string {
     if (this.isNone()) return "Option::None";
     return `Option::Some(${String(this.#val)})`;
+  }
+
+  /**
+   * Makes Option iterable for use with generator-based syntax.
+   * Yields self and returns the unwrapped value when resumed.
+   *
+   * @example
+   * ```ts
+   * const result = Option.genSimple(function* () {
+   *   const value = yield* Option.Some(42);
+   *   return value * 2;
+   * });
+   * ```
+   */
+  *[Symbol.iterator](): Generator<Option<T>, T, unknown> {
+    return (yield this) as T;
   }
 }

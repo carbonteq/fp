@@ -11,6 +11,6 @@ export default defineConfig((_options) => ({
   splitting: true,
   treeshake: true,
   unbundle: true,
-  dts: true,
+  dts: { tsgo: true },
   platform: "node",
 }));

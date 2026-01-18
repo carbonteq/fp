@@ -404,7 +404,7 @@ describe("Utility Methods", () => {
   describe("tap()", () => {
     it("should execute side effect for Some and return self", () => {
       const sideEffect = mock((x: number) => {
-        console.log(x);
+        return `${x} + 10`;
       });
       const opt = Option.Some(42);
       const result = opt.tap(sideEffect);
