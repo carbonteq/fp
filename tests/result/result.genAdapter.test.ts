@@ -78,12 +78,12 @@ describe("Result.genAdapter", () => {
         const num = yield* $(Result.Ok(42));
         const str = yield* $(Result.Ok("hello"));
         const obj = yield* $(Result.Ok({ x: 1 }));
-      
+
         // These should all have correct types
         expectTypeOf(num).toBeNumber();
         expectTypeOf(str).toBeString();
         expectTypeOf(obj).toEqualTypeOf<{ x: number }>();
-      
+
         return { num, str, obj };
       });
 
@@ -152,11 +152,11 @@ describe("Result.genAdapter", () => {
       const result = Result.genAdapter(function* ($) {
         const config = yield* $(Result.Ok({ multiplier: 2, offset: 10 }));
         const base = yield* $(Result.Ok(5));
-      
+
         // Reuse config multiple times
         const scaled = base * config.multiplier;
         const final = scaled + config.offset;
-      
+
         return final;
       });
 

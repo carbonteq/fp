@@ -81,12 +81,12 @@ describe("Option.genAdapter", () => {
         const num = yield* $(Option.Some(42));
         const str = yield* $(Option.Some("hello"));
         const obj = yield* $(Option.Some({ x: 1 }));
-      
+
         // These should all have correct types
         expectTypeOf(num).toBeNumber();
         expectTypeOf(str).toBeString();
         expectTypeOf(obj).toEqualTypeOf<{ x: number }>();
-      
+
         return { num, str, obj };
       });
 
