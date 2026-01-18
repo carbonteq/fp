@@ -459,4 +459,129 @@ describe("Option.asyncGenAdapter", () => {
       expect(genResult.unwrap()).toBe(genSimpleResult.unwrap());
     });
   });
+
+  describe("Option<Promise<T>> automatic awaiting", () => {
+    it("should automatically await inner promise and return T not Promise<T>", async () => {
+      const promiseFunc = (n: number): Option<Promise<number>> => {
+        return Option.Some(Promise.resolve(n * 2));
+      };
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        const value = yield* $(promiseFunc(21));
+
+        // value should be number, not Promise<number>
+        expectTypeOf(value).toEqualTypeOf<number>();
+        return value;
+      });
+
+      expectTypeOf(result).toEqualTypeOf<Option<number>>();
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(42);
+    });
+
+    it("should handle Option.map returning Promise", async () => {
+      const asyncDouble = async (n: number): Promise<number> => {
+        await delay(5);
+        return n * 2;
+      };
+
+      // Option.Some(3).map(asyncDouble) returns Option<Promise<number>>
+      const optionWithPromise = Option.Some(3).map(asyncDouble);
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        // Yielding Option<Promise<number>> should give us number
+        const value = yield* $(optionWithPromise);
+
+        expectTypeOf(value).toEqualTypeOf<number>();
+        return value + 10;
+      });
+
+      expectTypeOf(result).toEqualTypeOf<Option<number>>();
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(16); // 3 * 2 + 10
+    });
+
+    it("should handle mixed sync and async inner values", async () => {
+      const syncOption = Option.Some<number>(10);
+      const asyncOption = Option.Some<number>(5).map(async (n) => n * 3);
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        const a = yield* $(syncOption);
+        const b = yield* $(asyncOption);
+
+        expectTypeOf(a).toEqualTypeOf<number>();
+        expectTypeOf(b).toEqualTypeOf<number>();
+
+        return a + b;
+      });
+
+      expectTypeOf(result).toEqualTypeOf<Option<number>>();
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(25); // 10 + 15
+    });
+
+    it("should work with Option<Promise<T>> from flatMap", async () => {
+      const asyncFlatMap = async (n: number): Promise<Option<number>> => {
+        await delay(5);
+        return n > 0 ? Option.Some(n * 2) : Option.None;
+      };
+
+      // Option.flatMap with async returns Option<Promise<number>>
+      const optionWithPromise = Option.Some(5).flatMap(asyncFlatMap);
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        const value = yield* $(optionWithPromise);
+        expectTypeOf(value).toEqualTypeOf<number>();
+        return value;
+      });
+
+      expectTypeOf(result).toEqualTypeOf<Option<number>>();
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(10);
+    });
+
+    it("should short-circuit on None from async flatMap", async () => {
+      const asyncFlatMap = async (n: number): Promise<Option<number>> => {
+        await delay(5);
+        return n > 0 ? Option.Some(n * 2) : Option.None;
+      };
+
+      const optionWithPromise = Option.Some(-5).flatMap(asyncFlatMap);
+      let reachedAfterNone = false;
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        const value = yield* $(optionWithPromise);
+        reachedAfterNone = true;
+        return value + 100;
+      });
+
+      expect(result.isNone()).toBe(true);
+      expect(reachedAfterNone).toBe(false);
+    });
+
+    it("should combine Promise<Option<T>> and Option<Promise<T>>", async () => {
+      const fetchOption = async (): Promise<Option<number>> => {
+        await delay(5);
+        return Option.Some(100);
+      };
+
+      // Option<Promise<T>> from map
+      const optionWithPromise = Option.Some(5).map(async (n) => n * 2);
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        // Promise<Option<T>> via adapter
+        const a = yield* $(fetchOption());
+        // Option<Promise<T>> via adapter (auto-awaited)
+        const b = yield* $(optionWithPromise);
+
+        expectTypeOf(a).toEqualTypeOf<number>();
+        expectTypeOf(b).toEqualTypeOf<number>();
+
+        return a + b;
+      });
+
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(110); // 100 + 10
+    });
+  });
 });

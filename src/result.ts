@@ -76,9 +76,38 @@ class ResultYieldWrap<T, E> {
   }
 }
 
+/**
+ * Wrapper that makes Result yieldable in async generators with proper type tracking.
+ * Supports both Result<T, E> and Promise<Result<T, E>> for flexibility.
+ * Returns Awaited<T> to handle Result<Promise<U>, E> yielding U instead of Promise<U>.
+ *
+ * @internal
+ */
+class AsyncResultYieldWrap<T, E> {
+  constructor(readonly result: Result<T, E> | Promise<Result<T, E>>) {}
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    AsyncResultYieldWrap<T, E>,
+    Awaited<T>,
+    unknown
+  > {
+    return (yield this) as Awaited<T>;
+  }
+}
+
 /** Extract error type from yielded values */
 type ExtractResultError<T> =
+  // biome-ignore lint/suspicious/noExplicitAny: inference
   T extends ResultYieldWrap<any, infer E> ? E : never;
+
+/** Extract error type from async yielded values */
+type ExtractAsyncResultError<T> =
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  T extends AsyncResultYieldWrap<any, infer E> ? E : never;
+
+/** Extract error type directly from Result */
+// biome-ignore lint/suspicious/noExplicitAny: inference
+type ExtractError<T> = T extends Result<any, infer E> ? E : never;
 
 export class Result<T, E> {
   /** Discriminant tag for type-level identification */
@@ -1158,6 +1187,28 @@ export class Result<T, E> {
   *[Symbol.iterator](): Generator<Result<T, E>, T, unknown> {
     return (yield this) as T;
   }
+
+  /**
+   * Makes Result iterable for use with async generator-based syntax.
+   * Yields self and returns the unwrapped value when resumed.
+   * For Result<Promise<U>, E>, the returned value is Awaited<U> (the promise is awaited).
+   *
+   * @example
+   * ```ts
+   * const result = await Result.asyncGen(async function* () {
+   *   const value = yield* Result.Ok(42);
+   *   const asyncValue = yield* await Promise.resolve(Result.Ok(10));
+   *   return value + asyncValue;
+   * });
+   * ```
+   */
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    Result<T, E>,
+    Awaited<T>,
+    unknown
+  > {
+    return (yield this) as Awaited<T>;
+  }
 }
 
 // ==========================================================================
@@ -1261,14 +1312,16 @@ export namespace Result {
    * // Result<number, never>
    * ```
    */
-  export function gen<T, E>(
-    genFn: () => Generator<Result<unknown, E>, T, unknown>,
-  ): Result<T, E> {
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  export function gen<Eff extends Result<any, any>, T>(
+    // biome-ignore lint/suspicious/noExplicitAny: inference
+    genFn: () => Generator<Eff, T, any>,
+  ): Result<T, ExtractError<Eff>> {
     const iterator = genFn();
 
     // Use iteration instead of recursion to avoid stack overflow
     let nextArg: unknown;
-    let currentResult: Result<T, E>;
+    let currentResult: Result<T, ExtractError<Eff>>;
 
     while (true) {
       const next = iterator.next(nextArg);
@@ -1280,11 +1333,11 @@ export namespace Result {
       }
 
       // next.value is the Result that was yielded
-      const yielded = next.value as Result<unknown, E>;
+      const yielded = next.value as Result<unknown, unknown>;
 
       if (yielded.isErr()) {
         // Early termination on error - return the Err result
-        currentResult = yielded as Result<T, E>;
+        currentResult = yielded as unknown as Result<T, ExtractError<Eff>>;
         break;
       }
 
@@ -1312,9 +1365,11 @@ export namespace Result {
    * // Result<number, never>
    * ```
    */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
   export function genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
     genFn: (
       adapter: <A, E>(result: Result<A, E>) => ResultYieldWrap<A, E>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
     ) => Generator<Eff, T, any>,
   ): Result<T, ExtractResultError<Eff>> {
     const adapter = <A, E>(result: Result<A, E>): ResultYieldWrap<A, E> =>
@@ -1347,6 +1402,139 @@ export namespace Result {
 
       // Unwrap the Ok value and pass it back to the generator
       nextArg = result.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Async generator-based syntax for chaining Result operations (simplified, no adapter).
+   * Use yield* with Result values directly. For Promise<Result<T, E>>, await first then yield*.
+   * For Result<Promise<U>, E>, the inner promise is automatically awaited.
+   *
+   * Short-circuits on first Err, returning that error. Uses async iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
+   * const result = await Result.asyncGen(async function* () {
+   *   const a = yield* Result.Ok(1);
+   *   const b = yield* await fetchData(a);
+   *   return a + b;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  export async function asyncGen<Eff extends Result<any, any>, T>(
+    // biome-ignore lint/suspicious/noExplicitAny: inference
+    genFn: () => AsyncGenerator<Eff, T, any>,
+  ): Promise<Result<T, ExtractError<Eff>>> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractError<Eff>>;
+
+    while (true) {
+      const next = await iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is a Result (user awaits promises before yielding)
+      const result = next.value as Result<unknown, unknown>;
+
+      if (result.isErr()) {
+        // Early termination on error - return the Err result
+        currentResult = result as unknown as Result<T, ExtractError<Eff>>;
+        break;
+      }
+
+      // Unwrap the Ok value and await if it's a promise (for Result<Promise<U>, E>)
+      const unwrapped = result.unwrap();
+      nextArg = isPromiseLike(unwrapped) ? await unwrapped : unwrapped;
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Async generator-based syntax for chaining Result operations (with adapter).
+   * Uses an adapter function ($) for improved type inference.
+   * Supports both Result<T, E> and Promise<Result<T, E>> for flexibility.
+   * For Result<Promise<U>, E>, the inner promise is automatically awaited.
+   *
+   * Short-circuits on first Err, returning that error. Uses async iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
+   * const result = await Result.asyncGenAdapter(async function* ($) {
+   *   const a = yield* $(Result.Ok(1));
+   *   const b = yield* $(fetchData(a));
+   *   return a + b;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  export async function asyncGenAdapter<
+    // biome-ignore lint/suspicious/noExplicitAny: inference
+    Eff extends AsyncResultYieldWrap<any, any>,
+    T,
+  >(
+    genFn: (
+      adapter: <A, E2>(
+        result: Result<A, E2> | Promise<Result<A, E2>>,
+      ) => AsyncResultYieldWrap<A, E2>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
+    ) => AsyncGenerator<Eff, T, any>,
+  ): Promise<Result<T, ExtractAsyncResultError<Eff>>> {
+    const adapter = <A, E2>(
+      result: Result<A, E2> | Promise<Result<A, E2>>,
+    ): AsyncResultYieldWrap<A, E2> => new AsyncResultYieldWrap(result);
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractAsyncResultError<Eff>>;
+
+    while (true) {
+      const next = await iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is the AsyncResultYieldWrap that was yielded
+      const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>;
+      const resultOrPromise = wrapped.result;
+
+      // Resolve promise if needed (for Promise<Result<T, E>>)
+      const result = isPromiseLike(resultOrPromise)
+        ? await resultOrPromise
+        : resultOrPromise;
+
+      if (result.isErr()) {
+        // Early termination on error - return the Err result
+        currentResult = result as unknown as Result<
+          T,
+          ExtractAsyncResultError<Eff>
+        >;
+        break;
+      }
+
+      // Unwrap the Ok value and await if it's a promise (for Result<Promise<U>, E>)
+      const unwrapped = result.unwrap();
+      nextArg = isPromiseLike(unwrapped) ? await unwrapped : unwrapped;
     }
 
     return currentResult;

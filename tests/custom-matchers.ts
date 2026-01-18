@@ -1,4 +1,5 @@
 /* oxlint-disable typescript-eslint/restrict-template-expressions */
+/** biome-ignore-all lint/suspicious/noExplicitAny: custom inference */
 
 import type { CustomMatcher } from "bun:test";
 import { expect } from "bun:test";

@@ -53,6 +53,7 @@ class OptionYieldWrap<T> {
 /**
  * Wrapper that makes Option yieldable in async generators with proper type tracking.
  * Supports both Option<T> and Promise<Option<T>> for flexibility.
+ * Returns Awaited<T> to handle Option<Promise<U>> yielding U instead of Promise<U>.
  *
  * @internal
  */
@@ -61,10 +62,10 @@ class AsyncOptionYieldWrap<T> {
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
     AsyncOptionYieldWrap<T>,
-    T,
+    Awaited<T>,
     unknown
   > {
-    return (yield this) as T;
+    return (yield this) as Awaited<T>;
   }
 }
 
@@ -214,9 +215,11 @@ export class Option<T> {
    * // Option<number>
    * ```
    */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
   static genAdapter<Eff extends OptionYieldWrap<any>, T>(
     genFn: (
       adapter: <A>(option: Option<A>) => OptionYieldWrap<A>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
     ) => Generator<Eff, T, any>,
   ): Option<T> {
     const adapter = <A>(option: Option<A>): OptionYieldWrap<A> =>
@@ -257,6 +260,7 @@ export class Option<T> {
   /**
    * Async generator-based syntax for chaining Option operations (simplified, no adapter).
    * Use yield* with Option values directly. For Promise<Option<T>>, await first then yield*.
+   * When yielding Option<Promise<U>>, the inner promise is automatically awaited.
    *
    * Short-circuits on first None, returning Option.None. Uses async iteration instead of
    * recursion to avoid stack overflow on deep chains.
@@ -266,7 +270,9 @@ export class Option<T> {
    * const result = await Option.asyncGen(async function* () {
    *   const a = yield* Option.Some(1);
    *   const b = yield* await Promise.resolve(Option.Some(2));
-   *   return a + b;
+   *   // Option<Promise<T>> - inner promise is auto-awaited
+   *   const c = yield* Option.Some(Promise.resolve(3)); // c is number, not Promise<number>
+   *   return a + b + c;
    * });
    * // Option<number>
    * ```
@@ -298,8 +304,19 @@ export class Option<T> {
         break;
       }
 
-      // Unwrap the Some value and pass it back to the generator
-      nextArg = option.unwrap();
+      // Unwrap the Some value and await if it's a promise
+      const unwrapped = option.unwrap();
+      if (isPromiseLike(unwrapped)) {
+        const awaited = await unwrapped;
+        // Check if the awaited value is NONE_VAL (from Option<Promise<T>> when None)
+        if (awaited === NONE_VAL) {
+          currentResult = Option.None;
+          break;
+        }
+        nextArg = awaited;
+      } else {
+        nextArg = unwrapped;
+      }
     }
 
     return currentResult;
@@ -309,6 +326,7 @@ export class Option<T> {
    * Async generator-based syntax for chaining Option operations (with adapter).
    * Uses an adapter function ($) for improved type inference.
    * Supports both Option<T> and Promise<Option<T>> for flexibility.
+   * When yielding Option<Promise<U>>, the inner promise is automatically awaited.
    *
    * Short-circuits on first None, returning Option.None. Uses async iteration instead of
    * recursion to avoid stack overflow on deep chains.
@@ -318,16 +336,20 @@ export class Option<T> {
    * const result = await Option.asyncGenAdapter(async function* ($) {
    *   const a = yield* $(Option.Some(1));
    *   const b = yield* $(Promise.resolve(Option.Some(2)));
-   *   return a + b;
+   *   // Option<Promise<T>> - inner promise is auto-awaited
+   *   const c = yield* $(Option.Some(Promise.resolve(3))); // c is number, not Promise<number>
+   *   return a + b + c;
    * });
    * // Option<number>
    * ```
    */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
   static async asyncGenAdapter<Eff extends AsyncOptionYieldWrap<any>, T>(
     genFn: (
       adapter: <A>(
         option: Option<A> | Promise<Option<A>>,
       ) => AsyncOptionYieldWrap<A>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
     ) => AsyncGenerator<Eff, T, any>,
   ): Promise<Option<T>> {
     const adapter = <A>(
@@ -364,8 +386,19 @@ export class Option<T> {
         break;
       }
 
-      // Unwrap the Some value and pass it back to the generator
-      nextArg = option.unwrap();
+      // Unwrap the Some value and await if it's a promise
+      const unwrapped = option.unwrap();
+      if (isPromiseLike(unwrapped)) {
+        const awaited = await unwrapped;
+        // Check if the awaited value is NONE_VAL (from Option<Promise<T>> when None)
+        if (awaited === NONE_VAL) {
+          currentResult = Option.None;
+          break;
+        }
+        nextArg = awaited;
+      } else {
+        nextArg = unwrapped;
+      }
     }
 
     return currentResult;
@@ -811,6 +844,7 @@ export class Option<T> {
   /**
    * Makes Option iterable for use with async generator-based syntax.
    * Yields self and returns the unwrapped value when resumed.
+   * Returns Awaited<T> for proper type inference when inner value is a Promise.
    *
    * @example
    * ```ts
@@ -821,7 +855,11 @@ export class Option<T> {
    * });
    * ```
    */
-  async *[Symbol.asyncIterator](): AsyncGenerator<Option<T>, T, unknown> {
-    return (yield this) as T;
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    Option<T>,
+    Awaited<T>,
+    unknown
+  > {
+    return (yield this) as Awaited<T>;
   }
 }
