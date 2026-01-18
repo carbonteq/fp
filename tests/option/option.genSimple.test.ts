@@ -3,10 +3,10 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test";
 import { Option } from "@/option.js";
 
-describe("Option.genSimple", () => {
+describe("Option.gen", () => {
   describe("basic functionality", () => {
     it("should unwrap a single Some value", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const value = yield* Option.Some(42);
         return value;
       });
@@ -16,7 +16,7 @@ describe("Option.genSimple", () => {
     });
 
     it("should unwrap multiple Some values in sequence", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const a = yield* Option.Some(1);
         const b = yield* Option.Some(2);
         const c = yield* Option.Some(3);
@@ -28,7 +28,7 @@ describe("Option.genSimple", () => {
     });
 
     it("should work with no yields", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         return 42;
       });
 
@@ -39,7 +39,7 @@ describe("Option.genSimple", () => {
     it("should short-circuit on first None", () => {
       let reachedAfterNone = false;
 
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const a = yield* Option.Some(1);
         const b = yield* Option.None;
         reachedAfterNone = true;
@@ -52,12 +52,12 @@ describe("Option.genSimple", () => {
     });
 
     it("should return singleton None", () => {
-      const result1 = Option.genSimple(function* () {
+      const result1 = Option.gen(function* () {
         yield* Option.None;
         return 1;
       });
 
-      const result2 = Option.genSimple(function* () {
+      const result2 = Option.gen(function* () {
         yield* Option.None;
         return 2;
       });
@@ -68,7 +68,7 @@ describe("Option.genSimple", () => {
     });
 
     it("should track intermediate variables", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const a = yield* Option.Some(10);
         const b = yield* Option.Some(5);
         return a + b + a;
@@ -81,7 +81,7 @@ describe("Option.genSimple", () => {
 
   describe("type inference", () => {
     it("should infer return type correctly", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const a = yield* Option.Some(42);
         return a.toString();
       });
@@ -92,7 +92,7 @@ describe("Option.genSimple", () => {
     });
 
     it("should infer number return type", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const a = yield* Option.Some(1);
         const b = yield* Option.Some(2);
         return a + b;
@@ -108,7 +108,7 @@ describe("Option.genSimple", () => {
       const validatePositive = (n: number): Option<number> =>
         n > 0 ? Option.Some(n) : Option.None;
 
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const input = yield* Option.Some(4);
         const positive = yield* validatePositive(input);
         return positive * 2;
@@ -121,7 +121,7 @@ describe("Option.genSimple", () => {
     it("should not execute functions after None", () => {
       const mockFn = mock(() => Option.Some(10));
 
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const a = yield* Option.None;
         const b = yield* mockFn();
         return a + b;
@@ -134,7 +134,7 @@ describe("Option.genSimple", () => {
 
   describe("edge cases", () => {
     it("should handle many yields without stack overflow", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         let sum = 0;
         for (let i = 0; i < 100; i++) {
           const value = yield* Option.Some(i);
@@ -148,7 +148,7 @@ describe("Option.genSimple", () => {
     });
 
     it("should work with fromNullable", () => {
-      const result = Option.genSimple(function* () {
+      const result = Option.gen(function* () {
         const value = yield* Option.fromNullable(null);
         return value;
       });
@@ -159,7 +159,7 @@ describe("Option.genSimple", () => {
 
   describe("comparison with flatMap", () => {
     it("should be equivalent to flatMap chain", () => {
-      const genResult = Option.genSimple(function* () {
+      const genResult = Option.gen(function* () {
         const a = yield* Option.Some(1);
         const b = yield* Option.Some(2);
         return a + b;

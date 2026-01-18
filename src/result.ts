@@ -1149,7 +1149,7 @@ export class Result<T, E> {
    *
    * @example
    * ```ts
-   * const result = Result.genSimple(function* () {
+   * const result = Result.gen(function* () {
    *   const value = yield* Result.Ok(42);
    *   return value * 2;
    * });
@@ -1253,7 +1253,7 @@ export namespace Result {
    *
    * @example
    * ```ts
-   * const result = Result.genSimple(function* () {
+   * const result = Result.gen(function* () {
    *   const a = yield* Result.Ok(1);
    *   const b = yield* Result.Ok(2);
    *   return a + b;
@@ -1261,7 +1261,7 @@ export namespace Result {
    * // Result<number, never>
    * ```
    */
-  export function genSimple<T, E>(
+  export function gen<T, E>(
     genFn: () => Generator<Result<unknown, E>, T, unknown>,
   ): Result<T, E> {
     const iterator = genFn();
@@ -1304,7 +1304,7 @@ export namespace Result {
    *
    * @example
    * ```ts
-   * const result = Result.gen(function* ($) {
+   * const result = Result.genAdapter(function* ($) {
    *   const a = yield* $(Result.Ok(1));
    *   const b = yield* $(Result.Ok(2));
    *   return a + b;
@@ -1312,7 +1312,7 @@ export namespace Result {
    * // Result<number, never>
    * ```
    */
-  export function gen<Eff extends ResultYieldWrap<any, any>, T>(
+  export function genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
     genFn: (
       adapter: <A, E>(result: Result<A, E>) => ResultYieldWrap<A, E>,
     ) => Generator<Eff, T, any>,

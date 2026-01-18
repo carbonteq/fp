@@ -3,10 +3,10 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test";
 import { Result } from "@/result.js";
 
-describe("Result.genSimple", () => {
+describe("Result.gen", () => {
   describe("basic functionality", () => {
     it("should unwrap a single Ok value", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const value = yield* Result.Ok(42);
         return value;
       });
@@ -16,7 +16,7 @@ describe("Result.genSimple", () => {
     });
 
     it("should unwrap multiple Ok values in sequence", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Ok(1);
         const b = yield* Result.Ok(2);
         const c = yield* Result.Ok(3);
@@ -28,7 +28,7 @@ describe("Result.genSimple", () => {
     });
 
     it("should work with no yields", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         return 42;
       });
 
@@ -39,7 +39,7 @@ describe("Result.genSimple", () => {
     it("should short-circuit on first Err", () => {
       let reachedAfterErr = false;
 
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Ok(1);
         const b = yield* Result.Err<string, "error">("error");
         reachedAfterErr = true;
@@ -53,7 +53,7 @@ describe("Result.genSimple", () => {
     });
 
     it("should track intermediate variables", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Ok(10);
         const b = yield* Result.Ok(5);
         return a + b + a;
@@ -66,7 +66,7 @@ describe("Result.genSimple", () => {
 
   describe("type inference", () => {
     it("should infer return type correctly", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Ok(42);
         return a.toString();
       });
@@ -77,7 +77,7 @@ describe("Result.genSimple", () => {
     });
 
     it("should infer number return type", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Ok(1);
         const b = yield* Result.Ok(2);
         return a + b;
@@ -90,7 +90,7 @@ describe("Result.genSimple", () => {
     it("should infer complex return types", () => {
       type User = { name: string; age: number };
 
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const name = yield* Result.Ok("Alice");
         const age = yield* Result.Ok(30);
         return { name, age } as User;
@@ -109,7 +109,7 @@ describe("Result.genSimple", () => {
       const validateEven = (n: number): Result<number, "not_even"> =>
         n % 2 === 0 ? Result.Ok(n) : Result.Err("not_even");
 
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const input = yield* Result.Ok(4);
         const positive = yield* validatePositive(input);
         const even = yield* validateEven(positive);
@@ -124,7 +124,7 @@ describe("Result.genSimple", () => {
       const validatePositive = (n: number): Result<number, "not_positive"> =>
         n > 0 ? Result.Ok(n) : Result.Err("not_positive");
 
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const input = yield* Result.Ok(-2);
         const positive = yield* validatePositive(input);
         return positive;
@@ -138,7 +138,7 @@ describe("Result.genSimple", () => {
       const fetchValue = (n: number): Result<number, "fetch_error"> =>
         Result.Ok(n * 2);
 
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Ok(5);
         const b = yield* fetchValue(a);
         const c = yield* fetchValue(b);
@@ -152,7 +152,7 @@ describe("Result.genSimple", () => {
     it("should not execute functions after error", () => {
       const mockFn = mock(() => Result.Ok(10));
 
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const a = yield* Result.Err<string, "error">("error");
         const b = yield* mockFn();
         return a + b;
@@ -165,7 +165,7 @@ describe("Result.genSimple", () => {
 
   describe("edge cases", () => {
     it("should handle many yields without stack overflow", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         let sum = 0;
         for (let i = 0; i < 100; i++) {
           const value = yield* Result.Ok(i);
@@ -179,7 +179,7 @@ describe("Result.genSimple", () => {
     });
 
     it("should work with array operations", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const nums = yield* Result.Ok([1, 2, 3]);
         const doubled = nums.map((n) => n * 2);
         return doubled;
@@ -190,7 +190,7 @@ describe("Result.genSimple", () => {
     });
 
     it("should handle zero Ok values", () => {
-      const result = Result.genSimple(function* () {
+      const result = Result.gen(function* () {
         const value = yield* Result.Ok(0);
         return value;
       });
@@ -202,7 +202,7 @@ describe("Result.genSimple", () => {
 
   describe("comparison with flatMap", () => {
     it("should be equivalent to flatMap chain", () => {
-      const genResult = Result.genSimple(function* () {
+      const genResult = Result.gen(function* () {
         const a = yield* Result.Ok(1);
         const b = yield* Result.Ok(2);
         return a + b;

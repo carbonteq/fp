@@ -3,10 +3,10 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import { Result } from "@/result.js";
 
-describe("Result.gen (adapter)", () => {
+describe("Result.genAdapter", () => {
   describe("basic functionality", () => {
     it("should unwrap Ok values", () => {
-      const result = Result.gen(function* ($) {
+      const result = Result.genAdapter(function* ($) {
         const a = yield* $(Result.Ok(1));
         const b = yield* $(Result.Ok(2));
         return a + b;
@@ -19,7 +19,7 @@ describe("Result.gen (adapter)", () => {
     it("should short-circuit on Err", () => {
       let reached = false;
 
-      const result = Result.gen(function* ($) {
+      const result = Result.genAdapter(function* ($) {
         const a = yield* $(Result.Ok(1));
         const b = yield* $(Result.Err("error" as const));
         reached = true;
@@ -32,7 +32,7 @@ describe("Result.gen (adapter)", () => {
     });
 
     it("should work with no yields", () => {
-      const result = Result.gen(function* (_$) {
+      const result = Result.genAdapter(function* (_$) {
         return 42;
       });
 
@@ -43,7 +43,7 @@ describe("Result.gen (adapter)", () => {
 
   describe("type inference", () => {
     it("should infer return type correctly", () => {
-      const r = Result.gen(function* ($) {
+      const r = Result.genAdapter(function* ($) {
         const a = yield* $(Result.Ok(42));
         return a.toString();
       });
@@ -54,7 +54,7 @@ describe("Result.gen (adapter)", () => {
       type E1 = "error1";
       type E2 = "error2";
 
-      const r = Result.gen(function* ($) {
+      const r = Result.genAdapter(function* ($) {
         const a = yield* $(Result.Ok<number, E1>(1));
         const b = yield* $(Result.Ok<string, E2>("x"));
         return a + b.length;
@@ -64,7 +64,7 @@ describe("Result.gen (adapter)", () => {
     });
 
     it("should infer never for error when all Ok", () => {
-      const r = Result.gen(function* ($) {
+      const r = Result.genAdapter(function* ($) {
         const a = yield* $(Result.Ok(1));
         const b = yield* $(Result.Ok(2));
         return a + b;
@@ -74,16 +74,16 @@ describe("Result.gen (adapter)", () => {
     });
 
     it("should preserve value types through yields", () => {
-      const r = Result.gen(function* ($) {
+      const r = Result.genAdapter(function* ($) {
         const num = yield* $(Result.Ok(42));
         const str = yield* $(Result.Ok("hello"));
         const obj = yield* $(Result.Ok({ x: 1 }));
-
+      
         // These should all have correct types
         expectTypeOf(num).toBeNumber();
         expectTypeOf(str).toBeString();
         expectTypeOf(obj).toEqualTypeOf<{ x: number }>();
-
+      
         return { num, str, obj };
       });
 
@@ -99,7 +99,7 @@ describe("Result.gen (adapter)", () => {
       const validateEven = (n: number): Result<number, "not_even"> =>
         n % 2 === 0 ? Result.Ok(n) : Result.Err("not_even");
 
-      const result = Result.gen(function* ($) {
+      const result = Result.genAdapter(function* ($) {
         const a = yield* $(validatePositive(4));
         const b = yield* $(validateEven(a));
         return b * 2;
@@ -131,7 +131,7 @@ describe("Result.gen (adapter)", () => {
         email: string,
         password: string,
       ): Result<User, ValidationError | DbError> =>
-        Result.gen(function* ($) {
+        Result.genAdapter(function* ($) {
           const validEmail = yield* $(validateEmail(email));
           const validPassword = yield* $(validatePassword(password));
           const user = yield* $(createUser(validEmail, validPassword));
@@ -149,14 +149,14 @@ describe("Result.gen (adapter)", () => {
 
   describe("variable reuse", () => {
     it("should allow reusing intermediate values", () => {
-      const result = Result.gen(function* ($) {
+      const result = Result.genAdapter(function* ($) {
         const config = yield* $(Result.Ok({ multiplier: 2, offset: 10 }));
         const base = yield* $(Result.Ok(5));
-
+      
         // Reuse config multiple times
         const scaled = base * config.multiplier;
         const final = scaled + config.offset;
-
+      
         return final;
       });
 
@@ -166,13 +166,13 @@ describe("Result.gen (adapter)", () => {
 
   describe("comparison with genSimple", () => {
     it("should produce same result as genSimple", () => {
-      const genResult = Result.gen(function* ($) {
+      const genResult = Result.genAdapter(function* ($) {
         const a = yield* $(Result.Ok(1));
         const b = yield* $(Result.Ok(2));
         return a + b;
       });
 
-      const genSimpleResult = Result.genSimple(function* () {
+      const genSimpleResult = Result.gen(function* () {
         const a = yield* Result.Ok(1);
         const b = yield* Result.Ok(2);
         return a + b;

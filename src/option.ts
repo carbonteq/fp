@@ -137,7 +137,7 @@ export class Option<T> {
    *
    * @example
    * ```ts
-   * const result = Option.genSimple(function* () {
+   * const result = Option.gen(function* () {
    *   const a = yield* Option.Some(1);
    *   const b = yield* Option.Some(2);
    *   return a + b;
@@ -145,7 +145,7 @@ export class Option<T> {
    * // Option<number>
    * ```
    */
-  static genSimple<T>(
+  static gen<T>(
     genFn: () => Generator<Option<unknown>, T, unknown>,
   ): Option<T> {
     const iterator = genFn();
@@ -188,7 +188,7 @@ export class Option<T> {
    *
    * @example
    * ```ts
-   * const result = Option.gen(function* ($) {
+   * const result = Option.genAdapter(function* ($) {
    *   const a = yield* $(Option.Some(1));
    *   const b = yield* $(Option.Some(2));
    *   return a + b;
@@ -196,7 +196,7 @@ export class Option<T> {
    * // Option<number>
    * ```
    */
-  static gen<Eff extends OptionYieldWrap<any>, T>(
+  static genAdapter<Eff extends OptionYieldWrap<any>, T>(
     genFn: (
       adapter: <A>(option: Option<A>) => OptionYieldWrap<A>,
     ) => Generator<Eff, T, any>,
@@ -663,7 +663,7 @@ export class Option<T> {
    *
    * @example
    * ```ts
-   * const result = Option.genSimple(function* () {
+   * const result = Option.gen(function* () {
    *   const value = yield* Option.Some(42);
    *   return value * 2;
    * });
