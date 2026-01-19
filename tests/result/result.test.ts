@@ -526,10 +526,11 @@ describe("Result type inference", () => {
     });
 
     it("should correctly type orElse", () => {
-      const r = Result.Err<Error, number>(new Error());
+      const r = Result.Err<Error, string>(new Error());
+
       expectTypeOf(
         r.orElse((_e) => Result.Ok<string, TypeError>("fallback")),
-      ).toEqualTypeOf<Result<number | string, TypeError>>();
+      ).toEqualTypeOf<Result<string, TypeError>>();
     });
 
     it("should correctly type tap (returns same type)", () => {

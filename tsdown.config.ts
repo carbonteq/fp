@@ -1,6 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig((_options) => ({
+  tsconfig: "./tsconfig.build.json",
   entry: ["./src/**/*.ts", "!./src/**/*_old.ts"],
   format: ["esm", "cjs"],
   sourcemap: true,

@@ -1157,7 +1157,7 @@ export class Result<T, E> {
     this: Result<Array<In>, E>,
     mapper: (val: NoInfer<In>) => Out,
   ): Result<Array<Out>, E> {
-    if (this.isErr()) return this as unknown as Result<Array<Out>, E>;
+    if (this.isErr()) return this as Result<Array<Out>, E>;
 
     if (Array.isArray(this.#val)) {
       return new Result(this.#val.map(mapper), this.#err, this.#ctx, "Ok");
@@ -1167,9 +1167,19 @@ export class Result<T, E> {
   }
 
   /** Recover from error by providing fallback Result */
-  orElse<T2, E2>(fn: (err: E) => Result<T2, E2>): Result<T | T2, E2> {
-    if (this.isOk()) return this as unknown as Result<T | T2, E2>;
-    return fn(this.getErr());
+  orElse<E2>(fn: (err: E) => Result<T, E2>): Result<T, E2>;
+  orElse<E2>(fn: (err: E) => Promise<Result<T, E2>>): Result<Promise<T>, E2>;
+  orElse<E2>(
+    fn: (err: E) => Result<T, E2> | Promise<Result<T, E2>>,
+  ): Result<T, E2> | Result<Promise<T>, E2> {
+    if (this.isOk()) return this as Result<T, E2>;
+
+    const r = fn(this.getErr());
+    if (isPromiseLike(r)) {
+      return Result.fromPromise(r);
+    }
+
+    return r;
   }
 
   /**

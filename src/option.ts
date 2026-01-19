@@ -515,13 +515,14 @@ export class Option<T> {
   mapOr<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     defaultVal: U,
-    fn: Mapper<Curr, U>,
+    fn: AsyncMapper<Curr, U>,
   ): Promise<U>;
   mapOr<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     defaultVal: U,
-    fn: AsyncMapper<Curr, U>,
+    fn: Mapper<Curr, U>,
   ): Promise<U>;
+  mapOr<U>(this: Option<T>, defaultVal: U, fn: AsyncMapper<T, U>): Promise<U>;
   mapOr<U>(this: Option<T>, defaultVal: U, fn: Mapper<T, U>): U;
   mapOr<U, Curr = Awaited<T>>(
     defaultVal: U,
