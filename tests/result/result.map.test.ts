@@ -14,59 +14,13 @@ const errResIt = (_n: number) => Result.Err(new DummyError());
 const asyncErrResIt = async (_n: number) => Result.Err(new DummyError());
 
 describe("Result.map behavior", () => {
-  it("should transform an Ok value that is a Promise asynchronously", async () => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = mock(asyncDoubleIt);
-    const mockerB = mock(asyncDoubleIt);
-    const mapped = await r.map(mockerA).map(mockerB).toPromise();
-
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(8);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-  });
-
-  it("should not transform an Err value that is a Promise asynchronously", async () => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = mock(asyncDoubleIt);
-    const mockerB = mock(asyncDoubleIt);
-    const mapped = await r.map(mockerA).map(mockerB).toPromise();
-
-    expect(mapped.isErr()).toBeTrue();
-    expect(mapped.safeUnwrap()).toBeNull();
-    expect(mockerA).not.toHaveBeenCalled();
-    expect(mockerB).not.toHaveBeenCalled();
-  });
-
-  it("should transform an Ok value that is a Promise synchronously", async () => {
-    const r = Result.Ok(Promise.resolve(2));
-    const mockerA = mock(doubleIt);
-    const mockerB = mock(doubleIt);
-    const mapped = await r.map(mockerA).map(mockerB).toPromise();
-
-    expect(mapped.isOk()).toBeTrue();
-    expect(mapped.unwrap()).toBe(8);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-  });
-
-  it("should not transform an Err value that is a Promise synchronously", () => {
-    const r = Result.Err(Promise.resolve(new DummyError()));
-    const mockerA = mock(doubleIt);
-    const mockerB = mock(doubleIt);
-    const mapped = r.map(mockerA).map(mockerB);
-
-    expect(mapped.isErr()).toBeTrue();
-    expect(mapped.safeUnwrap()).toBeNull();
-    expect(mockerA).not.toHaveBeenCalled();
-    expect(mockerB).not.toHaveBeenCalled();
-  });
-
-  it("should transform an Ok value asynchronously", async () => {
+  it("should transform an Ok value asynchronously with mapAsync", async () => {
     const r = Result.Ok(2);
     const mockerA = mock(asyncDoubleIt);
     const mockerB = mock(asyncDoubleIt);
-    const mapped = await r.map(mockerA).map(mockerB).toPromise();
+    const mapped = await r
+      .mapAsync(mockerA)
+      .then((r) => r.mapAsync(mockerB).then((r2) => r2));
 
     expect(mapped.isOk()).toBeTrue();
     expect(mapped.unwrap()).toBe(8);
@@ -74,11 +28,13 @@ describe("Result.map behavior", () => {
     expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("should not transform an Err value asynchronously", async () => {
+  it("should not transform an Err value asynchronously with mapAsync", async () => {
     const r = Result.Err(new DummyError());
     const mockerA = mock(asyncDoubleIt);
     const mockerB = mock(asyncDoubleIt);
-    const mapped = await r.map(mockerA).map(mockerB).toPromise();
+    const mapped = await r
+      .mapAsync(mockerA)
+      .then((r) => r.mapAsync(mockerB).then((r2) => r2));
 
     expect(mapped.isErr()).toBeTrue();
     expect(mapped.safeUnwrap()).toBeNull();
@@ -123,12 +79,12 @@ describe("Result.map behavior", () => {
     expect(mockerB).not.toHaveBeenCalled();
   });
 
-  it("should not call mappers if starting from Err (async)", () => {
+  it("should not call mappers if starting from Err (async)", async () => {
     const mockerA = mock(asyncDoubleIt);
     const mockerB = mock(asyncDoubleIt);
 
     const r = Result.Err(new DummyError());
-    const mapped = r.map(mockerA).map(mockerB);
+    const mapped = await r.mapAsync(mockerA);
 
     expect(mapped.isErr()).toBeTrue();
     expect(() => mapped.unwrap()).toThrow(DummyError);
@@ -164,9 +120,9 @@ describe("Result.map behavior", () => {
       const mockerA = mock(asyncDoubleIt);
       const mockerB = mock(asyncDoubleIt);
       const mockerC = mock(asyncErrResIt);
-      const r1 = await r.map(mockerA).toPromise();
-      const r2 = await r.map(mockerB).toPromise();
-      const r3 = await r.flatMap(mockerC).toPromise();
+      const r1 = await r.mapAsync(mockerA);
+      const r2 = await r.mapAsync(mockerB);
+      const r3 = await r.flatMapAsync(mockerC);
 
       expect(r.isOk()).toBeTrue();
       expect(r1.isOk()).toBeTrue();
@@ -180,78 +136,74 @@ describe("Result.map behavior", () => {
       expect(mockerB).toHaveBeenCalledTimes(1);
       expect(mockerC).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it("two chained branches of computation starting from Promise should not affect parent or each other", async () => {
-      const r = Result.Ok(Promise.resolve(2));
+  describe("permutations", () => {
+    it("P1 - sync then async", async () => {
+      const r = Result.Ok(2);
+
       const mockerA = mock(doubleIt);
-      const mockerB = mock(doubleIt);
-      const mockerC = mock(errResIt);
-      const r1 = await r.map(mockerA).toPromise();
-      const r2 = await r.map(mockerB).toPromise();
-      const r3 = await r.flatMap(mockerC).toPromise();
+      const mockerB = mock(asyncDoubleIt);
 
-      expect(r.isOk()).toBeTrue();
-      expect(r1.isOk()).toBeTrue();
-      expect(r2.isOk()).toBeTrue();
-      expect(r3.isErr()).toBeTrue();
-      expect(await r.unwrap()).toBe(2);
-      expect(r1.unwrap()).toBe(4);
-      expect(r2.unwrap()).toBe(4);
-      expect(() => r3.unwrap()).toThrow(DummyError);
+      // Do sync map first, then async map
+      const syncMapped = r.map(mockerA);
+      const mapped = await syncMapped.mapAsync(mockerB);
+
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(8);
       expect(mockerA).toHaveBeenCalledTimes(1);
       expect(mockerB).toHaveBeenCalledTimes(1);
-      expect(mockerC).toHaveBeenCalledTimes(1);
     });
 
-    it("two chained branches of computation starting from Promise should not affect parent or each other (async)", async () => {
-      const r = Result.Ok(Promise.resolve(2));
+    it("P2 - async then sync", async () => {
+      const r = Result.Ok(2);
+
+      const mockerA = mock(doubleIt);
+      const mockerB = mock(asyncDoubleIt);
+
+      const mapped = await r.mapAsync(mockerB).then((res) => res.map(mockerA));
+
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(8);
+      expect(mockerA).toHaveBeenCalledTimes(1);
+      expect(mockerB).toHaveBeenCalledTimes(1);
+    });
+
+    it("P3 - chaining multiple async maps", async () => {
+      const r = Result.Ok(2);
+
       const mockerA = mock(asyncDoubleIt);
       const mockerB = mock(asyncDoubleIt);
-      const mockerC = mock(asyncErrResIt);
-      const r1 = await r.map(mockerA).toPromise();
-      const r2 = await r.map(mockerB).toPromise();
-      const r3 = await r.flatMap(mockerC).toPromise();
+      const mockerC = mock(asyncDoubleIt);
 
-      expect(r.isOk()).toBeTrue();
-      expect(r1.isOk()).toBeTrue();
-      expect(r2.isOk()).toBeTrue();
-      expect(r3.isErr()).toBeTrue();
-      expect(await r.unwrap()).toBe(2);
-      expect(r1.unwrap()).toBe(4);
-      expect(r2.unwrap()).toBe(4);
-      expect(() => r3.unwrap()).toThrow(DummyError);
+      const mapped = await r
+        .mapAsync(mockerA)
+        .then((res) => res.mapAsync(mockerB))
+        .then((res) => res.mapAsync(mockerC));
+
+      expect(mapped.isOk()).toBeTrue();
+      expect(mapped.unwrap()).toBe(16);
       expect(mockerA).toHaveBeenCalledTimes(1);
       expect(mockerB).toHaveBeenCalledTimes(1);
       expect(mockerC).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("permutations", () => {
-    it("P1", async () => {
-      const r = Result.Ok(2);
-
-      const mockerA = mock(doubleIt);
-      const mockerB = mock(asyncDoubleIt);
-
-      const mapped = await r.map(mockerA).map(mockerB).toPromise();
-
-      expect(mapped.isOk()).toBeTrue();
-      expect(mapped.unwrap()).toBe(8);
-      expect(mockerA).toHaveBeenCalledTimes(1);
-      expect(mockerB).toHaveBeenCalledTimes(1);
+  describe("mapAsync returns Promise", () => {
+    it("mapAsync should return a Promise", async () => {
+      const r = Result.Ok(5);
+      const result = r.mapAsync(async (x) => x * 2);
+      expect(result).toBeInstanceOf(Promise);
+      const resolved = await result;
+      expect(resolved.unwrap()).toBe(10);
     });
-    it("P2", async () => {
-      const r = Result.Ok(2);
 
-      const mockerA = mock(doubleIt);
-      const mockerB = mock(asyncDoubleIt);
-
-      const mapped = await r.map(mockerB).map(mockerA).toPromise();
-
-      expect(mapped.isOk()).toBeTrue();
-      expect(mapped.unwrap()).toBe(8);
-      expect(mockerA).toHaveBeenCalledTimes(1);
-      expect(mockerB).toHaveBeenCalledTimes(1);
+    it("mapAsync should handle errors", async () => {
+      const r = Result.Ok(5);
+      const result = await r.mapAsync(async () => {
+        throw new Error("test error");
+      });
+      expect(result.isErr()).toBeTrue();
     });
   });
 });

@@ -96,20 +96,21 @@ const fetchAllUserData = async (userId: number) => {
 const allData = await fetchAllUserData(1);
 console.log("5. Fetch all user data:", allData.unwrap()); // { user: { id: 1, name: "User 1" }, posts: [...], settings: { theme: "dark" } }
 
-// Example 6: asyncGenAdapter with Result<Promise<T>, E>
-const autoAwait = await Result.asyncGenAdapter(async function* ($) {
-  // Result.map with async function returns Result<Promise<T>, E>
-  const asyncMapped = Result.Ok(5).map(async (x) => {
-    await delay(10);
-    return x * 2;
+// Example 6: asyncGenAdapter with async transformation
+const doubleAsync = async (n: number): Promise<number> => {
+  await delay(10);
+  return n * 2;
+};
+
+const autoAwait = (async () => {
+  const gen = Result.asyncGenAdapter(async function* ($) {
+    const value = yield* $(Result.Ok(5));
+    const doubled = await doubleAsync(value);
+    return doubled;
   });
-
-  // asyncGenAdapter automatically awaits the inner promise
-  const value = yield* $(asyncMapped);
-
-  return value;
-});
-console.log("6. Auto-await inner promise:", autoAwait.unwrap()); // 10
+  return gen;
+})();
+console.log("6. Async transformation:", (await autoAwait).unwrap()); // 10
 
 // Example 7: asyncGenAdapter with complex validation
 type ValidationError =
@@ -248,11 +249,11 @@ const fetchWithFallbackAsync = async (
   // Try primary first
   let result = await fetchWithRetryAsync(primaryUrl);
 
-  // Try fallbacks in sequence using orElse
+  // Try fallbacks in sequence (orElse is synchronous)
   for (const url of fallbackUrls) {
-    result = await result
-      .orElse(async () => fetchWithRetryAsync(url))
-      .toPromise();
+    if (result.isErr()) {
+      result = await fetchWithRetryAsync(url);
+    }
   }
 
   return result;
@@ -307,55 +308,52 @@ const pipelineResult = await processDataPipelineAsync({ input: "42" });
 console.log("10. Data pipeline:", pipelineResult.unwrap()); // { value: 42, valid: true, timestamp: ... }
 
 // Example 11: asyncGenAdapter with array operations
+const doubleArrayAsync = async (arr: number[]): Promise<number[]> => {
+  await delay(5);
+  return arr.map((x) => x * 2);
+};
+
+const filterArrayAsync = async (arr: number[]): Promise<number[]> => {
+  await delay(5);
+  return arr.filter((x) => x > 5);
+};
+
+const sumArrayAsync = async (arr: number[]): Promise<number> => {
+  await delay(5);
+  return arr.reduce((a, b) => a + b, 0);
+};
+
 const processItemsAsync = async (items: number[]) => {
-  return Result.asyncGenAdapter(async function* ($) {
-    // Async map
-    const doubled = yield* $(
-      Result.Ok(items).map(async (arr) => {
-        await delay(5);
-        return arr.map((x) => x * 2);
-      }),
-    );
-
-    // Async filter
-    const filtered = yield* $(
-      Result.Ok(doubled).map(async (arr) => {
-        await delay(5);
-        return arr.filter((x) => x > 5);
-      }),
-    );
-
-    // Async reduce
-    const sum = yield* $(
-      Result.Ok(filtered).map(async (arr) => {
-        await delay(5);
-        return arr.reduce((a, b) => a + b, 0);
-      }),
-    );
-
+  const gen = Result.asyncGenAdapter(async function* ($) {
+    const arr = yield* $(Result.Ok(items));
+    const doubled = await doubleArrayAsync(arr);
+    const filtered = await filterArrayAsync(doubled);
+    const sum = await sumArrayAsync(filtered);
     return sum;
   });
+  return gen;
 };
 const itemsResult = await processItemsAsync([1, 2, 3, 4, 5]);
-console.log("11. Process items:", itemsResult.unwrap()); // 24 (6 + 8 + 10)
+console.log("11. Process items:", (await itemsResult).unwrap()); // 24 (6 + 8 + 10)
 
 // Example 12: asyncGenAdapter with conditional logic
-const conditionalAsync = await Result.asyncGenAdapter(async function* ($) {
-  const input = yield* $(Result.Ok(5));
+const conditionalAsync = (async () => {
+  const gen = Result.asyncGenAdapter(async function* ($) {
+    const input = yield* $(Result.Ok(5));
 
-  if (input > 0) {
-    const result = yield* $(
-      Result.Ok(input).map(async (x) => {
+    if (input > 0) {
+      const result = await (async (x: number) => {
         await delay(5);
         return x * 2;
-      }),
-    );
-    return { value: result, source: "doubled" as const };
-  }
+      })(input);
+      return { value: result, source: "doubled" as const };
+    }
 
-  return { value: input, source: "original" as const };
-});
-console.log("12. Conditional async:", conditionalAsync.unwrap()); // { value: 10, source: "doubled" }
+    return { value: input, source: "original" as const };
+  });
+  return gen;
+})();
+console.log("12. Conditional async:", (await conditionalAsync).unwrap()); // { value: 10, source: "doubled" }
 
 // Example 13: asyncGenAdapter for batch operations
 const batchFetchAsync = async (ids: number[]) => {
@@ -394,19 +392,20 @@ const fetchUserProfile = async (userId: number) => {
 const profile = await fetchUserProfile(1);
 console.log("14. User profile:", profile.unwrap()); // { user: ..., posts: [...], settings: { theme: "dark" }, notifications: { unread: 5 } }
 
-// Example 15: asyncGenAdapter with toPromise
+// Example 15: asyncGenAdapter with async transformation
+const transformItemsAsync = async (
+  items: number[],
+): Promise<Result<number[], "transform_error">> => {
+  await delay(5);
+  return Result.Ok(items.map((x) => x * 2));
+};
+
 const withToPromise = await Result.asyncGenAdapter(async function* ($) {
-  const asyncMapped = Result.Ok([1, 2, 3]).map(async (arr) => {
-    await delay(5);
-    return arr.map((x) => x * 2);
-  });
-
-  // toPromise resolves Result<Promise<T>, E> to Result<T, E>
-  const resolved = yield* $(await asyncMapped.toPromise());
-
+  const arr = yield* $(Result.Ok([1, 2, 3]));
+  const resolved = yield* $(await transformItemsAsync(arr));
   return resolved;
 });
-console.log("15. With toPromise:", withToPromise.unwrap()); // [2, 4, 6]
+console.log("15. Async transformation:", withToPromise.unwrap()); // [2, 4, 6]
 
 // Example 16: asyncGenAdapter for complex workflow
 type Order = { id: number; items: string[]; total: number };
@@ -495,26 +494,27 @@ const configsResult = await fetchAllConfigsAsync(["api_key", "timeout"]);
 console.log("17. Fetch all configs:", configsResult.unwrap()); // { api_key: "secret123", timeout: "5000" }
 
 // Example 18: asyncGenAdapter with nested operations
-const nested = await Result.asyncGenAdapter(async function* ($) {
-  const outer = yield* $(Result.Ok(5));
+const nested = (async () => {
+  const gen = Result.asyncGenAdapter(async function* ($) {
+    const outer = yield* $(Result.Ok(5));
 
-  // Nested asyncGenAdapter call - returns a Result, so we yield* to flatten it
-  const inner = yield* $(
-    await Result.asyncGenAdapter(async function* ($) {
-      const a = yield* $(Result.Ok(outer));
-      const b = yield* $(
-        Result.Ok(a).map(async (x) => {
+    // Nested asyncGenAdapter call - returns a Result, so we yield* to flatten it
+    const inner = yield* $(
+      await Result.asyncGenAdapter(async function* ($) {
+        const a = yield* $(Result.Ok(outer));
+        const b = await (async (x: number) => {
           await delay(5);
           return x * 2;
-        }),
-      );
-      return b;
-    }),
-  );
+        })(a);
+        return b;
+      }),
+    );
 
-  return inner;
-});
-console.log("18. Nested:", nested.unwrap()); // 10
+    return inner;
+  });
+  return gen;
+})();
+console.log("18. Nested:", (await nested).unwrap()); // 10
 
 // Example 19: asyncGenAdapter vs asyncGen - same result
 const asyncGenResult = await Result.asyncGen(async function* () {

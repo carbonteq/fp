@@ -33,9 +33,11 @@ const result = Result.Ok(10)
   .map((x) => x.toString());
 console.log("3. Chain maps:", result.unwrap()); // "30"
 
-const userId = Result.Ok(42);
+// Example 4: Map to object
+type UserId = number;
 type User = { id: UserId; name: string };
 
+const userId = Result.Ok<UserId>(42);
 const user = userId.map((id): User => ({ id, name: `User ${id}` }));
 console.log("4. Map to object:", user.unwrap()); // { id: 42, name: "User 42" }
 
@@ -45,19 +47,8 @@ const parsed = Result.Ok("123")
   .map((num) => num * 2);
 console.log("5. Parse and double:", parsed.unwrap()); // 246
 
-// Example 6: Map with async function
-// Note: map(async fn) returns Result<Promise<T>, E>
-const asyncResult = Result.Ok(5).map(async (x) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return x * 2;
-});
-
-console.log("6. Map with async fn:", asyncResult); // Result<Promise<...>>
-
-// Resolve the async result
-asyncResult.unwrap().then((value) => {
-  console.log("   Resolved:", value); // 10
-});
+// Example 6: Map is synchronous - for async operations, use gen.async* methods
+// See 07-asyncGen.ts and 08-asyncGenAdapter.ts for async patterns
 
 // Example 7: Map with array operations
 const numbers = Result.Ok([1, 2, 3, 4, 5]);
@@ -65,18 +56,5 @@ const sumSquared = numbers
   .map((arr) => arr.filter((x) => x % 2 === 0))
   .map((arr) => arr.reduce((sum, x) => sum + x, 0));
 console.log("7. Filter and sum:", sumSquared.unwrap()); // 6 (2 + 4)
-
-// Example 8: Map for type transformation
-type UserId = number;
-type SerializedUser = { user_id: UserId; display_name: string };
-
-const userId2: Result<UserId, string> = Result.Ok(123);
-const serialized = userId2.map(
-  (id): SerializedUser => ({
-    user_id: id,
-    display_name: `User_${id}`,
-  }),
-);
-console.log("8. Type transformation:", serialized.unwrap()); // { user_id: 123, display_name: "User_123" }
 
 console.log("\n=== All map examples completed ===");

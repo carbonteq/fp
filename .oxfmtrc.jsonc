@@ -9,7 +9,8 @@
     "**/*.json",
     "**/*.jsonc",
     "**/*.md",
-    "**/*.toml"
+    "**/*.toml",
+    "**/*.yml"
   ],
   "printWidth": 80, // like biome
   "useTabs": false,

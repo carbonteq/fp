@@ -190,16 +190,14 @@ describe("Result.asyncGenAdapter", () => {
   });
 
   describe("sync Result with async map/flatMap", () => {
-    it("should handle Result.Ok(x).map(asyncFunc).toPromise() via adapter", async () => {
+    it("should handle Result.Ok(x).mapAsync(asyncFunc) via adapter", async () => {
       const asyncDouble = async (n: number): Promise<number> => {
         await delay(5);
         return n * 2;
       };
 
       const result = await Result.asyncGenAdapter(async function* ($) {
-        const mapped = Result.Ok<number, string>(3)
-          .map(asyncDouble)
-          .toPromise();
+        const mapped = await Result.Ok<number, string>(3).mapAsync(asyncDouble);
         const value = yield* $(mapped);
         return value;
       });
@@ -209,7 +207,7 @@ describe("Result.asyncGenAdapter", () => {
       expect(result.unwrap()).toBe(6);
     });
 
-    it("should handle Result.Ok(x).flatMap(asyncFunc).toPromise() via adapter", async () => {
+    it("should handle Result.Ok(x).flatMapAsync(asyncFunc) via adapter", async () => {
       const asyncValidate = async (
         n: number,
       ): Promise<Result<number, string>> => {
@@ -218,9 +216,9 @@ describe("Result.asyncGenAdapter", () => {
       };
 
       const result = await Result.asyncGenAdapter(async function* ($) {
-        const mapped = Result.Ok<number, string>(5)
-          .flatMap(asyncValidate)
-          .toPromise();
+        const mapped = await Result.Ok<number, string>(5).flatMapAsync(
+          asyncValidate,
+        );
         const value = yield* $(mapped);
         return value;
       });
@@ -241,9 +239,9 @@ describe("Result.asyncGenAdapter", () => {
       let reachedAfterErr = false;
 
       const result = await Result.asyncGenAdapter(async function* ($) {
-        const mapped = Result.Ok<number, string>(-5)
-          .flatMap(asyncValidate)
-          .toPromise();
+        const mapped = await Result.Ok<number, string>(-5).flatMapAsync(
+          asyncValidate,
+        );
         const value = yield* $(mapped);
         reachedAfterErr = true;
         return value + 100;
@@ -262,9 +260,8 @@ describe("Result.asyncGenAdapter", () => {
 
       const result = await Result.asyncGenAdapter(async function* ($) {
         const first = yield* $(Result.Ok<string, string>("hello"));
-        const transformed = yield* $(
-          Result.Ok<string, string>(first).map(asyncTransform).toPromise(),
-        );
+        // first is a string, so just call async transform directly
+        const transformed = await asyncTransform(first);
         const final = yield* $(Result.Ok(`${transformed}!`));
         return final;
       });
@@ -275,16 +272,15 @@ describe("Result.asyncGenAdapter", () => {
     });
   });
 
-  describe("Result<Promise<T>, E> automatic awaiting", () => {
-    it("should automatically await inner promise and return T not Promise<T>", async () => {
-      const promiseFunc = (n: number): Result<Promise<number>, string> => {
-        return Result.Ok(Promise.resolve(n * 2));
+  describe("Promise<Result<T, E>> handling", () => {
+    it("should handle Promise<Result<T, E>> yields", async () => {
+      const promiseFunc = (n: number): Promise<Result<number, string>> => {
+        return Promise.resolve(Result.Ok(n * 2));
       };
 
       const result = await Result.asyncGenAdapter(async function* ($) {
         const value = yield* $(promiseFunc(21));
 
-        // value should be number, not Promise<number>
         expectTypeOf(value).toEqualTypeOf<number>();
         return value;
       });
@@ -294,18 +290,15 @@ describe("Result.asyncGenAdapter", () => {
       expect(result.unwrap()).toBe(42);
     });
 
-    it("should handle Result.map returning Promise", async () => {
+    it("should handle Promise<Result<T, E>> from mapAsync", async () => {
       const asyncDouble = async (n: number): Promise<number> => {
         await delay(5);
         return n * 2;
       };
 
-      // Result.Ok(3).map(asyncDouble) returns Result<Promise<number>, never>
-      const resultWithPromise = Result.Ok(3).map(asyncDouble);
-
       const result = await Result.asyncGenAdapter(async function* ($) {
-        // Yielding Result<Promise<number>, never> should give us number
-        const value = yield* $(resultWithPromise);
+        // Use mapAsync which returns Promise<Result<number, never>>
+        const value = yield* $(await Result.Ok(3).mapAsync(asyncDouble));
 
         expectTypeOf(value).toEqualTypeOf<number>();
         return value + 10;
@@ -318,7 +311,9 @@ describe("Result.asyncGenAdapter", () => {
 
     it("should handle mixed sync and async inner values", async () => {
       const syncResult = Result.Ok<number, "err1">(10);
-      const asyncResult = Result.Ok<number, "err2">(5).map(async (n) => n * 3);
+      const asyncResult = await Result.Ok<number, "err2">(5).mapAsync(
+        async (n) => n * 3,
+      );
 
       const result = await Result.asyncGenAdapter(async function* ($) {
         const a = yield* $(syncResult);
@@ -336,7 +331,9 @@ describe("Result.asyncGenAdapter", () => {
     });
 
     it("should short-circuit on Err and not yield subsequent values", async () => {
-      const mockFn = mock((n: number) => Result.Ok(n).map(async (x) => x * 2));
+      const mockFn = mock(
+        async (n: number) => await Result.Ok(n).mapAsync(async (x) => x * 2),
+      );
 
       const result = await Result.asyncGenAdapter(async function* ($) {
         const a = yield* $(Result.Err<"error", number>("error"));
@@ -480,7 +477,7 @@ describe("Result.asyncGenAdapter", () => {
         throw new Error("Network error");
       };
 
-      await expect(
+      expect(
         Result.asyncGenAdapter(async function* ($) {
           const value = yield* $(failingFetch());
           return value;

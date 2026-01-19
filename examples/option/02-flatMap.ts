@@ -127,19 +127,8 @@ const getUserEmail = (id: string): Option<string> => {
 console.log("8. User with email:", getUserEmail("user-123").unwrap()); // "alice@example.com"
 console.log("   User without email:", getUserEmail("user-456")._tag); // "None"
 
-// Example 9: flatMap with async function
-const asyncValidate = async (n: number): Promise<Option<number>> => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return n > 0 ? Option.Some(n) : Option.None;
-};
-
-const asyncResult = Option.Some(5).flatMap((n) => asyncValidate(n));
-console.log("9. Async flatMap:", asyncResult); // Option<Promise<...>>
-
-(async () => {
-  const awaited = await asyncResult.unwrap();
-  console.log("   Resolved:", awaited); // 5
-})();
+// Example 9: flatMap is synchronous - for async operations, use gen.async* methods
+// See 07-asyncGen.ts and 08-asyncGenAdapter.ts for async patterns
 
 // Example 10: Nested object access with flatMap
 type Address = { street: string; city: string };
@@ -159,11 +148,11 @@ const emp1: Employee = {
 const emp2: Employee = { name: "Bob", company: { name: "Acme" } };
 const emp3: Employee = { name: "Charlie" };
 
-console.log("10. Employee with city:", getEmployeeCity(emp1).unwrap()); // "NYC"
+console.log("9. Employee with city:", getEmployeeCity(emp1).unwrap()); // "NYC"
 console.log("    Employee without address:", getEmployeeCity(emp2)._tag); // "None"
 console.log("    Employee without company:", getEmployeeCity(emp3)._tag); // "None"
 
-// Example 11: flatMap for safe array element access
+// Example 10: flatMap for safe array element access
 const safeGetElement = <T>(arr: T[], index: number): Option<T> => {
   return index >= 0 && index < arr.length
     ? Option.Some(arr[index])
@@ -174,18 +163,18 @@ const getSecondElement = <T>(arr: T[]): Option<T> => {
   return safeGetElement(arr, 1);
 };
 
-console.log("11. Second element:", getSecondElement([1, 2, 3]).unwrap()); // 2
+console.log("10. Second element:", getSecondElement([1, 2, 3]).unwrap()); // 2
 console.log("    Out of bounds:", getSecondElement([1])._tag); // "None"
 
-// Example 12: flatMap with Option.all
+// Example 11: flatMap with Option.all
 const getAllUsers = (...ids: UserId[]): Option<User[]> => {
   return Option.all(...ids.map((id) => getUser(id)));
 };
 
-console.log("12. All users found:", getAllUsers(1, 2).unwrap()); // [{ id: 1, ... }, { id: 2, ... }]
+console.log("11. All users found:", getAllUsers(1, 2).unwrap()); // [{ id: 1, ... }, { id: 2, ... }]
 console.log("    Some users missing:", getAllUsers(1, 999)._tag); // "None"
 
-// Example 13: flatMap for parsing and validating JSON
+// Example 12: flatMap for parsing and validating JSON
 const safeParseJSON = (json: string): Option<unknown> => {
   try {
     return Option.Some(JSON.parse(json));
@@ -203,13 +192,13 @@ const parseAndValidateString = (json: string): Option<string> => {
 };
 
 console.log(
-  "13. Valid JSON string:",
+  "12. Valid JSON string:",
   parseAndValidateString('"hello"').unwrap(),
 ); // "hello"
 console.log("    Invalid JSON:", parseAndValidateString("invalid")._tag); // "None"
 console.log("    Non-string JSON:", parseAndValidateString("123")._tag); // "None"
 
-// Example 14: flatMap for configuration lookup
+// Example 13: flatMap for configuration lookup
 type Config = {
   api?: { key?: string; endpoint?: string };
   database?: { host?: string; port?: number };
@@ -225,13 +214,13 @@ const getApiEndpoint = (cfg: Config): Option<string> => {
   );
 };
 
-console.log("14. API endpoint:", getApiEndpoint(config).unwrap()); // "https://api.example.com"
+console.log("13. API endpoint:", getApiEndpoint(config).unwrap()); // "https://api.example.com"
 console.log(
   "    Missing endpoint:",
   getApiEndpoint({ api: { key: "test" } })._tag,
 ); // "None"
 
-// Example 15: flatMap with conditional logic
+// Example 14: flatMap with conditional logic
 const findAdultUser = (id: UserId): Option<User> => {
   return getUser(id).flatMap((user) => {
     // Simulate age check
@@ -240,9 +229,6 @@ const findAdultUser = (id: UserId): Option<User> => {
   });
 };
 
-console.log("15. Adult user:", findAdultUser(1).unwrap()); // { id: 1, name: "Alice" }
+console.log("14. Adult user:", findAdultUser(1).unwrap()); // { id: 1, name: "Alice" }
 
 console.log("\n=== All flatMap examples completed ===");
-
-// Wait for async examples to complete
-await new Promise((resolve) => setTimeout(resolve, 50));

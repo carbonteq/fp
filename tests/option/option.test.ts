@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test";
 import { Option, UnwrappedNone } from "@/option.js";
 import type { Result } from "@/result.js";
-import { expectSyncValue } from "../testUtils";
 
 const doubleIt = (n: number) => n * 2;
 const doubleOptIt = (n: number) => Option.Some(n * 2);
@@ -50,9 +49,9 @@ describe("map behavior", () => {
     expect(mapped.unwrap()).toBe(4);
   });
 
-  it("should double if some async", async () => {
+  it("should double if some async (using mapAsync)", async () => {
     const opt = Option.Some(2);
-    const mapped = await opt.map(asyncDoubleIt).toPromise();
+    const mapped = await opt.mapAsync(asyncDoubleIt);
 
     expect(mapped.isSome()).toBeTrue();
     expect(mapped.unwrap()).toBe(4);
@@ -67,11 +66,11 @@ describe("map behavior", () => {
     expect(mockedDouble).not.toHaveBeenCalled();
   });
 
-  it("should not call mapper if starting from None promise", async () => {
+  it("should not call async mapper if None", async () => {
     const opt: Option<number> = Option.None;
 
     const mockedDouble = mock(asyncDoubleIt);
-    const mapped = await opt.map(mockedDouble).toPromise();
+    const mapped = await opt.mapAsync(mockedDouble);
 
     expect(mapped.isNone()).toBeTrue();
     expect(mockedDouble).not.toHaveBeenCalled();
@@ -117,15 +116,50 @@ describe("flatMap behavior", () => {
   });
 });
 
+describe("flatMapAsync behavior", () => {
+  it("should call async flatMappers if starting from Some", async () => {
+    const mockerA = mock(asyncDoubleOptIt);
+    const mockerB = mock(asyncDoubleOptIt);
+
+    const opt = Option.Some(3);
+    const mapped = await opt
+      .flatMapAsync(mockerA)
+      .then((o) => o.flatMapAsync(mockerB));
+
+    expect(mapped.isSome()).toBeTrue();
+    expect(mockerA).toHaveBeenCalledTimes(1);
+    expect(mockerB).toHaveBeenCalledTimes(1);
+    expect(mapped.unwrap()).toBe(12);
+  });
+
+  it("should not call async flatMappers if starting from None", async () => {
+    const mockerA = mock(asyncDoubleOptIt);
+    const mockerB = mock(asyncDoubleOptIt);
+
+    const opt = Option.None;
+    const mapped = await opt
+      .flatMapAsync(mockerA)
+      .then((o) => o.flatMapAsync(mockerB));
+
+    expect(mapped.isNone()).toBeTrue();
+    expect(mockerA).not.toHaveBeenCalled();
+    expect(mockerB).not.toHaveBeenCalled();
+  });
+});
+
 describe("filter behavior", () => {
-  it("should propagate async filter None state", async () => {
-    const opt = Option.Some(Promise.resolve(2));
-    const filtered = opt.filter(async (n) => n > 10);
-    const resolved = await filtered.toPromise();
+  it("should filter sync values", () => {
+    const opt = Option.Some(2);
+    const filtered = opt.filter((n) => n > 10);
 
     expect(filtered.isNone()).toBeTrue();
-    expect(filtered.isSome()).toBeFalse();
-    expect(resolved.isNone()).toBeTrue();
+  });
+
+  it("should filter async values (using filterAsync)", async () => {
+    const opt = Option.Some(2);
+    const filtered = await opt.filterAsync(async (n) => n > 10);
+
+    expect(filtered.isNone()).toBeTrue();
   });
 });
 
@@ -151,62 +185,20 @@ describe("branching map", () => {
     expect(mockerC).toHaveBeenCalledTimes(1);
   });
 
-  it("two chained branches of computation should not affect parent or each other (async)", async () => {
+  it("two async branches should not affect parent or each other", async () => {
     const o = Option.Some(2);
     const mockerA = mock(asyncDoubleIt);
     const mockerB = mock(asyncDoubleIt);
     const mockerC = mock(asyncOptNone);
-    const o1 = await o.map(mockerA).toPromise();
-    const o2 = await o.map(mockerB).toPromise();
-    const o3 = await o.flatMap(mockerC).toPromise();
+    const o1 = await o.mapAsync(mockerA);
+    const o2 = await o.mapAsync(mockerB);
+    const o3 = await o.flatMapAsync(mockerC);
 
     expect(o.isSome()).toBeTrue();
     expect(o1.isSome()).toBeTrue();
     expect(o2.isSome()).toBeTrue();
     expect(o3.isNone()).toBeTrue();
     expect(o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toBe(4);
-    expect(o2.unwrap()).toBe(4);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation starting from Promise should not affect parent or each other", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(doubleIt);
-    const mockerB = mock(doubleIt);
-    const mockerC = mock(noneOptIt);
-    const o1 = await o.map(mockerA).toPromise();
-    const o2 = await o.map(mockerB).toPromise();
-    const o3 = await o.flatMap(mockerC).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isSome()).toBeTrue();
-    expect(o3.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toBe(4);
-    expect(o2.unwrap()).toBe(4);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation starting from Promise should not affect parent or each other (async)", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(asyncDoubleIt);
-    const mockerB = mock(asyncDoubleIt);
-    const mockerC = mock(asyncOptNone);
-    const o1 = await o.map(mockerA).toPromise();
-    const o2 = await o.map(mockerB).toPromise();
-    const o3 = await o.flatMap(mockerC).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isSome()).toBeTrue();
-    expect(o3.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
     expect(o1.unwrap()).toBe(4);
     expect(o2.unwrap()).toBe(4);
     expect(mockerA).toHaveBeenCalledTimes(1);
@@ -232,49 +224,17 @@ describe("branching flatMap", () => {
     expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("two chained branches of computation should not affect parent or each other (async)", async () => {
+  it("two async branches should not affect parent or each other", async () => {
     const o = Option.Some(2);
     const mockerA = mock(asyncDoubleOptIt);
     const mockerB = mock(asyncOptNone);
-    const o1 = await o.flatMap(mockerA).toPromise();
-    const o2 = await o.flatMap(mockerB).toPromise();
+    const o1 = await o.flatMapAsync(mockerA);
+    const o2 = await o.flatMapAsync(mockerB);
 
     expect(o.isSome()).toBeTrue();
     expect(o1.isSome()).toBeTrue();
     expect(o2.isNone()).toBeTrue();
     expect(o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toBe(4);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation from Promise should not affect parent or each other", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(doubleOptIt);
-    const mockerB = mock(noneOptIt);
-    const o1 = await o.flatMap(mockerA).toPromise();
-    const o2 = await o.flatMap(mockerB).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toBe(4);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation from Promise should not affect parent or each other (async)", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(asyncDoubleOptIt);
-    const mockerB = mock(asyncOptNone);
-    const o1 = await o.flatMap(mockerA).toPromise();
-    const o2 = await o.flatMap(mockerB).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
     expect(o1.unwrap()).toBe(4);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
@@ -296,21 +256,21 @@ describe("branching zip", () => {
     expect(o2.isSome()).toBeTrue();
     expect(o3.isNone()).toBeTrue();
     expect(o.unwrap()).toBe(2);
-    expect(expectSyncValue(o1.unwrap())).toEqual([2, 4]);
-    expect(expectSyncValue(o2.unwrap())).toEqual([2, 4]);
+    expect(o1.unwrap()).toEqual([2, 4]);
+    expect(o2.unwrap()).toEqual([2, 4]);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
     expect(mockerC).toHaveBeenCalledTimes(1);
   });
 
-  it("two chained branches of computation should not affect parent or each other (async)", async () => {
+  it("two async branches should not affect parent or each other", async () => {
     const o = Option.Some(2);
     const mockerA = mock(asyncDoubleIt);
     const mockerB = mock(asyncDoubleIt);
     const mockerC = mock(asyncOptNone);
-    const o1 = await o.zip(mockerA).toPromise();
-    const o2 = await o.zip(mockerB).toPromise();
-    const o3 = await o.flatMap(mockerC).toPromise();
+    const o1 = await o.zipAsync(mockerA);
+    const o2 = await o.zipAsync(mockerB);
+    const o3 = await o.flatMapAsync(mockerC);
 
     expect(o.isSome()).toBeTrue();
     expect(o1.isSome()).toBeTrue();
@@ -319,48 +279,6 @@ describe("branching zip", () => {
     expect(o.unwrap()).toBe(2);
     expect(o1.unwrap()).toEqual([2, 4]);
     expect(o2.unwrap()).toEqual([2, 4]);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation starting from Promise should not affect parent or each other", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(doubleIt);
-    const mockerB = mock(doubleIt);
-    const mockerC = mock(noneOptIt);
-    const o1 = await o.zip(mockerA).toPromise();
-    const o2 = await o.zip(mockerB).toPromise();
-    const o3 = await o.flatMap(mockerC).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isSome()).toBeTrue();
-    expect(o3.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
-    expect(expectSyncValue(o1.unwrap())).toEqual([2, 4]);
-    expect(expectSyncValue(o2.unwrap())).toEqual([2, 4]);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-    expect(mockerC).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation starting from Promise should not affect parent or each other (async)", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(asyncDoubleIt);
-    const mockerB = mock(asyncDoubleIt);
-    const mockerC = mock(asyncOptNone);
-    const o1 = await o.zip(mockerA).toPromise();
-    const o2 = await o.zip(mockerB).toPromise();
-    const o3 = await o.flatMap(mockerC).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isSome()).toBeTrue();
-    expect(o3.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
-    expect(expectSyncValue(o1.unwrap())).toEqual([2, 4]);
-    expect(expectSyncValue(o2.unwrap())).toEqual([2, 4]);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
     expect(mockerC).toHaveBeenCalledTimes(1);
@@ -384,49 +302,17 @@ describe("branching flatZip", () => {
     expect(mockerB).toHaveBeenCalledTimes(1);
   });
 
-  it("two chained branches of computation should not affect parent or each other (async)", async () => {
+  it("two async branches should not affect parent or each other", async () => {
     const o = Option.Some(2);
     const mockerA = mock(asyncDoubleOptIt);
     const mockerB = mock(asyncOptNone);
-    const o1 = await o.flatZip(mockerA).toPromise();
-    const o2 = await o.flatZip(mockerB).toPromise();
+    const o1 = await o.flatZipAsync(mockerA);
+    const o2 = await o.flatZipAsync(mockerB);
 
     expect(o.isSome()).toBeTrue();
     expect(o1.isSome()).toBeTrue();
     expect(o2.isNone()).toBeTrue();
     expect(o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toEqual([2, 4]);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation from Promise should not affect parent or each other", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(doubleOptIt);
-    const mockerB = mock(noneOptIt);
-    const o1 = await o.flatZip(mockerA).toPromise();
-    const o2 = await o.flatZip(mockerB).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
-    expect(o1.unwrap()).toEqual([2, 4]);
-    expect(mockerA).toHaveBeenCalledTimes(1);
-    expect(mockerB).toHaveBeenCalledTimes(1);
-  });
-
-  it("two chained branches of computation from Promise should not affect parent or each other (async)", async () => {
-    const o = Option.Some(Promise.resolve(2));
-    const mockerA = mock(asyncDoubleOptIt);
-    const mockerB = mock(asyncOptNone);
-    const o1 = await o.flatZip(mockerA).toPromise();
-    const o2 = await o.flatZip(mockerB).toPromise();
-
-    expect(o.isSome()).toBeTrue();
-    expect(o1.isSome()).toBeTrue();
-    expect(o2.isNone()).toBeTrue();
-    expect(await o.unwrap()).toBe(2);
     expect(o1.unwrap()).toEqual([2, 4]);
     expect(mockerA).toHaveBeenCalledTimes(1);
     expect(mockerB).toHaveBeenCalledTimes(1);
@@ -460,13 +346,6 @@ describe("Option type inference", () => {
     it("should correctly type fromPredicate", () => {
       expectTypeOf(Option.fromPredicate(42, (n) => n > 0)).toEqualTypeOf<
         Option<number>
-      >();
-    });
-
-    it("should correctly type fromPromise", () => {
-      const promiseOpt = Promise.resolve(Option.Some(42));
-      expectTypeOf(Option.fromPromise(promiseOpt)).toEqualTypeOf<
-        Option<Promise<number>>
       >();
     });
   });
@@ -512,30 +391,12 @@ describe("Option type inference", () => {
       >();
     });
 
-    it("should correctly type map with async mapper", () => {
+    it("should correctly type mapAsync", () => {
       const opt = Option.Some(42);
 
-      // Async mapper: Option<Promise<U>>
-      expectTypeOf(opt.map(async (n) => n.toString())).toEqualTypeOf<
-        Option<Promise<string>>
-      >();
-    });
-
-    it("should correctly type map on async Option with sync mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // Sync mapper on Promise<T>: Option<Promise<U>>
-      expectTypeOf(opt.map((n) => n.toString())).toEqualTypeOf<
-        Option<Promise<string>>
-      >();
-    });
-
-    it("should correctly type map on async Option with async mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // Async mapper on Promise<T>: Option<Promise<U>>
-      expectTypeOf(opt.map(async (n) => n.toString())).toEqualTypeOf<
-        Option<Promise<string>>
+      // Async mapper: Promise<Option<U>>
+      expectTypeOf(opt.mapAsync(async (n) => n.toString())).toEqualTypeOf<
+        Promise<Option<string>>
       >();
     });
 
@@ -548,31 +409,13 @@ describe("Option type inference", () => {
       >();
     });
 
-    it("should correctly type flatMap with async mapper", () => {
+    it("should correctly type flatMapAsync", () => {
       const opt = Option.Some(42);
 
-      // Async flatMap: Option<Promise<U>>
+      // Async flatMap: Promise<Option<U>>
       expectTypeOf(
-        opt.flatMap(async (n) => Option.Some(n.toString())),
-      ).toEqualTypeOf<Option<Promise<string>>>();
-    });
-
-    it("should correctly type flatMap on async Option with sync mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // flatMap on Promise<T>: Option<Promise<U>>
-      expectTypeOf(opt.flatMap((n) => Option.Some(n.toString()))).toEqualTypeOf<
-        Option<Promise<string>>
-      >();
-    });
-
-    it("should correctly type flatMap on async Option with async mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // Async flatMap on Promise<T>: Option<Promise<U>>
-      expectTypeOf(
-        opt.flatMap(async (n) => Option.Some(n.toString())),
-      ).toEqualTypeOf<Option<Promise<string>>>();
+        opt.flatMapAsync(async (n) => Option.Some(n.toString())),
+      ).toEqualTypeOf<Promise<Option<string>>>();
     });
 
     it("should correctly type filter with sync predicate", () => {
@@ -582,12 +425,12 @@ describe("Option type inference", () => {
       expectTypeOf(opt.filter((n) => n > 0)).toEqualTypeOf<Option<number>>();
     });
 
-    it("should correctly type filter with async predicate", () => {
+    it("should correctly type filterAsync", () => {
       const opt = Option.Some(42);
 
-      // Async predicate: Option<Promise<T>>
-      expectTypeOf(opt.filter(async (n) => n > 0)).toEqualTypeOf<
-        Option<Promise<number>>
+      // Async predicate: Promise<Option<T>>
+      expectTypeOf(opt.filterAsync(async (n) => n > 0)).toEqualTypeOf<
+        Promise<Option<number>>
       >();
     });
 
@@ -600,13 +443,13 @@ describe("Option type inference", () => {
       ).toEqualTypeOf<string>();
     });
 
-    it("should correctly type mapOr on async Option", () => {
-      const opt = Option.Some(Promise.resolve(42));
+    it("should correctly type mapOrAsync", () => {
+      const opt = Option.Some(42);
 
-      // mapOr on async Option returns Promise<U>
-      expectTypeOf(opt.mapOr("default", (n) => n.toString())).toEqualTypeOf<
-        Promise<string>
-      >();
+      // mapOrAsync returns Promise<U>
+      expectTypeOf(
+        opt.mapOrAsync("default", async (n) => n.toString()),
+      ).toEqualTypeOf<Promise<string>>();
     });
   });
 
@@ -620,30 +463,12 @@ describe("Option type inference", () => {
       >();
     });
 
-    it("should correctly type zip with async mapper", () => {
+    it("should correctly type zipAsync", () => {
       const opt = Option.Some(42);
 
-      // Async zip: Option<Promise<[T, U]>>
-      expectTypeOf(opt.zip(async (n) => n.toString())).toEqualTypeOf<
-        Option<Promise<[number, string]>>
-      >();
-    });
-
-    it("should correctly type zip on async Option with sync mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // Sync zip on Promise<T>: Option<Promise<[T, U]>>
-      expectTypeOf(opt.zip((n) => n.toString())).toEqualTypeOf<
-        Option<Promise<[number, string]>>
-      >();
-    });
-
-    it("should correctly type zip on async Option with async mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // Async zip on Promise<T>: Option<Promise<[T, U]>>
-      expectTypeOf(opt.zip(async (n) => n.toString())).toEqualTypeOf<
-        Option<Promise<[number, string]>>
+      // Async zip: Promise<Option<[T, U]>>
+      expectTypeOf(opt.zipAsync(async (n) => n.toString())).toEqualTypeOf<
+        Promise<Option<[number, string]>>
       >();
     });
 
@@ -656,31 +481,13 @@ describe("Option type inference", () => {
       >();
     });
 
-    it("should correctly type flatZip with async mapper", () => {
+    it("should correctly type flatZipAsync", () => {
       const opt = Option.Some(42);
 
-      // Async flatZip: Option<Promise<[T, U]>>
+      // Async flatZip: Promise<Option<[T, U]>>
       expectTypeOf(
-        opt.flatZip(async (n) => Option.Some(n.toString())),
-      ).toEqualTypeOf<Option<Promise<[number, string]>>>();
-    });
-
-    it("should correctly type flatZip on async Option with sync mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // flatZip on Promise<T>: Option<Promise<[T, U]>>
-      expectTypeOf(opt.flatZip((n) => Option.Some(n.toString()))).toEqualTypeOf<
-        Option<Promise<[number, string]>>
-      >();
-    });
-
-    it("should correctly type flatZip on async Option with async mapper", () => {
-      const opt = Option.Some(Promise.resolve(42));
-
-      // Async flatZip on Promise<T>: Option<Promise<[T, U]>>
-      expectTypeOf(
-        opt.flatZip(async (n) => Option.Some(n.toString())),
-      ).toEqualTypeOf<Option<Promise<[number, string]>>>();
+        opt.flatZipAsync(async (n) => Option.Some(n.toString())),
+      ).toEqualTypeOf<Promise<Option<[number, string]>>>();
     });
   });
 
@@ -783,27 +590,21 @@ describe("Option type inference", () => {
       expectTypeOf(chained).toEqualTypeOf<Option<[string, number]>>();
     });
 
-    it("should correctly type async chains with map", async () => {
+    it("should correctly type async chains with mapAsync", async () => {
       const opt = Option.Some(42);
 
-      // Chain with async in the middle
-      const chained = opt.map(async (n) => n * 2).map((n) => n.toString());
+      // Chain with async
+      const chained = await opt.mapAsync(async (n) => n * 2);
 
-      expectTypeOf(chained).toEqualTypeOf<Option<Promise<string>>>();
-
-      // After toPromise
-      const resolved = await chained.toPromise();
-      expectTypeOf(resolved).toEqualTypeOf<Option<string>>();
+      expectTypeOf(chained).toEqualTypeOf<Option<number>>();
     });
 
-    it("should correctly type async chains with flatMap", async () => {
+    it("should correctly type async chains with flatMapAsync", async () => {
       const opt = Option.Some(42);
 
-      const chained = opt
-        .flatMap(async (n) => Option.Some(n * 2))
-        .map((n) => n.toString());
+      const chained = await opt.flatMapAsync(async (n) => Option.Some(n * 2));
 
-      expectTypeOf(chained).toEqualTypeOf<Option<Promise<string>>>();
+      expectTypeOf(chained).toEqualTypeOf<Option<number>>();
     });
 
     it("should correctly type branching computations", () => {
@@ -822,22 +623,11 @@ describe("Option type inference", () => {
     it("should correctly type async flatZip chains", async () => {
       const opt = Option.Some(42);
 
-      const chained = opt
-        .flatZip(async (n) => Option.Some(n.toString()))
-        .map(([num, str]) => `${num}: ${str}`);
+      const chained = await opt.flatZipAsync(async (n) =>
+        Option.Some(n.toString()),
+      );
 
-      expectTypeOf(chained).toEqualTypeOf<Option<Promise<string>>>();
-    });
-
-    it("should correctly type mixed sync and async chains", async () => {
-      const opt = Option.Some(42);
-
-      const chained = opt
-        .map((n) => n * 2) // sync
-        .map(async (n) => n.toString()) // becomes async
-        .map((s) => s.length); // stays async
-
-      expectTypeOf(chained).toEqualTypeOf<Option<Promise<number>>>();
+      expectTypeOf(chained).toEqualTypeOf<Option<[number, string]>>();
     });
   });
 
@@ -847,16 +637,6 @@ describe("Option type inference", () => {
       expectTypeOf(opt.toResult(new Error())).toEqualTypeOf<
         Result<number, Error>
       >();
-    });
-
-    it("should correctly type toPromise on sync Option", async () => {
-      const opt = Option.Some(42);
-      expectTypeOf(opt.toPromise()).toEqualTypeOf<Promise<Option<number>>>();
-    });
-
-    it("should correctly type toPromise on async Option", async () => {
-      const opt = Option.Some(Promise.resolve(42));
-      expectTypeOf(opt.toPromise()).toEqualTypeOf<Promise<Option<number>>>();
     });
 
     it("should correctly type innerMap", () => {
@@ -871,6 +651,12 @@ describe("Option type inference", () => {
       expectTypeOf(opt.tap((n) => console.log(n))).toEqualTypeOf<
         Option<number>
       >();
+    });
+
+    it("should correctly type tapAsync (returns same type)", async () => {
+      const opt = Option.Some(42);
+      const result = await opt.tapAsync((n) => Promise.resolve(console.log(n)));
+      expectTypeOf(result).toEqualTypeOf<Option<number>>();
     });
   });
 

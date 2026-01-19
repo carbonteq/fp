@@ -168,15 +168,17 @@ describe("Result type inference", () => {
       expectTypeOf(asyncResult.unwrap()).toEqualTypeOf<Promise<number>>();
 
       // safeUnwrap() on Promise returns Promise<T | null> | null
-      expectTypeOf(asyncResult.safeUnwrap()).toEqualTypeOf<Promise<
-        number | null
-      > | null>();
+      expectTypeOf(
+        asyncResult.safeUnwrap(),
+      ).toEqualTypeOf<Promise<number> | null>();
 
       // unwrapOr on async returns Promise
-      expectTypeOf(asyncResult.unwrapOr(0)).toEqualTypeOf<Promise<number>>();
+      expectTypeOf(asyncResult.unwrapOr(Promise.resolve(0))).toEqualTypeOf<
+        Promise<number>
+      >();
 
       // unwrapOrElse on async returns Promise
-      expectTypeOf(asyncResult.unwrapOrElse(() => 0)).toEqualTypeOf<
+      expectTypeOf(asyncResult.unwrapOrElse(async () => 0)).toEqualTypeOf<
         Promise<number>
       >();
     });
@@ -196,9 +198,7 @@ describe("Result type inference", () => {
       const r = Result.Ok<number, Error>(42);
 
       // Async mapper: Result<Promise<U>, E>
-      expectTypeOf(r.map(async (n) => n.toString())).toEqualTypeOf<
-        Result<Promise<string>, Error>
-      >();
+      expectTypeOf(r.map(async (n) => n.toString())).toEqualTypeOf<never>();
     });
 
     it("should correctly type map on async Result with sync mapper", () => {
@@ -206,7 +206,7 @@ describe("Result type inference", () => {
 
       // Sync mapper on Promise<T>: Result<Promise<U>, E>
       expectTypeOf(r.map((n) => n.toString())).toEqualTypeOf<
-        Result<Promise<string>, Error>
+        Result<string, Error>
       >();
     });
 
@@ -214,9 +214,7 @@ describe("Result type inference", () => {
       const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42));
 
       // Async mapper on Promise<T>: Result<Promise<U>, E>
-      expectTypeOf(r.map(async (n) => n.toString())).toEqualTypeOf<
-        Result<Promise<string>, Error>
-      >();
+      expectTypeOf(r.map(async (n) => n.toString())).toEqualTypeOf<never>();
     });
 
     it("should correctly type mapErr", () => {
@@ -237,22 +235,13 @@ describe("Result type inference", () => {
       ).toEqualTypeOf<Result<string, Error | TypeError>>();
     });
 
-    it("should correctly type flatMap with async mapper", () => {
-      const r = Result.Ok<number, Error>(42);
-
-      // Async flatMap: Result<Promise<U>, E | E2>
-      expectTypeOf(
-        r.flatMap(async (n) => Result.Ok<string, TypeError>(n.toString())),
-      ).toEqualTypeOf<Result<Promise<string>, Error | TypeError>>();
-    });
-
     it("should correctly type flatMap on async Result", () => {
       const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42));
 
       // flatMap on Promise<T>: Result<Promise<U>, E | E2>
       expectTypeOf(
         r.flatMap((n) => Result.Ok<string, TypeError>(n.toString())),
-      ).toEqualTypeOf<Result<Promise<string>, Error | TypeError>>();
+      ).toEqualTypeOf<Result<string, Error | TypeError>>();
     });
 
     it("should correctly type mapBoth", () => {
@@ -281,9 +270,7 @@ describe("Result type inference", () => {
       const r = Result.Ok<number, Error>(42);
 
       // Async zip: Result<Promise<[T, U]>, E>
-      expectTypeOf(r.zip(async (n) => n.toString())).toEqualTypeOf<
-        Result<Promise<[number, string]>, Error>
-      >();
+      expectTypeOf(r.zip(async (n) => n.toString())).toEqualTypeOf<never>();
     });
 
     it("should correctly type zip on async Result", () => {
@@ -291,7 +278,7 @@ describe("Result type inference", () => {
 
       // Sync zip on Promise<T>: Result<Promise<[T, U]>, E>
       expectTypeOf(r.zip((n) => n.toString())).toEqualTypeOf<
-        Result<Promise<[number, string]>, Error>
+        Result<[Promise<number>, string], Error>
       >();
     });
 
@@ -309,26 +296,8 @@ describe("Result type inference", () => {
 
       // Async flatZip: Result<Promise<[T, U]>, E | E2>
       expectTypeOf(
-        r.flatZip(async (n) => Result.Ok<string, TypeError>(n.toString())),
-      ).toEqualTypeOf<Result<Promise<[number, string]>, Error | TypeError>>();
-    });
-
-    it("should correctly type zipErr with sync mapper", () => {
-      const r = Result.Ok<number, Error>(42);
-
-      // zipErr: Result<T, E | E2> (retains original value type)
-      expectTypeOf(
-        r.zipErr((_n) => Result.Ok<void, TypeError>(undefined)),
-      ).toEqualTypeOf<Result<number, Error | TypeError>>();
-    });
-
-    it("should correctly type zipErr with async mapper", () => {
-      const r = Result.Ok<number, Error>(42);
-
-      // Async zipErr: Result<Promise<T>, E | E2>
-      expectTypeOf(
-        r.zipErr(async (_n) => Result.Ok<void, TypeError>(undefined)),
-      ).toEqualTypeOf<Result<Promise<number>, Error | TypeError>>();
+        r.flatZipAsync(async (n) => Result.Ok<string, TypeError>(n.toString())),
+      ).toEqualTypeOf<Promise<Result<[number, string], Error | TypeError>>>();
     });
   });
 
@@ -400,7 +369,7 @@ describe("Result type inference", () => {
 
     it("should correctly type tryAsyncCatch", () => {
       expectTypeOf(Result.tryAsyncCatch(async () => 42)).toEqualTypeOf<
-        Result<Promise<number>, unknown>
+        Promise<Result<number, unknown>>
       >();
     });
 
@@ -420,13 +389,6 @@ describe("Result type inference", () => {
 
       // any returns first Ok type, collects errors into array
       expectTypeOf(Result.any(r1, r2)).toEqualTypeOf<Result<number, Error[]>>();
-    });
-
-    it("should correctly type fromPromise", () => {
-      const promiseResult = Promise.resolve(Result.Ok<number, Error>(42));
-      expectTypeOf(Result.fromPromise(promiseResult)).toEqualTypeOf<
-        Result<Promise<number>, Error>
-      >();
     });
   });
 
@@ -454,19 +416,6 @@ describe("Result type inference", () => {
       expectTypeOf(chained).toEqualTypeOf<
         Result<[string, number], Error | TypeError>
       >();
-    });
-
-    it("should correctly type async chains with map", async () => {
-      const r = Result.Ok<number, Error>(42);
-
-      // Chain with async in the middle
-      const chained = r.map(async (n) => n * 2).map((n) => n.toString());
-
-      expectTypeOf(chained).toEqualTypeOf<Result<Promise<string>, Error>>();
-
-      // After toPromise
-      const resolved = await chained.toPromise();
-      expectTypeOf(resolved).toEqualTypeOf<Result<string, Error>>();
     });
 
     it("should accumulate error types through flatMap chain", () => {
@@ -498,11 +447,11 @@ describe("Result type inference", () => {
       const r = Result.Ok<number, Error>(42);
 
       const chained = r
-        .flatZip(async (n) => Result.Ok<string, TypeError>(n.toString()))
-        .map(([num, str]) => `${num}: ${str}`);
+        .flatZipAsync(async (n) => Result.Ok<string, TypeError>(n.toString()))
+        .then((r) => r.map(([num, str]) => `${num}: ${str}`));
 
       expectTypeOf(chained).toEqualTypeOf<
-        Result<Promise<string>, Error | TypeError>
+        Promise<Result<string, Error | TypeError>>
       >();
     });
   });
@@ -511,13 +460,6 @@ describe("Result type inference", () => {
     it("should correctly type toOption", () => {
       const r = Result.Ok<number, Error>(42);
       expectTypeOf(r.toOption()).toEqualTypeOf<Option<number>>();
-    });
-
-    it("should correctly type toPromise", async () => {
-      const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42));
-      expectTypeOf(r.toPromise()).toEqualTypeOf<
-        Promise<Result<number, Error>>
-      >();
     });
 
     it("should correctly type flip", () => {
@@ -578,7 +520,7 @@ describe("Result type inference", () => {
       ]);
 
       expectTypeOf(validated).toEqualTypeOf<
-        Result<Promise<number>, Error | (ErrorA | ErrorB)[]>
+        Promise<Result<number, Error | (ErrorA | ErrorB)[]>>
       >();
     });
   });

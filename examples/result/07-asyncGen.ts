@@ -89,20 +89,21 @@ const getUserWithPosts = async (userId: UserId) => {
 const userPosts = await getUserWithPosts(1);
 console.log("6. User with posts:", userPosts.unwrap()); // { user: { id: 1, name: "User 1" }, posts: [...] }
 
-// Example 7: asyncGen with Result<Promise<T>, E> (auto-await)
-const autoAwait = await Result.asyncGen(async function* () {
-  // Result.map with async function returns Result<Promise<T>, E>
-  const asyncMapped = Result.Ok(5).map(async (x) => {
-    await delay(10);
-    return x * 2;
+// Example 7: asyncGen with async transformation
+const doubleAsync = async (n: number): Promise<number> => {
+  await delay(10);
+  return n * 2;
+};
+
+const autoAwait = (async () => {
+  const gen = Result.asyncGen(async function* () {
+    const value = yield* Result.Ok(5);
+    const doubled = await doubleAsync(value);
+    return doubled;
   });
-
-  // asyncGen automatically awaits the inner promise
-  const value = yield* asyncMapped;
-
-  return value;
-});
-console.log("7. Auto-await inner promise:", autoAwait.unwrap()); // 10
+  return gen;
+})();
+console.log("7. Async transformation:", (await autoAwait).unwrap()); // 10
 
 // Example 8: asyncGen for validation pipeline
 const validatePositive = async (
@@ -170,21 +171,23 @@ const multipleFetches = await Result.asyncGen(async function* () {
 });
 console.log("11. Multiple fetches:", multipleFetches.unwrap()); // { user: ..., posts: [...], settings: { theme: "dark" } }
 
-// Example 12: asyncGen with async map chains
-const mapChain = await Result.asyncGen(async function* () {
-  const step1 = yield* Result.Ok(5).map(async (x) => {
-    await delay(5);
-    return x * 2;
+// Example 12: asyncGen with async transformation chain
+const mapChain = (async () => {
+  const gen = Result.asyncGen(async function* () {
+    const value = yield* Result.Ok(5);
+    const step1 = await (async (x: number) => {
+      await delay(5);
+      return x * 2;
+    })(value);
+    const step2 = await (async (x: number) => {
+      await delay(5);
+      return x + 10;
+    })(step1);
+    return step2;
   });
-
-  const step2 = yield* Result.Ok(step1).map(async (x) => {
-    await delay(5);
-    return x + 10;
-  });
-
-  return step2;
-});
-console.log("12. Map chain:", mapChain.unwrap()); // 20 (5 * 2 + 10)
+  return gen;
+})();
+console.log("12. Async transformation chain:", (await mapChain).unwrap()); // 20 (5 * 2 + 10)
 
 // Example 13: asyncGen with complex workflow
 type Order = { id: number; total: number };
@@ -223,19 +226,20 @@ const completeOrder = async (orderId: number) => {
 const orderResult = await completeOrder(123);
 console.log("13. Complete order:", orderResult.unwrap()); // { order: { id: 123, total: 100 }, payment: { ... }, receipt: { ... } }
 
-// Example 14: asyncGen with toPromise conversion
+// Example 14: asyncGen with async transformation
+const transformArrayAsync = async (
+  items: number[],
+): Promise<Result<number[], "transform_error">> => {
+  await delay(5);
+  return Result.Ok(items.map((x) => x * 2));
+};
+
 const withToPromise = await Result.asyncGen(async function* () {
-  const asyncMapped = Result.Ok([1, 2, 3]).map(async (arr) => {
-    await delay(5);
-    return arr.map((x) => x * 2);
-  });
-
-  // toPromise resolves the inner Result<Promise<T>, E>
-  const resolved = yield* await asyncMapped.toPromise();
-
+  const arr = yield* Result.Ok([1, 2, 3]);
+  const resolved = yield* await transformArrayAsync(arr);
   return resolved;
 });
-console.log("14. With toPromise:", withToPromise.unwrap()); // [2, 4, 6]
+console.log("14. Async transformation:", withToPromise.unwrap()); // [2, 4, 6]
 
 // Example 15: asyncGen for data transformation pipeline
 type RawData = { value: string };
@@ -270,7 +274,7 @@ const processedData = await processRawDataAsync({ value: "42" });
 console.log("15. Process raw data:", processedData.unwrap()); // { value: 42, timestamp: ... }
 
 // Example 16: Using orElse for fallback pattern (proper way)
-// Note: asyncGen short-circuits on Err, so fallbacks should use orElse instead
+// Note: orElse is synchronous - for async fallbacks, await the result first
 const fetchWithRetry = async (
   url: string,
 ): Promise<Result<string, "fetch_error">> => {
@@ -282,10 +286,14 @@ const fetchWithRetry = async (
 };
 
 const fetchWithFallback = async (primaryUrl: string, fallbackUrl: string) => {
-  // Use orElse for proper fallback handling
+  // Try primary first
   const primary = await fetchWithRetry(primaryUrl);
 
-  return primary.orElse(async () => await fetchWithRetry(fallbackUrl));
+  // If primary failed, try fallback (orElse is synchronous)
+  if (primary.isErr()) {
+    return await fetchWithRetry(fallbackUrl);
+  }
+  return primary;
 };
 
 const fallbackResult = await fetchWithFallback(
@@ -296,22 +304,26 @@ console.log("16. Fetch with fallback:", fallbackResult.unwrap()); // "response d
 
 // Example 17: asyncGen with array processing
 const processItemsAsync = async (items: number[]) => {
+  const doubleAsync = async (arr: number[]): Promise<number[]> => {
+    await delay(5);
+    return arr.map((x) => x * 2);
+  };
+
+  const filterAsync = async (arr: number[]): Promise<number[]> => {
+    await delay(5);
+    return arr.filter((x) => x > 5);
+  };
+
+  const sumAsync = async (arr: number[]): Promise<number> => {
+    await delay(5);
+    return arr.reduce((a, b) => a + b, 0);
+  };
+
   return Result.asyncGen(async function* () {
-    const doubled = yield* Result.Ok(items).map(async (arr) => {
-      await delay(5);
-      return arr.map((x) => x * 2);
-    });
-
-    const filtered = yield* Result.Ok(doubled).map(async (arr) => {
-      await delay(5);
-      return arr.filter((x) => x > 5);
-    });
-
-    const sum = yield* Result.Ok(filtered).map(async (arr) => {
-      await delay(5);
-      return arr.reduce((a, b) => a + b, 0);
-    });
-
+    const arr = yield* Result.Ok(items);
+    const doubled = await doubleAsync(arr);
+    const filtered = await filterAsync(doubled);
+    const sum = await sumAsync(filtered);
     return sum;
   });
 };
@@ -319,20 +331,23 @@ const itemsResult = await processItemsAsync([1, 2, 3, 4, 5]);
 console.log("17. Process items:", itemsResult.unwrap()); // 24 (6 + 8 + 10)
 
 // Example 18: asyncGen with conditional async operations
-const conditionalAsync = await Result.asyncGen(async function* () {
-  const input = yield* Result.Ok(5);
+const conditionalAsync = (async () => {
+  const gen = Result.asyncGen(async function* () {
+    const input = yield* Result.Ok(5);
 
-  if (input > 0) {
-    const result = yield* Result.Ok(input).map(async (x) => {
-      await delay(5);
-      return x * 2;
-    });
-    return { value: result, source: "doubled" as const };
-  }
+    if (input > 0) {
+      const result = await (async (x: number) => {
+        await delay(5);
+        return x * 2;
+      })(input);
+      return { value: result, source: "doubled" as const };
+    }
 
-  return { value: input, source: "original" as const };
-});
-console.log("18. Conditional async:", conditionalAsync.unwrap()); // { value: 10, source: "doubled" }
+    return { value: input, source: "original" as const };
+  });
+  return gen;
+})();
+console.log("18. Conditional async:", (await conditionalAsync).unwrap()); // { value: 10, source: "doubled" }
 
 // Example 19: asyncGen for batch operations
 const batchFetch = async (ids: number[]) => {

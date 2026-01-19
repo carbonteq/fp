@@ -72,7 +72,7 @@ describe("README Examples - Option Type", () => {
   });
 
   describe("map", () => {
-    it("should apply bonus to balance using map", async () => {
+    it("should apply bonus to balance using mapAsync", async () => {
       async function fetchUserBalanceFromDatabase(
         userId: string,
       ): Promise<Option<number>> {
@@ -83,9 +83,8 @@ describe("README Examples - Option Type", () => {
       async function applyBonus() {
         const userId = "user123";
         const balanceOption = await Option.Some(userId)
-          .flatMap(fetchUserBalanceFromDatabase)
-          .map((balance) => balance * 1.1)
-          .toPromise();
+          .flatMapAsync(fetchUserBalanceFromDatabase)
+          .then((o) => o.map((balance) => balance * 1.1));
         return balanceOption;
       }
 
@@ -103,16 +102,15 @@ describe("README Examples - Option Type", () => {
       }
 
       const balanceOption = await Option.Some("user123")
-        .flatMap(fetchUserBalanceFromDatabase)
-        .map((balance) => balance * 1.1)
-        .toPromise();
+        .flatMapAsync(fetchUserBalanceFromDatabase)
+        .then((o) => o.map((balance) => balance * 1.1));
 
       expect(balanceOption.isNone()).toBe(true);
     });
   });
 
   describe("flatZip", () => {
-    it("should combine price and stock using flatZip", async () => {
+    it("should combine price and stock using flatZipAsync", async () => {
       async function fetchProductPrice(
         productId: string,
       ): Promise<Option<number>> {
@@ -120,7 +118,6 @@ describe("README Examples - Option Type", () => {
         return Option.Some(100);
       }
 
-      // Note: flatZip receives the price (number) from flatMap, not the original productId
       async function fetchProductStock(price: number): Promise<Option<number>> {
         await Promise.resolve(price);
         return Option.Some(50);
@@ -130,9 +127,8 @@ describe("README Examples - Option Type", () => {
         productId: string,
       ): Promise<Option<[number, number]>> {
         const productDetails = await Option.Some(productId)
-          .flatMap(fetchProductPrice)
-          .flatZip(fetchProductStock)
-          .toPromise();
+          .flatMapAsync(fetchProductPrice)
+          .then((o) => o.flatZipAsync(fetchProductStock));
         return productDetails;
       }
 
@@ -149,17 +145,14 @@ describe("README Examples - Option Type", () => {
         return Option.None;
       }
 
-      // Note: README example has fetchProductStock(productId: string) but flatZip
-      // receives the result of flatMap (the price number), not the original productId
       async function fetchProductStock(price: number): Promise<Option<number>> {
         await Promise.resolve(price);
         return Option.Some(50);
       }
 
       const result = await Option.Some("123")
-        .flatMap(fetchProductPrice)
-        .flatZip(fetchProductStock)
-        .toPromise();
+        .flatMapAsync(fetchProductPrice)
+        .then((o) => o.flatZipAsync(fetchProductStock));
 
       expect(result.isNone()).toBe(true);
     });
@@ -176,11 +169,9 @@ describe("README Examples - Option Type", () => {
       }
 
       async function safeFindUserById(id: number): Promise<string> {
-        const res = (await findUserById(id)).mapOr(
-          `User not found`,
-          (res) => `User: ${res}`,
-        );
-        return res;
+        const userOpt = await findUserById(id);
+        const result = userOpt.mapOr(`User not found`, (res) => `User: ${res}`);
+        return result;
       }
 
       const result = await safeFindUserById(10);
@@ -197,11 +188,9 @@ describe("README Examples - Option Type", () => {
       }
 
       async function safeFindUserById(id: number): Promise<string> {
-        const res = (await findUserById(id)).mapOr(
-          `User not found`,
-          (res) => `User: ${res}`,
-        );
-        return res;
+        const userOpt = await findUserById(id);
+        const result = userOpt.mapOr(`User not found`, (res) => `User: ${res}`);
+        return result;
       }
 
       const result = await safeFindUserById(0);
@@ -289,33 +278,15 @@ describe("README Examples - Option Type", () => {
       expect(missing.unwrapErr()).toBe("User not found");
     });
 
-    it("should wrap Promise in Option with fromPromise", async () => {
+    it("should handle async fetching with explicit Promise<Option<T>>", async () => {
       async function fetchUser(id: string): Promise<Option<{ name: string }>> {
         await Promise.resolve(id);
         return id === "1" ? Option.Some({ name: "Alice" }) : Option.None;
       }
 
-      const userOpt = Option.fromPromise(fetchUser("1"));
-      expect(userOpt.isSome()).toBe(true);
-
-      const inner = await userOpt.unwrap();
-      expect(inner).toEqual({ name: "Alice" });
-    });
-
-    it("should wrap failed Promise with fromPromise", async () => {
-      async function fetchUser(id: string): Promise<Option<{ name: string }>> {
-        await Promise.resolve(id);
-        return Option.None;
-      }
-
-      const userOpt = Option.fromPromise(fetchUser("999"));
-      // fromPromise wraps the promise - the Option is Some containing the Promise
-      expect(userOpt.isSome()).toBe(true);
-
-      // The promise inside resolves to NONE_VAL (a Symbol)
-      const promise = userOpt.unwrap();
-      const result = await promise;
-      expect(typeof result).toBe("symbol");
+      const user = await fetchUser("1");
+      expect(user.isSome()).toBe(true);
+      expect(user.unwrap()).toEqual({ name: "Alice" });
     });
   });
 

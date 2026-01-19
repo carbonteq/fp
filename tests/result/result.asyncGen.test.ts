@@ -208,15 +208,15 @@ describe("Result.asyncGen", () => {
   });
 
   describe("sync Result with async map/flatMap", () => {
-    it("should handle Result.Ok(x).map(asyncFunc) via toPromise", async () => {
+    it("should handle Result.Ok(x).mapAsync(asyncFunc)", async () => {
       const asyncDouble = async (n: number): Promise<number> => {
         await delay(5);
         return n * 2;
       };
 
       const result = await Result.asyncGen(async function* () {
-        const mapped = Result.Ok(3).map(asyncDouble);
-        const value = yield* await mapped.toPromise();
+        const mapped = await Result.Ok(3).mapAsync(asyncDouble);
+        const value = yield* mapped;
         return value;
       });
 
@@ -225,7 +225,7 @@ describe("Result.asyncGen", () => {
       expect(result.unwrap()).toBe(6);
     });
 
-    it("should handle Result.Ok(x).flatMap(asyncFunc) via toPromise", async () => {
+    it("should handle Result.Ok(x).flatMapAsync(asyncFunc)", async () => {
       const asyncValidate = async (
         n: number,
       ): Promise<Result<number, string>> => {
@@ -234,8 +234,10 @@ describe("Result.asyncGen", () => {
       };
 
       const result = await Result.asyncGen(async function* () {
-        const mapped = Result.Ok<number, string>(5).flatMap(asyncValidate);
-        const value = yield* await mapped.toPromise();
+        const mapped = await Result.Ok<number, string>(5).flatMapAsync(
+          asyncValidate,
+        );
+        const value = yield* mapped;
         return value;
       });
 
@@ -255,8 +257,10 @@ describe("Result.asyncGen", () => {
       let reachedAfterErr = false;
 
       const result = await Result.asyncGen(async function* () {
-        const mapped = Result.Ok<number, string>(-5).flatMap(asyncValidate);
-        const value = yield* await mapped.toPromise();
+        const mapped = await Result.Ok<number, string>(-5).flatMapAsync(
+          asyncValidate,
+        );
+        const value = yield* mapped;
         reachedAfterErr = true;
         return value + 100;
       });
@@ -274,9 +278,8 @@ describe("Result.asyncGen", () => {
 
       const result = await Result.asyncGen(async function* () {
         const first = yield* Result.Ok<string, string>("hello");
-        const transformed = yield* await Result.Ok<string, string>(first)
-          .map(asyncTransform)
-          .toPromise();
+        // first is just a string, so call async transform directly
+        const transformed = await asyncTransform(first);
         const final = yield* Result.Ok(`${transformed}!`);
         return final;
       });
@@ -287,16 +290,15 @@ describe("Result.asyncGen", () => {
     });
   });
 
-  describe("Result<Promise<T>, E> automatic awaiting", () => {
-    it("should automatically await inner promise and return T not Promise<T>", async () => {
-      const promiseFunc = (n: number): Result<Promise<number>, string> => {
-        return Result.Ok(Promise.resolve(n * 2));
+  describe("Promise<Result<T, E>> with asyncGen", () => {
+    it("should handle Promise<Result<T, E>> when explicitly awaited", async () => {
+      const promiseFunc = (n: number): Promise<Result<number, string>> => {
+        return Promise.resolve(Result.Ok(n * 2));
       };
 
       const result = await Result.asyncGen(async function* () {
-        const value = yield* promiseFunc(21);
+        const value = yield* await promiseFunc(21);
 
-        // value should be number, not Promise<number>
         expectTypeOf(value).toEqualTypeOf<number>();
         return value;
       });
@@ -306,18 +308,15 @@ describe("Result.asyncGen", () => {
       expect(result.unwrap()).toBe(42);
     });
 
-    it("should handle Result.map returning Promise", async () => {
+    it("should handle Promise<Result<T, E>> from mapAsync", async () => {
       const asyncDouble = async (n: number): Promise<number> => {
         await delay(5);
         return n * 2;
       };
 
-      // Result.Ok(3).map(asyncDouble) returns Result<Promise<number>, never>
-      const resultWithPromise = Result.Ok(3).map(asyncDouble);
-
       const result = await Result.asyncGen(async function* () {
-        // Yielding Result<Promise<number>, never> should give us number
-        const value = yield* resultWithPromise;
+        // Use mapAsync which returns Promise<Result<number, never>>
+        const value = yield* await Result.Ok(3).mapAsync(asyncDouble);
 
         expectTypeOf(value).toEqualTypeOf<number>();
         return value + 10;
@@ -330,7 +329,9 @@ describe("Result.asyncGen", () => {
 
     it("should handle mixed sync and async inner values", async () => {
       const syncResult = Result.Ok<number, "err1">(10);
-      const asyncResult = Result.Ok<number, "err2">(5).map(async (n) => n * 3);
+      const asyncResult = await Result.Ok<number, "err2">(5).mapAsync(
+        async (n) => n * 3,
+      );
 
       const result = await Result.asyncGen(async function* () {
         const a = yield* syncResult;
@@ -348,11 +349,12 @@ describe("Result.asyncGen", () => {
     });
 
     it("should short-circuit on Err and not yield subsequent values", async () => {
-      const mockFn = mock((n: number) => Result.Ok(n).map(async (x) => x * 2));
+      const mockFn = mock(async () => Result.Ok(10));
 
       const result = await Result.asyncGen(async function* () {
         const a = yield* Result.Err<"error", number>("error");
-        const b = yield* mockFn(5);
+        const b = yield* await mockFn();
+
         return a + b;
       });
 
@@ -497,7 +499,7 @@ describe("Result.asyncGen", () => {
         throw new Error("Network error");
       };
 
-      await expect(
+      expect(
         Result.asyncGen(async function* () {
           const value = yield* await failingFetch();
           return value;
@@ -514,9 +516,9 @@ describe("Result.asyncGen", () => {
         return a + b;
       });
 
-      const flatMapResult = await Result.Ok<number, string>(1)
-        .flatMap(async (a) => Result.Ok<number, string>(2).map((b) => a + b))
-        .toPromise();
+      const flatMapResult = await Result.Ok<number, string>(1).flatMapAsync(
+        async (a) => Result.Ok<number, string>(2).map((b) => a + b),
+      );
 
       expect(genResult.isOk()).toBe(true);
       expect(flatMapResult.isOk()).toBe(true);

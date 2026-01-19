@@ -22,16 +22,8 @@ console.log("1. Zip 5 with double:", zipped.unwrap()); // [5, 10]
 const zippedErr = Result.Err<string, number>("error").zip((x) => x * 2);
 console.log("2. Zip on Err:", zippedErr.unwrapErr()); // "error"
 
-// Example 3: Zip with async function
-const asyncZipped = Result.Ok(5).zip(async (x) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return x * 2;
-});
-console.log("3. Async zip:", asyncZipped); // Result<Promise<[5, 10]>, never>
-
-asyncZipped.unwrap().then((value) => {
-  console.log("   Resolved:", value); // [5, 10]
-});
+// Example 3: Zip is synchronous - for async operations, use gen.async* methods
+// See 07-asyncGen.ts and 08-asyncGenAdapter.ts for async patterns
 
 // Example 4: Zip for validation with context
 const parseAndValidate = (str: string) => {
@@ -149,19 +141,5 @@ const calculationSteps = Result.Ok(10)
   .zip(([[start, _sum], product]) => product - start); // subtract
 
 console.log("11. Calculation steps:", calculationSteps.unwrap()); // [[[10, 15], 30], 20]
-
-// Example 12: Async zip for API call patterns
-const fetchUser = async (id: number) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return { id, name: `User ${id}` };
-};
-
-const userWithTimestamp = Result.Ok(1)
-  .zip(async (id) => fetchUser(id))
-  .map(([id, user]) => ({ id, user, fetchedAt: Date.now() }));
-
-userWithTimestamp.unwrap().then((result) => {
-  console.log("12. Async fetch with timestamp:", result); // { id: 1, user: { id: 1, name: "User 1" }, fetchedAt: ... }
-});
 
 console.log("\n=== All zip examples completed ===");

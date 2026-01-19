@@ -219,15 +219,14 @@ describe("Option.asyncGen", () => {
   });
 
   describe("sync Option with async map/flatMap", () => {
-    it("should handle Option.Some(x).map(asyncFunc) via toPromise", async () => {
+    it("should handle async operations with explicit async methods", async () => {
       const asyncDouble = async (n: number): Promise<number> => {
         await delay(5);
         return n * 2;
       };
 
       const result = await Option.asyncGen(async function* () {
-        const mapped = Option.Some(3).map(asyncDouble);
-        const value = yield* await mapped.toPromise();
+        const value = yield* await Option.Some(3).mapAsync(asyncDouble);
         return value;
       });
 
@@ -236,15 +235,14 @@ describe("Option.asyncGen", () => {
       expect(result.unwrap()).toBe(6);
     });
 
-    it("should handle Option.Some(x).flatMap(asyncFunc) via toPromise", async () => {
+    it("should handle async flatMap with explicit async methods", async () => {
       const asyncValidate = async (n: number): Promise<Option<number>> => {
         await delay(5);
         return n > 0 ? Option.Some(n * 2) : Option.None;
       };
 
       const result = await Option.asyncGen(async function* () {
-        const mapped = Option.Some(5).flatMap(asyncValidate);
-        const value = yield* await mapped.toPromise();
+        const value = yield* await Option.Some(5).flatMapAsync(asyncValidate);
         return value;
       });
 
@@ -262,8 +260,7 @@ describe("Option.asyncGen", () => {
       let reachedAfterNone = false;
 
       const result = await Option.asyncGen(async function* () {
-        const mapped = Option.Some(-5).flatMap(asyncValidate);
-        const value = yield* await mapped.toPromise();
+        const value = yield* await Option.Some(-5).flatMapAsync(asyncValidate);
         reachedAfterNone = true;
         return value + 100;
       });
@@ -280,9 +277,8 @@ describe("Option.asyncGen", () => {
 
       const result = await Option.asyncGen(async function* () {
         const first = yield* Option.Some("hello");
-        const transformed = yield* await Option.Some(first)
-          .map(asyncTransform)
-          .toPromise();
+        const transformed =
+          yield* await Option.Some(first).mapAsync(asyncTransform);
         const final = yield* Option.Some(`${transformed}!`);
         return final;
       });
@@ -292,15 +288,14 @@ describe("Option.asyncGen", () => {
       expect(result.unwrap()).toBe("HELLO!");
     });
 
-    it("should handle filter with async predicate via toPromise", async () => {
+    it("should handle filter with async predicate", async () => {
       const asyncIsEven = async (n: number): Promise<boolean> => {
         await delay(5);
         return n % 2 === 0;
       };
 
       const result = await Option.asyncGen(async function* () {
-        const filtered = Option.Some(4).filter(asyncIsEven);
-        const value = yield* await filtered.toPromise();
+        const value = yield* await Option.Some(4).filterAsync(asyncIsEven);
         return value * 2;
       });
 
@@ -316,8 +311,8 @@ describe("Option.asyncGen", () => {
       };
 
       const result = await Option.asyncGen(async function* () {
-        const filtered = Option.Some(3).filter(asyncIsEven);
-        const value = yield* await filtered.toPromise();
+        const filtered = await Option.Some(3).filterAsync(asyncIsEven);
+        const value = yield* filtered;
         return value * 2;
       });
 
@@ -420,32 +415,35 @@ describe("Option.asyncGen", () => {
     });
   });
 
-  describe("comparison with flatMap", () => {
-    it("should be equivalent to async flatMap chain", async () => {
+  describe("comparison with asyncGenAdapter", () => {
+    it("should produce same result as asyncGenAdapter", async () => {
       const genResult = await Option.asyncGen(async function* () {
         const a = yield* Option.Some(1);
         const b = yield* await Promise.resolve(Option.Some(2));
         return a + b;
       });
 
-      const flatMapResult = await Option.Some(1)
-        .flatMap(async (a) => Option.Some(2).map((b) => a + b))
-        .toPromise();
+      const adapterResult = await Option.asyncGenAdapter(async function* ($) {
+        const a = yield* $(Option.Some(1));
+        const b = yield* $(await Promise.resolve(Option.Some(2)));
+        return a + b;
+      });
 
       expect(genResult.isSome()).toBe(true);
-      expect(flatMapResult.isSome()).toBe(true);
-      expect(genResult.unwrap()).toBe(flatMapResult.unwrap());
+      expect(adapterResult.isSome()).toBe(true);
+      expect(genResult.unwrap()).toBe(adapterResult.unwrap());
     });
   });
 
-  describe("Option<Promise<T>> automatic awaiting", () => {
-    it("should automatically await inner promise and return T not Promise<T>", async () => {
-      const promiseFunc = (n: number): Option<Promise<number>> => {
-        return Option.Some(Promise.resolve(n * 2));
+  describe("explicit async patterns", () => {
+    it("should handle explicit Promise<Option<T>> yields", async () => {
+      const fetchDoubled = async (n: number): Promise<Option<number>> => {
+        await delay(5);
+        return Option.Some(n * 2);
       };
 
       const result = await Option.asyncGen(async function* () {
-        const value = yield* promiseFunc(21);
+        const value = yield* await fetchDoubled(21);
 
         // value should be number, not Promise<number>
         expectTypeOf(value).toEqualTypeOf<number>();
@@ -457,18 +455,15 @@ describe("Option.asyncGen", () => {
       expect(result.unwrap()).toBe(42);
     });
 
-    it("should handle Option.map returning Promise", async () => {
+    it("should handle mapAsync in asyncGen", async () => {
       const asyncDouble = async (n: number): Promise<number> => {
         await delay(5);
         return n * 2;
       };
 
-      // Option.Some(3).map(asyncDouble) returns Option<Promise<number>>
-      const optionWithPromise = Option.Some(3).map(asyncDouble);
-
       const result = await Option.asyncGen(async function* () {
-        // Yielding Option<Promise<number>> should give us number
-        const value = yield* optionWithPromise;
+        // mapAsync returns Promise<Option<number>>, which we await before yielding
+        const value = yield* await Option.Some(3).mapAsync(asyncDouble);
 
         expectTypeOf(value).toEqualTypeOf<number>();
         return value + 10;
@@ -479,13 +474,12 @@ describe("Option.asyncGen", () => {
       expect(result.unwrap()).toBe(16); // 3 * 2 + 10
     });
 
-    it("should handle mixed sync and async inner values", async () => {
+    it("should handle mixed sync and async operations", async () => {
       const syncOption = Option.Some<number>(10);
-      const asyncOption = Option.Some<number>(5).map(async (n) => n * 3);
 
       const result = await Option.asyncGen(async function* () {
         const a = yield* syncOption;
-        const b = yield* asyncOption;
+        const b = yield* await Option.Some(5).mapAsync(async (n) => n * 3);
 
         expectTypeOf(a).toEqualTypeOf<number>();
         expectTypeOf(b).toEqualTypeOf<number>();
@@ -498,17 +492,15 @@ describe("Option.asyncGen", () => {
       expect(result.unwrap()).toBe(25); // 10 + 15
     });
 
-    it("should work with Option<Promise<T>> from flatMap", async () => {
+    it("should work with flatMapAsync in asyncGen", async () => {
       const asyncFlatMap = async (n: number): Promise<Option<number>> => {
         await delay(5);
         return n > 0 ? Option.Some(n * 2) : Option.None;
       };
 
-      // Option.flatMap with async returns Option<Promise<number>>
-      const optionWithPromise = Option.Some(5).flatMap(asyncFlatMap);
-
       const result = await Option.asyncGen(async function* () {
-        const value = yield* optionWithPromise;
+        // flatMapAsync returns Promise<Option<number>>, which we await before yielding
+        const value = yield* await Option.Some(5).flatMapAsync(asyncFlatMap);
         expectTypeOf(value).toEqualTypeOf<number>();
         return value;
       });
@@ -524,11 +516,10 @@ describe("Option.asyncGen", () => {
         return n > 0 ? Option.Some(n * 2) : Option.None;
       };
 
-      const optionWithPromise = Option.Some(-5).flatMap(asyncFlatMap);
       let reachedAfterNone = false;
 
       const result = await Option.asyncGen(async function* () {
-        const value = yield* optionWithPromise;
+        const value = yield* await Option.Some(-5).flatMapAsync(asyncFlatMap);
         reachedAfterNone = true;
         return value + 100;
       });
@@ -537,33 +528,16 @@ describe("Option.asyncGen", () => {
       expect(reachedAfterNone).toBe(false);
     });
 
-    it("should handle nested promises in Option", async () => {
-      const nestedPromise = Option.Some(Promise.resolve(Promise.resolve(42)));
-
-      const result = await Option.asyncGen(async function* () {
-        const value = yield* nestedPromise;
-        // With Awaited<T>, nested promises should be fully resolved
-        return value;
-      });
-
-      expect(result.isSome()).toBe(true);
-      expect(result.unwrap()).toBe(42);
-    });
-
-    it("should combine with Promise<Option<T>> (await outside)", async () => {
+    it("should combine multiple async operations", async () => {
       const fetchOption = async (): Promise<Option<number>> => {
         await delay(5);
         return Option.Some(100);
       };
 
-      // Option<Promise<T>> from map
-      const optionWithPromise = Option.Some(5).map(async (n) => n * 2);
-
       const result = await Option.asyncGen(async function* () {
-        // Await Promise<Option<T>> outside
+        // Both operations use explicit async methods
         const a = yield* await fetchOption();
-        // Yield Option<Promise<T>> directly (auto-awaited)
-        const b = yield* optionWithPromise;
+        const b = yield* await Option.Some(5).mapAsync(async (n) => n * 2);
 
         expectTypeOf(a).toEqualTypeOf<number>();
         expectTypeOf(b).toEqualTypeOf<number>();

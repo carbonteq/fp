@@ -144,7 +144,7 @@ console.log("   Items:", asyncAdapterResult.items.length);
 console.log("   Stats:", asyncAdapterResult.stats);
 
 // ============================================================================
-// STYLE 3: Using Result<Promise<T>, E> with auto-await
+// STYLE 3: Using async operations directly (no map)
 // ============================================================================
 
 async function processListWithAsyncMappers(
@@ -152,11 +152,12 @@ async function processListWithAsyncMappers(
   items: ItemEntity[],
 ): Promise<GroceryListDetails> {
   const result = await Result.asyncGen(async function* () {
-    // Result.map with async function returns Result<Promise<T>, E>
-    const itemsSerialized = yield* Result.Ok(items).map(serializeItemsAsync);
+    const itemsValue = yield* Result.Ok(items);
+    // Do async operations outside of map
+    const itemsSerialized = await serializeItemsAsync(itemsValue);
 
     // Same for stats calculation
-    const stats = yield* Result.Ok(items).map(calculateDetailedStatsAsync);
+    const stats = await calculateDetailedStatsAsync(itemsValue);
 
     return {
       id: list.id,
@@ -173,7 +174,7 @@ async function processListWithAsyncMappers(
 }
 
 // Test auto-await
-console.log("\n3. Auto-await inner promises:");
+console.log("\n3. Direct async operations:");
 const autoAwaitResult = await processListWithAsyncMappers(
   new GroceryListEntity(
     "list-456",
@@ -220,14 +221,10 @@ async function processListWithFullValidationAsync(
     const activeItems = yield* $(filterActiveItems(validItems));
 
     // Step 8: Async serialization
-    const itemsSerialized = yield* $(
-      Result.Ok(activeItems).map(serializeItemsAsync),
-    );
+    const itemsSerialized = await serializeItemsAsync(activeItems);
 
     // Step 9: Async stats calculation
-    const stats = yield* $(
-      Result.Ok(activeItems).map(calculateDetailedStatsAsync),
-    );
+    const stats = await calculateDetailedStatsAsync(activeItems);
 
     return {
       id: list.id,
@@ -313,26 +310,22 @@ const sequentialResult = await fetchAllDataSequential("user-123");
 console.log("   Result:", sequentialResult._tag);
 
 // ===========================================================================
-// USING TOPROMISE FOR CONVERSION
+// USING DIRECT ASYNC OPERATIONS
 // ============================================================================
 
-async function processWithToPromise(items: ItemEntity[]) {
+async function processWithDirectAsync(items: ItemEntity[]) {
   return Result.asyncGen(async function* () {
-    // Convert Result<Promise<T>, E> to Result<T, E>
-    const itemsSerialized = yield* await Result.Ok(items)
-      .map(serializeItemsAsync)
-      .toPromise();
-
-    const stats = yield* await Result.Ok(items)
-      .map(calculateDetailedStatsAsync)
-      .toPromise();
+    const itemsValue = yield* Result.Ok(items);
+    // Do async operations directly
+    const itemsSerialized = await serializeItemsAsync(itemsValue);
+    const stats = await calculateDetailedStatsAsync(itemsValue);
 
     return { items: itemsSerialized, stats };
   });
 }
 
-console.log("\n6. Using toPromise:");
-const toPromiseResult = await processWithToPromise(mockItems);
+console.log("\n6. Direct async operations:");
+const toPromiseResult = await processWithDirectAsync(mockItems);
 
 if (toPromiseResult.isErr()) {
   console.log("   Error:", toPromiseResult.unwrapErr());
@@ -350,8 +343,8 @@ console.log("\n=== Readability Comparison ===\n");
 
 console.log("asyncGen:");
 console.log("  - yield* await Promise<Result<T,E>>");
-console.log("  - Auto-awaits Result<Promise<T>, E>");
 console.log("  - Clean, linear async code");
+console.log("  - Do async operations outside Result wrappers");
 
 console.log("\nasyncGenAdapter:");
 console.log("  - yield* $(await Promise<Result<T,E>>)");
@@ -361,6 +354,6 @@ console.log("  - Explicit adapter makes yields clear");
 console.log("\nBoth support:");
 console.log("  - Mixed sync/async operations");
 console.log("  - Automatic error short-circuiting");
-console.log("  - Async mappers via Result<Promise<T>, E>");
+console.log("  - Direct async functions (no map(async fn))");
 
 console.log("\n=== All async workflow examples completed ===");

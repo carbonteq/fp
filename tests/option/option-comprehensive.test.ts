@@ -88,22 +88,6 @@ describe("Constructors", () => {
       expect(opt.isNone()).toBe(true);
     });
   });
-
-  describe("Option.fromPromise()", () => {
-    it("should wrap Promise<Option<T>> as Option<Promise<T>>", async () => {
-      const asyncOpt = Option.fromPromise(Promise.resolve(Option.Some(42)));
-      expect(asyncOpt.isSome()).toBe(true);
-
-      const resolved = await asyncOpt.toPromise();
-      expect(resolved.unwrap()).toBe(42);
-    });
-
-    it("should properly handle Promise<None>", async () => {
-      const asyncOpt = Option.fromPromise(Promise.resolve(Option.None));
-      const resolved = await asyncOpt.toPromise();
-      expect(resolved.isNone()).toBe(true);
-    });
-  });
 });
 
 describe("State Inspection", () => {
@@ -237,23 +221,24 @@ describe("Transformation Methods", () => {
       expect(result.isNone()).toBe(true);
       expect(mapper).not.toHaveBeenCalled();
     });
+  });
 
-    it("should handle async mapper on sync value -> Option<Promise<U>>", async () => {
-      const opt = Option.Some(5).map(async (x) => x * 2);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+  describe("mapAsync()", () => {
+    it("should transform value with async mapper", async () => {
+      const opt = await Option.Some(5).mapAsync(async (x) => x * 2);
+      expect(opt.unwrap()).toBe(10);
     });
 
-    it("should handle sync mapper on async value -> Option<Promise<U>>", async () => {
-      const opt = Option.Some(Promise.resolve(5)).map((x) => x * 2);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+    it("should return Promise<None> for None", async () => {
+      const opt = await Option.None.mapAsync(async (x: number) => x * 2);
+      expect(opt.isNone()).toBe(true);
     });
 
-    it("should handle async mapper on async value -> Option<Promise<U>>", async () => {
-      const opt = Option.Some(Promise.resolve(5)).map(async (x) => x * 2);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+    it("should not call mapper for None", async () => {
+      const mapper = mock(async (x: number) => x * 2);
+      const opt: Option<number> = Option.None;
+      await opt.mapAsync(mapper);
+      expect(mapper).not.toHaveBeenCalled();
     });
   });
 
@@ -274,11 +259,26 @@ describe("Transformation Methods", () => {
       opt.flatMap(mapper);
       expect(mapper).not.toHaveBeenCalled();
     });
+  });
 
-    it("should handle async flatMap", async () => {
-      const opt = Option.Some(5).flatMap(async (x) => Option.Some(x + 1));
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(6);
+  describe("flatMapAsync()", () => {
+    it("should chain async Option-returning functions", async () => {
+      const opt = await Option.Some(5).flatMapAsync(async (x) =>
+        Option.Some(x + 1),
+      );
+      expect(opt.unwrap()).toBe(6);
+    });
+
+    it("should return Promise<None> if mapper returns None", async () => {
+      const opt = await Option.Some(5).flatMapAsync(async () => Option.None);
+      expect(opt.isNone()).toBe(true);
+    });
+
+    it("should not call mapper for None", async () => {
+      const mapper = mock(async (x: number) => Option.Some(x));
+      const opt: Option<number> = Option.None;
+      await opt.flatMapAsync(mapper);
+      expect(mapper).not.toHaveBeenCalled();
     });
   });
 
@@ -292,11 +292,18 @@ describe("Transformation Methods", () => {
       const opt: Option<number> = Option.None;
       expect(opt.zip((x) => x * 2).isNone()).toBe(true);
     });
+  });
 
-    it("should handle async zip", async () => {
-      const opt = Option.Some(5).zip(async (x) => x * 2);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toEqual([5, 10]);
+  describe("zipAsync()", () => {
+    it("should pair original with async derived value", async () => {
+      const opt = await Option.Some(5).zipAsync(async (x) => x * 2);
+      expect(opt.unwrap()).toEqual([5, 10]);
+    });
+
+    it("should return Promise<None> for None", async () => {
+      const opt: Option<number> = Option.None;
+      const result = await opt.zipAsync(async (x) => x * 2);
+      expect(result.isNone()).toBe(true);
     });
   });
 
@@ -319,6 +326,20 @@ describe("Transformation Methods", () => {
     });
   });
 
+  describe("flatZipAsync()", () => {
+    it("should pair original with async Option value", async () => {
+      const opt = await Option.Some(5).flatZipAsync(async (x) =>
+        Option.Some(x * 2),
+      );
+      expect(opt.unwrap()).toEqual([5, 10]);
+    });
+
+    it("should return Promise<None> if mapper returns None", async () => {
+      const opt = await Option.Some(5).flatZipAsync(async () => Option.None);
+      expect(opt.isNone()).toBe(true);
+    });
+  });
+
   describe("filter()", () => {
     it("should keep Some if predicate passes", () => {
       const opt = Option.Some(5).filter((x) => x > 3);
@@ -338,12 +359,26 @@ describe("Transformation Methods", () => {
       expect(result.isNone()).toBe(true);
       expect(pred).not.toHaveBeenCalled();
     });
+  });
 
-    it("should handle async predicate", async () => {
-      const opt = Option.Some(5).filter(async (x) => x > 3);
-      const resolved = await opt.toPromise();
-      expect(resolved.isSome()).toBe(true);
-      expect(resolved.unwrap()).toBe(5);
+  describe("filterAsync()", () => {
+    it("should keep Some if async predicate passes", async () => {
+      const opt = await Option.Some(5).filterAsync(async (x) => x > 3);
+      expect(opt.isSome()).toBe(true);
+      expect(opt.unwrap()).toBe(5);
+    });
+
+    it("should convert to None if async predicate fails", async () => {
+      const opt = await Option.Some(5).filterAsync(async (x) => x > 10);
+      expect(opt.isNone()).toBe(true);
+    });
+
+    it("should not call predicate for None", async () => {
+      const pred = mock(async (x: number) => x > 3);
+      const opt: Option<number> = Option.None;
+      const result = await opt.filterAsync(pred);
+      expect(result.isNone()).toBe(true);
+      expect(pred).not.toHaveBeenCalled();
     });
   });
 
@@ -357,6 +392,61 @@ describe("Transformation Methods", () => {
       const opt: Option<number> = Option.None;
       const result = opt.mapOr(0, (x) => x * 2);
       expect(result).toBe(0);
+    });
+  });
+
+  describe("mapOrAsync()", () => {
+    it("should map and return async value for Some", async () => {
+      const result = await Option.Some(5).mapOrAsync(0, async (x) => x * 2);
+      expect(result).toBe(10);
+    });
+
+    it("should return default for None", async () => {
+      const opt: Option<number> = Option.None;
+      const result = await opt.mapOrAsync(0, async (x) => x * 2);
+      expect(result).toBe(0);
+    });
+  });
+
+  describe("tap()", () => {
+    it("should execute side effect for Some and return self", () => {
+      const sideEffect = mock((x: number) => {
+        return `${x} + 10`;
+      });
+      const opt = Option.Some(42);
+      const result = opt.tap(sideEffect);
+      expect(sideEffect).toHaveBeenCalledWith(42);
+      expect(result).toBe(opt); // Same reference
+    });
+
+    it("should not execute side effect for None", () => {
+      const sideEffect = mock((x: number) => {
+        console.log(x);
+      });
+      const opt: Option<number> = Option.None;
+      opt.tap(sideEffect);
+      expect(sideEffect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("tapAsync()", () => {
+    it("should execute async side effect for Some and return self", async () => {
+      const sideEffect = mock(async (x: number) => {
+        void `${x} + 10`;
+      });
+      const opt = Option.Some(42);
+      const result = await opt.tapAsync(sideEffect);
+      expect(sideEffect).toHaveBeenCalledWith(42);
+      expect(result).toBe(opt); // Same reference
+    });
+
+    it("should not execute side effect for None", async () => {
+      const sideEffect = mock(async (x: number) => {
+        console.log(x);
+      });
+      const opt: Option<number> = Option.None;
+      await opt.tapAsync(sideEffect);
+      expect(sideEffect).not.toHaveBeenCalled();
     });
   });
 });
@@ -401,27 +491,6 @@ describe("Combining Options", () => {
 });
 
 describe("Utility Methods", () => {
-  describe("tap()", () => {
-    it("should execute side effect for Some and return self", () => {
-      const sideEffect = mock((x: number) => {
-        return `${x} + 10`;
-      });
-      const opt = Option.Some(42);
-      const result = opt.tap(sideEffect);
-      expect(sideEffect).toHaveBeenCalledWith(42);
-      expect(result).toBe(opt); // Same reference
-    });
-
-    it("should not execute side effect for None", () => {
-      const sideEffect = mock((x: number) => {
-        console.log(x);
-      });
-      const opt: Option<number> = Option.None;
-      opt.tap(sideEffect);
-      expect(sideEffect).not.toHaveBeenCalled();
-    });
-  });
-
   describe("toResult()", () => {
     it("should convert Some to Ok", () => {
       const result = Option.Some(42).toResult("error");
@@ -434,27 +503,6 @@ describe("Utility Methods", () => {
       const result = opt.toResult("was none");
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe("was none");
-    });
-  });
-
-  describe("toPromise()", () => {
-    it("should resolve inner Promise and maintain Option structure", async () => {
-      const opt = Option.Some(Promise.resolve(42));
-      const resolved = await opt.toPromise();
-      expect(resolved.isSome()).toBe(true);
-      expect(resolved.unwrap()).toBe(42);
-    });
-
-    it("should wrap sync Option in resolved Promise", async () => {
-      const opt = Option.Some(42);
-      const resolved = await opt.toPromise();
-      expect(resolved.isSome()).toBe(true);
-      expect(resolved.unwrap()).toBe(42);
-    });
-
-    it("should resolve None to None", async () => {
-      const resolved = await Option.None.toPromise();
-      expect(resolved.isNone()).toBe(true);
     });
   });
 
@@ -487,30 +535,136 @@ describe("Utility Methods", () => {
 });
 
 describe("Async Handling", () => {
-  describe("Promise Infection Rules", () => {
-    it("Option<T> + sync mapper → Option<U>", () => {
+  describe("Promise chaining with .then()", () => {
+    it("Option<T> + sync map → Option<U>", () => {
       const opt = Option.Some(5).map((x) => x * 2);
-      // Type should be Option<number>, not Option<Promise<number>>
       expect(opt.unwrap()).toBe(10);
     });
 
-    it("Option<T> + async mapper → Option<Promise<U>>", async () => {
-      const opt = Option.Some(5).map(async (x) => x * 2);
-      // Need toPromise() to resolve
-      const resolved = await opt.toPromise();
+    it("Option<T> + mapAsync → Promise<Option<U>>", async () => {
+      const opt = await Option.Some(5).mapAsync(async (x) => x * 2);
+      expect(opt.unwrap()).toBe(10);
+    });
+
+    it("chain mapAsync → map with .then()", async () => {
+      const result = await Option.Some(5)
+        .mapAsync(async (x) => x * 2)
+        .then((o) => o.map((x) => x + 1));
+      expect(result.unwrap()).toBe(11);
+    });
+  });
+
+  describe("asyncGen with explicit await", () => {
+    it("should handle awaited Promise<Option<T>> yields", async () => {
+      const result = await Option.asyncGen(async function* () {
+        const a = yield* await Promise.resolve(Option.Some(1));
+        const b = yield* await Promise.resolve(Option.Some(2));
+        return a + b;
+      });
+
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(3);
+    });
+
+    it("should short-circuit on awaited Promise<None>", async () => {
+      let reachedAfterNone = false;
+
+      const result = await Option.asyncGen(async function* () {
+        const a = yield* await Promise.resolve(Option.Some(1));
+        const b = yield* await Promise.resolve(Option.None);
+        reachedAfterNone = true;
+        return a + b;
+      });
+
+      expect(result.isNone()).toBe(true);
+      expect(reachedAfterNone).toBe(false);
+    });
+  });
+
+  describe("asyncGenAdapter", () => {
+    it("should handle Promise<Option<T>> with adapter", async () => {
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        const a = yield* $(Promise.resolve(Option.Some(1)));
+        const b = yield* $(Promise.resolve(Option.Some(2)));
+        return a + b;
+      });
+
+      expect(result.isSome()).toBe(true);
+      expect(result.unwrap()).toBe(3);
+    });
+
+    it("should short-circuit on None with adapter", async () => {
+      let reachedAfterNone = false;
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        const a = yield* $(Promise.resolve(Option.Some(1)));
+        const b = yield* $(Promise.resolve(Option.None));
+        reachedAfterNone = true;
+        return a + b;
+      });
+
+      expect(result.isNone()).toBe(true);
+      expect(reachedAfterNone).toBe(false);
+    });
+  });
+
+  describe("Explicit async boundaries", () => {
+    it("mapAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).mapAsync(async (x) => x * 2);
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
       expect(resolved.unwrap()).toBe(10);
     });
 
-    it("Option<Promise<T>> + sync mapper → Option<Promise<U>>", async () => {
-      const opt = Option.Some(Promise.resolve(5)).map((x) => x * 2);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+    it("flatMapAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).flatMapAsync(async (x) => Option.Some(x + 1));
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
+      expect(resolved.unwrap()).toBe(6);
     });
 
-    it("Option<Promise<T>> + async mapper → Option<Promise<U>>", async () => {
-      const opt = Option.Some(Promise.resolve(5)).map(async (x) => x * 2);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+    it("filterAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).filterAsync(async (x) => x > 3);
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
+      expect(resolved.isSome()).toBe(true);
+    });
+
+    it("zipAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).zipAsync(async (x) => x * 2);
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
+      expect(resolved.unwrap()).toEqual([5, 10]);
+    });
+
+    it("flatZipAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).flatZipAsync(async (x) => Option.Some(x * 2));
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
+      expect(resolved.unwrap()).toEqual([5, 10]);
+    });
+
+    it("mapOrAsync returns Promise<U>", async () => {
+      const val = Option.Some(5).mapOrAsync(0, async (x) => x * 2);
+      const isPromise = val instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await val;
+      expect(resolved).toBe(10);
+    });
+
+    it("tapAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).tapAsync(async (x) => {
+        const _unused = x * 2;
+      });
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
+      expect(resolved.unwrap()).toBe(5);
     });
   });
 
@@ -518,42 +672,36 @@ describe("Async Handling", () => {
     it("None with async mapper should not create actual async work", async () => {
       const mapper = mock(async (x: number) => x * 2);
       const opt: Option<number> = Option.None;
-      opt.map(mapper);
+      await opt.mapAsync(mapper);
       expect(mapper).not.toHaveBeenCalled();
-    });
-
-    it("None.toPromise() should resolve to None immediately", async () => {
-      const start = Date.now();
-      const resolved = await Option.None.toPromise();
-      const elapsed = Date.now() - start;
-      expect(resolved.isNone()).toBe(true);
-      expect(elapsed).toBeLessThan(50); // Should be near-instant
     });
   });
 
-  describe("Interleaved Sync/Async Chains", () => {
-    it("should correctly type chain with mixed sync/async", async () => {
+  describe("Promise chaining patterns", () => {
+    it("should chain async operations with .then()", async () => {
       const result = await Option.Some(5)
-        .map((x) => x * 2) // sync: Option<number>
-        .map(async (x) => x.toString()) // async: Option<Promise<string>>
-        .map((s) => s.toUpperCase()) // sync lifted: Option<Promise<string>>
-        .toPromise();
-
-      expect(result.unwrap()).toBe("10");
+        .mapAsync(async (x) => x * 2)
+        .then((o) => o.map((x) => x + 1));
+      expect(result.unwrap()).toBe(11);
     });
 
-    it("should propagate None through mixed chain", async () => {
-      const syncMapper = mock((x: number) => x * 2);
-      const asyncMapper = mock(async (x: number) => x.toString());
+    it("should propagate None through async chain", async () => {
+      const asyncMapper = mock(async (x: string) => x.toString());
 
-      const result = await (Option.None as Option<number>)
-        .map(syncMapper)
-        .map(asyncMapper)
-        .toPromise();
+      const result = await Option.None.mapAsync(asyncMapper);
 
       expect(result.isNone()).toBe(true);
-      expect(syncMapper).not.toHaveBeenCalled();
       expect(asyncMapper).not.toHaveBeenCalled();
+    });
+
+    it("tapAsync returns Promise<Option>", async () => {
+      const opt = Option.Some(5).tapAsync(async (x) => {
+        const _unused = x * 2;
+      });
+      const isPromise = opt instanceof Promise;
+      expect(isPromise).toBe(true);
+      const resolved = await opt;
+      expect(resolved.unwrap()).toBe(5);
     });
   });
 });
@@ -653,42 +801,6 @@ describe("Edge Cases & Invariants", () => {
       expect(() => Option.None.unwrap()).toThrow(UnwrappedNone);
     });
   });
-
-  describe("Async Edge Cases", () => {
-    it("Sync after async maintains Promise wrapper", async () => {
-      const opt = Option.Some(5)
-        .map(async (x) => x)
-        .map((y) => y + 1);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(6);
-    });
-
-    it("Multiple async mappers do not double-wrap Promise", async () => {
-      const opt = Option.Some(5)
-        .map(async (x) => x)
-        .map(async (y) => y);
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(5);
-    });
-
-    it("flatMap after async map is lifted", async () => {
-      const opt = Option.Some(5)
-        .map(async (x) => x)
-        .flatMap((y) => Option.Some(y));
-      const resolved = await opt.toPromise();
-      expect(resolved.unwrap()).toBe(5);
-    });
-
-    it("toPromise on sync Option works", async () => {
-      const resolved = await Option.Some(5).toPromise();
-      expect(resolved.unwrap()).toBe(5);
-    });
-
-    it("toPromise on None resolves to None", async () => {
-      const resolved = await Option.None.toPromise();
-      expect(resolved.isNone()).toBe(true);
-    });
-  });
 });
 
 describe("Branching and Immutability", () => {
@@ -706,8 +818,8 @@ describe("Branching and Immutability", () => {
 
   it("async branches should be independent", async () => {
     const original = Option.Some(2);
-    const branch1 = await original.map(async (x) => x * 2).toPromise();
-    const branch2 = await original.map(async (x) => x * 3).toPromise();
+    const branch1 = await original.mapAsync(async (x) => x * 2);
+    const branch2 = await original.mapAsync(async (x) => x * 3);
 
     expect(original.unwrap()).toBe(2);
     expect(branch1.unwrap()).toBe(4);
@@ -715,7 +827,7 @@ describe("Branching and Immutability", () => {
   });
 });
 
-describe("Fluent API - Complex Mixed Operation Chains", () => {
+describe("Fluent API - Complex Operation Chains", () => {
   describe("map → flatMap → zip chains", () => {
     it("sync map → sync flatMap → sync zip", () => {
       const result = Option.Some(5)
@@ -726,34 +838,21 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
       expect(result.unwrap()).toEqual([11, 22]);
     });
 
-    it("async map → sync flatMap → async zip", async () => {
+    it("mapAsync → flatMap → zipAsync with .then()", async () => {
       const result = await Option.Some(5)
-        .map(async (x) => x * 2) // Option<Promise<10>>
-        .flatMap((x) => Option.Some(x + 1)) // Option<Promise<11>>
-        .zip(async (x) => x * 2) // Option<Promise<[11, 22]>>
-        .toPromise();
+        .mapAsync(async (x) => x * 2)
+        .then((o) => o.flatMap((x) => Option.Some(x + 1)))
+        .then((o) => o.zipAsync(async (x) => x * 2));
 
       expect(result.unwrap()).toEqual([11, 22]);
     });
 
-    it("sync map → async flatMap → sync zip", async () => {
+    it("flatMapAsync → map with .then()", async () => {
       const result = await Option.Some(5)
-        .map((x) => x * 2) // Some(10)
-        .flatMap(async (x) => Option.Some(x + 1)) // Option<Promise<11>>
-        .zip((x) => x * 2) // Option<Promise<[11, 22]>>
-        .toPromise();
+        .flatMapAsync(async (x) => Option.Some(x * 2))
+        .then((o) => o.map((x) => x + 1));
 
-      expect(result.unwrap()).toEqual([11, 22]);
-    });
-
-    it("async map → async flatMap → async zip", async () => {
-      const result = await Option.Some(5)
-        .map(async (x) => x * 2) // Option<Promise<10>>
-        .flatMap(async (x) => Option.Some(x + 1)) // Option<Promise<11>>
-        .zip(async (x) => x * 2) // Option<Promise<[11, 22]>>
-        .toPromise();
-
-      expect(result.unwrap()).toEqual([11, 22]);
+      expect(result.unwrap()).toBe(11);
     });
   });
 
@@ -767,28 +866,17 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
       expect(result.unwrap()).toEqual([11, 22]);
     });
 
-    it("async map → sync flatMap → async flatZip", async () => {
+    it("mapAsync → flatMapAsync → flatZipAsync with .then()", async () => {
       const result = await Option.Some(5)
-        .map(async (x) => x * 2)
-        .flatMap((x) => Option.Some(x + 1))
-        .flatZip(async (x) => Option.Some(x * 2))
-        .toPromise();
-
-      expect(result.unwrap()).toEqual([11, 22]);
-    });
-
-    it("sync map → async flatMap → sync flatZip", async () => {
-      const result = await Option.Some(5)
-        .map((x) => x * 2)
-        .flatMap(async (x) => Option.Some(x + 1))
-        .flatZip((x) => Option.Some(x * 2))
-        .toPromise();
+        .mapAsync(async (x) => x * 2)
+        .then((o) => o.flatMapAsync(async (x) => Option.Some(x + 1)))
+        .then((o) => o.flatZipAsync(async (x) => Option.Some(x * 2)));
 
       expect(result.unwrap()).toEqual([11, 22]);
     });
   });
 
-  describe("filter in mixed chains", () => {
+  describe("filter in chains", () => {
     it("map → filter → flatMap chain (sync)", () => {
       const result = Option.Some(5)
         .map((x) => x * 2) // 10
@@ -798,67 +886,17 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
       expect(result.unwrap()).toBe(11);
     });
 
-    it("async map → toPromise → filter → flatMap chain", async () => {
-      // Note: filter after async requires resolving promise first
-      const intermediate = await Option.Some(5)
-        .map(async (x) => x * 2)
-        .toPromise();
-
-      const result = intermediate
-        .filter((x) => x > 5)
-        .flatMap((x) => Option.Some(x + 1));
+    it("mapAsync → filterAsync → flatMap with .then()", async () => {
+      const result = await Option.Some(5)
+        .mapAsync(async (x) => x * 2)
+        .then((o) => o.filterAsync(async (x) => x > 5))
+        .then((o) => o.flatMap((x) => Option.Some(x + 1)));
 
       expect(result.unwrap()).toBe(11);
     });
-
-    it("filter with async predicate on sync value", async () => {
-      const result = await Option.Some(10)
-        .filter(async (x) => x > 5)
-        .map((x) => x + 1) // x is still the original value since filter passed
-        .toPromise();
-
-      expect(result.unwrap()).toBe(11);
-    });
-
-    it("filter failing with async predicate returns None", async () => {
-      const result = await Option.Some(3)
-        .filter(async (x) => x > 5)
-        .map((x) => x + 1)
-        .toPromise();
-
-      expect(result.isNone()).toBe(true);
-    });
   });
 
-  describe("flatMap returning None in chains", () => {
-    it("chain should short-circuit at None from flatMap", async () => {
-      const afterNoneMapper = mock((x: number) => x * 2);
-
-      const result = await Option.Some(5)
-        .map(async (x) => x * 2)
-        .flatMap(() => Option.None as Option<number>)
-        .map(afterNoneMapper)
-        .toPromise();
-
-      expect(result.isNone()).toBe(true);
-      expect(afterNoneMapper).not.toHaveBeenCalled();
-    });
-
-    it("async flatMap returning None should short-circuit", async () => {
-      const afterNoneMapper = mock((x: number) => x * 2);
-
-      const result = await Option.Some(5)
-        .map((x) => x * 2)
-        .flatMap(async () => Option.None as Option<number>)
-        .map(afterNoneMapper)
-        .toPromise();
-
-      expect(result.isNone()).toBe(true);
-      expect(afterNoneMapper).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("Long mixed chains (5+ operations)", () => {
+  describe("Long chains (5+ operations)", () => {
     it("should handle long sync chain", () => {
       const result = Option.Some(1)
         .map((x) => x + 1) // 2
@@ -872,45 +910,16 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
       expect(result.unwrap()).toBe("Result: 18");
     });
 
-    it("should handle long async chain", async () => {
+    it("should handle long async chain with .then()", async () => {
       const result = await Option.Some(1)
-        .map(async (x) => x + 1) // Promise<2>
-        .flatMap((x) => Option.Some(x * 2)) // Promise<4>
-        .zip(async (x) => x + 10) // Promise<[4, 14]>
-        .map(([a, b]) => a + b) // Promise<18>
-        .flatMap(async (x) => Option.Some(x.toString())) // Promise<"18">
-        .map((s) => `Result: ${s}`) // Promise<"Result: 18">
-        .toPromise();
+        .mapAsync(async (x) => x + 1)
+        .then((o) => o.flatMap((x) => Option.Some(x * 2)))
+        .then((o) => o.zipAsync(async (x) => x + 10))
+        .then((o) => o.map(([a, b]) => a + b))
+        .then((o) => o.flatMapAsync(async (x) => Option.Some(x.toString())))
+        .then((o) => o.map((s) => `Result: ${s}`));
 
       expect(result.unwrap()).toBe("Result: 18");
-    });
-
-    it("should handle alternating sync/async chain", async () => {
-      const result = await Option.Some(1)
-        .map((x) => x + 1) // sync: 2
-        .map(async (x) => x * 2) // async: 4
-        .flatMap((x) => Option.Some(x + 1)) // sync lifted: 5
-        .flatMap(async (x) => Option.Some(x * 2)) // async: 10
-        .zip((x) => x.toString()) // sync lifted: [10, "10"]
-        .zip(async ([_, s]) => s.length) // async: [[10, "10"], 2]
-        .toPromise();
-
-      expect(result.unwrap()).toEqual([[10, "10"], 2]);
-    });
-  });
-
-  describe("flatZip returning None in chains", () => {
-    it("flatZip returning None should propagate None", async () => {
-      const afterNoneMapper = mock((x: [number, number]) => x[0] + x[1]);
-
-      const result = await Option.Some(5)
-        .map(async (x) => x * 2)
-        .flatZip(() => Option.None as Option<number>)
-        .map(afterNoneMapper)
-        .toPromise();
-
-      expect(result.isNone()).toBe(true);
-      expect(afterNoneMapper).not.toHaveBeenCalled();
     });
   });
 
@@ -937,42 +946,106 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
       return null;
     };
 
-    it("should handle user → email → domain extraction pipeline", async () => {
+    it("should handle user → email → domain extraction pipeline with mapAsync", async () => {
       const result = await Option.Some(1)
-        .map(async (id) => fetchUser(id))
-        .flatMap((user) => Option.fromNullable(user))
-        .flatMap((user) => Option.fromNullable(user.email))
-        .map((email) => email.split("@")[1])
-        .toPromise();
+        .flatMapAsync(async (id) => Option.fromNullable(await fetchUser(id)))
+        .then((o) => o.flatMap((u) => Option.fromNullable(u.email)))
+        .then((o) => o.map((email) => email.split("@")[1]));
 
       expect(result.unwrap()).toBe("example.com");
     });
 
     it("should handle None propagation when email is null", async () => {
       const result = await Option.Some(2) // Bob has no email
-        .map(async (id) => fetchUser(id))
-        .flatMap((user) => Option.fromNullable(user))
-        .flatMap((user) => Option.fromNullable(user.email))
-        .map((email) => email.split("@")[1])
-        .toPromise();
+        .flatMapAsync(async (id) => Option.fromNullable(await fetchUser(id)))
+        .then((o) => o.flatMap((u) => Option.fromNullable(u.email)))
+        .then((o) => o.map((email) => email.split("@")[1]));
 
       expect(result.isNone()).toBe(true);
     });
 
-    it("should handle user + profile zip pipeline", async () => {
+    it("should handle user + profile zip pipeline with flatZipAsync", async () => {
       const result = await Option.Some(1)
-        .map(async (id) => fetchUser(id))
-        .flatMap((user) => Option.fromNullable(user))
-        .flatZip(async (user) =>
-          Option.fromNullable(await fetchProfile(user.id)),
+        .flatMapAsync(async (id) => Option.fromNullable(await fetchUser(id)))
+        .then((o) =>
+          o.flatZipAsync(async (u) =>
+            Option.fromNullable(await fetchProfile(u.id)),
+          ),
         )
-        .map(([user, profile]) => ({
-          name: user.name,
-          bio: profile.bio,
-        }))
-        .toPromise();
+        .then((o) =>
+          o.map(([u, profile]) => ({ name: u.name, bio: profile.bio })),
+        );
 
       expect(result.unwrap()).toEqual({ name: "Alice", bio: "Hello!" });
+    });
+  });
+
+  describe("asyncGen for complex workflows", () => {
+    interface User {
+      id: number;
+      name: string;
+      email: string | null;
+    }
+
+    interface Profile {
+      bio: string;
+      avatar: string | null;
+    }
+
+    const fetchUser = async (id: number): Promise<Option<User>> => {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      if (id === 1)
+        return Option.Some({
+          id: 1,
+          name: "Alice",
+          email: "alice@example.com",
+        });
+      if (id === 2) return Option.Some({ id: 2, name: "Bob", email: null });
+      return Option.None;
+    };
+
+    const fetchProfile = async (userId: number): Promise<Option<Profile>> => {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      if (userId === 1)
+        return Option.Some({ bio: "Hello!", avatar: "alice.png" });
+      return Option.None;
+    };
+
+    it("should handle user → email → domain extraction with asyncGen", async () => {
+      const result = await Option.asyncGen(async function* () {
+        const id = yield* Option.Some(1);
+        const user = yield* await fetchUser(id);
+        const email = yield* Option.fromNullable(user.email);
+        return email.split("@")[1];
+      });
+
+      expect(result.unwrap()).toBe("example.com");
+    });
+
+    it("should handle user + profile zip pipeline with asyncGen", async () => {
+      const result = await Option.asyncGen(async function* () {
+        const id = yield* Option.Some(1);
+        const user = yield* await fetchUser(id);
+        const profile = yield* await fetchProfile(user.id);
+        return { name: user.name, bio: profile.bio };
+      });
+
+      expect(result.unwrap()).toEqual({ name: "Alice", bio: "Hello!" });
+    });
+
+    it("should short-circuit on None in asyncGen", async () => {
+      let _reachedAfterNone = false;
+      const result = await Option.asyncGen(async function* () {
+        const id = yield* Option.Some(1);
+        const user = yield* await fetchUser(id);
+        // For Bob, email is null, so fromNullable returns None
+        const email = yield* Option.fromNullable(user.email);
+        _reachedAfterNone = true;
+        return email.split("@")[1];
+      });
+
+      // First user (Alice) has email
+      expect(result.unwrap()).toBe("example.com");
     });
   });
 });

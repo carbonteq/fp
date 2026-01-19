@@ -8,10 +8,6 @@
 
 import { Option } from "../../dist/option.mjs";
 
-// ============================================================================
-// BASIC ZIP EXAMPLES
-// ============================================================================
-
 console.log("=== Option.zip() Examples ===\n");
 
 // Example 1: Basic zip - pair value with its double
@@ -23,30 +19,29 @@ const zippedNone = Option.None.zip((x: number) => x * 2);
 console.log("2. Zip on None:", zippedNone._tag); // "None"
 
 // Example 3: Zip with async function
-const asyncZipped = Option.Some(5).zip(async (x) => {
+const asyncZipped = await Option.Some(5).zipAsync(async (x) => {
   await new Promise((resolve) => setTimeout(resolve, 10));
   return x * 2;
 });
-console.log("3. Async zip:", asyncZipped); // Option<Promise<[5, 10]>>
+console.log("3. Async zip:", asyncZipped._tag); // "Some"
 
-(async () => {
-  const value = await asyncZipped.unwrap();
-  console.log("   Resolved:", value); // [5, 10]
-})();
+const value = asyncZipped.unwrap();
+console.log("   Resolved:", value); // [5, 10]
 
 // Example 4: Zip for validation with context
 const parseAndValidate = (str: string) => {
   return Option.fromNullable(Number(str))
     .filter((n) => !Number.isNaN(n))
-    .zip((num) => (num > 0 ? num : Option.None))
-    .map(([original, _validated]) => ({
+    .flatZip((num) => (num > 0 ? Option.Some(num) : Option.None))
+    .map(([num, _validated]) => ({
       original: str,
-      parsed: original,
+      parsed: num,
       isValidated: true,
     }));
 };
 
 console.log("4. Parse with context:", parseAndValidate("42").unwrap()); // { original: "42", parsed: 42, isValidated: true }
+console.log("    Negative number:", parseAndValidate("-5")._tag); // "None"
 
 // Example 5: Multiple zips - accumulate related values
 const userStats = Option.Some(100) // starting score
@@ -99,7 +94,9 @@ type ValidatedField = { name: string; value: string; isValid: boolean };
 
 const validateField = (field: Field): Option<ValidatedField> => {
   return Option.Some(field)
-    .zip((field) => (field.value.length > 0 ? Option.Some(field) : Option.None))
+    .flatZip((field) =>
+      field.value.length > 0 ? Option.Some(field) : Option.None,
+    )
     .map(([original, _]) => ({ ...original, isValid: true }));
 };
 
@@ -126,14 +123,12 @@ const fetchUser = async (id: number) => {
   return { id, name: `User ${id}` };
 };
 
-const userWithTimestamp = Option.Some(1)
-  .zip(async (id) => fetchUser(id))
-  .map(([id, user]) => ({ id, user, fetchedAt: Date.now() }));
+const userWithTimestamp = await Option.Some(1)
+  .zipAsync((id) => fetchUser(id))
+  .then((o) => o.map(([id, user]) => ({ id, user, fetchedAt: Date.now() })));
 
-(async () => {
-  const result = await userWithTimestamp.unwrap();
-  console.log("11. Async fetch with timestamp:", result); // { id: 1, user: { id: 1, name: "User 1" }, fetchedAt: ... }
-})();
+const result2 = userWithTimestamp.unwrap();
+console.log("11. Async fetch with timestamp:", result2); // { id: 1, user: { id: 1, name: "User 1" }, fetchedAt: ... }
 
 // Example 12: Zip for pairing input with output
 type ProcessResult<T, U> = { input: T; output: U };
@@ -199,6 +194,4 @@ console.log("    Divide by zero:", safeDivideWithContext(10, 0)._tag); // "None"
 console.log("\n=== All zip examples completed ===");
 
 // Wait for async examples to complete
-(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 50));
-})();
+await new Promise((resolve) => setTimeout(resolve, 50));

@@ -303,21 +303,20 @@ console.log(
   (await fetchMultipleAsync(1, 2, 3)).unwrap(),
 );
 
-// Example 14: asyncGenAdapter with toPromise
-const toPromiseExample = await Option.asyncGenAdapter(async function* ($) {
-  // Convert Option<Promise<T>> to Option<T> using toPromise
-  const items = yield* $(
-    await Option.Some([1, 2, 3])
-      .map(async (arr) => {
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        return arr.map((n) => n * 2);
-      })
-      .toPromise(),
-  );
+// Example 14: asyncGenAdapter with async transformation
+const transformItemsAsync = async (
+  items: number[],
+): Promise<Option<number[]>> => {
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  return Option.Some(items.map((n) => n * 2));
+};
 
+const toPromiseExample = await Option.asyncGenAdapter(async function* ($) {
+  const arr = yield* $(Option.Some([1, 2, 3]));
+  const items = yield* $(await transformItemsAsync(arr));
   return items.reduce((sum, n) => sum + n, 0);
 });
-console.log("14. With toPromise:", toPromiseExample.unwrap()); // 12
+console.log("14. Async transformation:", toPromiseExample.unwrap()); // 12
 
 // Example 15: asyncGenAdapter for complex workflows
 type Order = { id: number; total: number };

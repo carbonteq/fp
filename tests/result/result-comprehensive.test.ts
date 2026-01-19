@@ -81,25 +81,6 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.fromPromise()", () => {
-    it("should wrap Promise<Result<T, E>> as Result<Promise<T>, E>", async () => {
-      const asyncResult = Result.fromPromise(Promise.resolve(Result.Ok(42)));
-      expect(asyncResult.isOk()).toBe(true);
-
-      const resolved = await asyncResult.toPromise();
-      expect(resolved.unwrap()).toBe(42);
-    });
-
-    it("should properly handle Promise<Err>", async () => {
-      const asyncResult = Result.fromPromise(
-        Promise.resolve(Result.Err("failed")),
-      );
-      const resolved = await asyncResult.toPromise();
-      expect(resolved.isErr()).toBe(true);
-      expect(resolved.unwrapErr()).toBe("failed");
-    });
-  });
-
   describe("Result.tryCatch()", () => {
     it("should return Ok when function succeeds", () => {
       const result = Result.tryCatch(() => JSON.parse('{"a": 1}'));
@@ -120,28 +101,27 @@ describe("Constructors", () => {
       const result = Result.tryCatch(() => {
         throw new Error("test error");
       });
+
       expect(result.isErr()).toBe(true);
     });
   });
 
   describe("Result.tryAsyncCatch()", () => {
     it("should return Ok when async function succeeds", async () => {
-      const result = Result.tryAsyncCatch(async () => 42);
-      const resolved = await result.toPromise();
-      expect(resolved.isOk()).toBe(true);
-      expect(resolved.unwrap()).toBe(42);
+      const result = await Result.tryAsyncCatch(async () => 42);
+      expect(result.isOk()).toBe(true);
+      expect(result.unwrap()).toBe(42);
     });
 
     it("should return Err when async function rejects", async () => {
-      const result = Result.tryAsyncCatch(
+      const result = await Result.tryAsyncCatch(
         async () => {
           throw new Error("async error");
         },
         (e: unknown) => `Caught: ${String(e)}`,
       );
-      const resolved = await result.toPromise();
-      expect(resolved.isErr()).toBe(true);
-      expect(resolved.unwrapErr()).toMatch(/Caught/);
+      expect(result.isErr()).toBe(true);
+      expect(result.unwrapErr()).toMatch(/Caught/);
     });
   });
 
@@ -296,9 +276,8 @@ describe("Transformation Methods (Ok Track)", () => {
     });
 
     it("should handle async mapper", async () => {
-      const result = Result.Ok(5).map(async (x) => x * 2);
-      const resolved = await result.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+      const result = await Result.Ok(5).mapAsync(async (x) => x * 2);
+      expect(result.unwrap()).toBe(10);
     });
   });
 
@@ -410,28 +389,6 @@ describe("Transformation Methods (Err Track)", () => {
         Result.Err({ code: 500 } as { code: number }),
       );
       expect(recovered.isErr()).toBe(true);
-    });
-  });
-
-  describe("zipErr()", () => {
-    it("should return Err when binder returns Err", () => {
-      const result = Result.Ok(42).zipErr(() => Result.Err("validation error"));
-      expect(result.isErr()).toBe(true);
-    });
-
-    it("should preserve Ok value when binder returns Ok", () => {
-      const result = Result.Ok(42).zipErr((v) => Result.Ok(v * 10));
-      expect(result.isOk()).toBe(true);
-      expect(result.unwrap()).toBe(42);
-    });
-
-    it("should short-circuit on Err", () => {
-      // Err<E, T> signature has E (error) first, T (success) second
-      const result = Result.Err<string, number>("initial").zipErr(() =>
-        Result.Err("second"),
-      );
-      expect(result.isErr()).toBe(true);
-      expect(result.unwrapErr()).toBe("initial");
     });
   });
 });
@@ -551,14 +508,13 @@ describe("Utility Methods", () => {
 
     it("should execute side effect for async Err after resolution", async () => {
       const sideEffect = mock((e: string) => console.error(e));
-      const result = Result.tryAsyncCatch(
+      const result = await Result.tryAsyncCatch(
         async () => {
           throw new Error("boom");
         },
         (e) => (e as Error).message,
       );
 
-      await result.toPromise();
       result.tapErr(sideEffect);
 
       expect(sideEffect).toHaveBeenCalledWith("boom");
@@ -579,14 +535,13 @@ describe("Utility Methods", () => {
     });
 
     it("should flip async Err to Ok after resolution", async () => {
-      const result = Result.tryAsyncCatch(
+      const result = await Result.tryAsyncCatch(
         async () => {
           throw new Error("boom");
         },
         (e) => (e as Error).message,
       );
 
-      await result.toPromise();
       const flipped = result.flip();
 
       expect(flipped.isOk()).toBe(true);
@@ -605,20 +560,6 @@ describe("Utility Methods", () => {
       const result: Result<number, string> = Result.Err("error");
       const opt = result.toOption();
       expect(opt.isNone()).toBe(true);
-    });
-  });
-
-  describe("toPromise()", () => {
-    it("should resolve inner Promise for Ok", async () => {
-      const result = Result.Ok(Promise.resolve(42));
-      const resolved = await result.toPromise();
-      expect(resolved.isOk()).toBe(true);
-      expect(resolved.unwrap()).toBe(42);
-    });
-
-    it("should wrap sync Result in resolved Promise", async () => {
-      const resolved = await Result.Ok(42).toPromise();
-      expect(resolved.unwrap()).toBe(42);
     });
   });
 
@@ -652,45 +593,37 @@ describe("Async Handling", () => {
       expect(result.unwrap()).toBe(10);
     });
 
-    it("Result<T, E> + async mapper → Result<Promise<U>, E>", async () => {
-      const result = Result.Ok(5).map(async (x) => x * 2);
-      const resolved = await result.toPromise();
-      expect(resolved.unwrap()).toBe(10);
-    });
-
-    it("Result<Promise<T>, E> + sync mapper → Result<Promise<U>, E>", async () => {
-      const result = Result.Ok(Promise.resolve(5)).map((x) => x * 2);
-      const resolved = await result.toPromise();
-      expect(resolved.unwrap()).toBe(10);
+    it("Result<T, E> + async mapper → use mapAsync for Promise<Result<U, E>>", async () => {
+      const result = await Result.Ok(5).mapAsync(async (x) => x * 2);
+      expect(result.unwrap()).toBe(10);
     });
   });
 
   describe("Err Short-Circuit with Async", () => {
-    it("Err with async mapper should not create async work", () => {
+    it("Err with async mapper should not create async work", async () => {
       const mapper = mock(async (x: number) => x * 2);
       const result: Result<number, string> = Result.Err("error");
-      result.map(mapper);
+      await result.mapAsync(mapper);
       expect(mapper).not.toHaveBeenCalled();
     });
   });
 
   describe("Interleaved Sync/Async Chains", () => {
     it("should handle mixed sync/async chain", async () => {
-      const result = await Result.Ok(5)
-        .map((x) => x * 2)
-        .map(async (x) => x.toString())
-        .map((s) => s.toUpperCase())
-        .toPromise();
+      const result = await Promise.resolve(Result.Ok(5))
+        .then((r) => r.map((x) => x * 2))
+        .then((r) => r.mapAsync(async (x) => x.toString()))
+        .then((r) => r.map((s) => s.toUpperCase()));
 
       expect(result.unwrap()).toBe("10");
     });
 
-    it("should propagate Err through mixed chain", async () => {
-      const result = await (Result.Err("error") as Result<number, string>)
-        .map((x) => x * 2)
-        .map(async (x) => x.toString())
-        .toPromise();
+    it("should propagate Err through mixed chain", () => {
+      const result = (Result.Err("error") as Result<number, string>).map(
+        (x) => x * 2,
+      );
 
+      // Result is Err, so map should short-circuit and return Err directly
       expect(result.isErr()).toBe(true);
     });
   });
@@ -761,10 +694,9 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
 
     it("async map → sync flatMap → async zip", async () => {
       const result = await Result.Ok(5)
-        .map(async (x) => x * 2)
-        .flatMap((x) => Result.Ok(x + 1))
-        .zip(async (x) => x * 2)
-        .toPromise();
+        .mapAsync(async (x) => x * 2)
+        .then((r) => r.flatMap((x) => Result.Ok(x + 1)))
+        .then((r) => r.zipAsync(async (x) => x * 2));
 
       expect(result.unwrap()).toEqual([11, 22]);
     });
@@ -781,15 +713,13 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
   });
 
   describe("Err propagation in chains", () => {
-    it("Err should propagate through map chain", async () => {
+    it("Err should propagate through map chain", () => {
       const okMapper = mock((x: number) => x * 2);
       const errMapper = mock((e: string) => e.toUpperCase());
 
-      const result = await (Result.Err("error") as Result<number, string>)
+      const result = (Result.Err("error") as Result<number, string>)
         .map(okMapper)
-        .map(async (x) => x + 1)
-        .mapErr(errMapper)
-        .toPromise();
+        .mapErr(errMapper);
 
       expect(result.isErr()).toBe(true);
       expect(okMapper).not.toHaveBeenCalled();
@@ -810,20 +740,22 @@ describe("Fluent API - Complex Mixed Operation Chains", () => {
 
     it("should handle user fetch pipeline", async () => {
       const result = await Result.Ok(1)
-        .map(async (id) => fetchUser(id))
-        .flatMap((user) => Result.fromNullable(user, "User not found"))
-        .map((user) => user.name)
-        .toPromise();
+        .mapAsync(async (id) => fetchUser(id))
+        .then((r) =>
+          r.flatMap((user) => Result.fromNullable(user, "User not found")),
+        )
+        .then((r) => r.map((user) => user.name));
 
       expect(result.unwrap()).toBe("Alice");
     });
 
     it("should handle missing user", async () => {
       const result = await Result.Ok(999)
-        .map(async (id) => fetchUser(id))
-        .flatMap((user) => Result.fromNullable(user, "User not found"))
-        .map((user) => user.name)
-        .toPromise();
+        .mapAsync(async (id) => fetchUser(id))
+        .then((r) =>
+          r.flatMap((user) => Result.fromNullable(user, "User not found")),
+        )
+        .then((r) => r.map((user) => user.name));
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toBe("User not found");
@@ -846,8 +778,8 @@ describe("Branching and Immutability", () => {
 
   it("async branches should be independent", async () => {
     const original = Result.Ok(2);
-    const branch1 = await original.map(async (x) => x * 2).toPromise();
-    const branch2 = await original.map(async (x) => x * 3).toPromise();
+    const branch1 = await original.mapAsync(async (x) => x * 2);
+    const branch2 = await original.mapAsync(async (x) => x * 3);
 
     expect(original.unwrap()).toBe(2);
     expect(branch1.unwrap()).toBe(4);
@@ -888,63 +820,55 @@ describe("_tag Discriminant", () => {
 
 describe("Async-Aware Extraction Methods", () => {
   describe("unwrapOr with async Result", () => {
-    it("should return Promise resolving to value for Ok", async () => {
-      const result = Result.Ok(Promise.resolve(42));
-      const value = await result.unwrapOr(0);
+    it("should return value for Ok", async () => {
+      const result = Result.Ok(42);
+      const value = result.unwrapOr(0);
       expect(value).toBe(42);
     });
 
-    it("should return Promise resolving to default for Err that became async", async () => {
-      const result = Result.Ok(5)
-        .map(async (x) => x * 2)
-        .flatMap(() => Result.Err("failed") as Result<number, string>);
-
-      const resolved = await result.toPromise();
-      const value = resolved.unwrapOr(999);
+    it("should return default for Err", async () => {
+      const result: Result<number, string> = Result.Err("error");
+      const value = result.unwrapOr(999);
       expect(value).toBe(999);
     });
   });
 
   describe("unwrapOrElse with async Result", () => {
-    it("should return Promise resolving to value for Ok", async () => {
-      const result = Result.Ok(Promise.resolve(42));
-      const value = await result.unwrapOrElse(() => 0);
+    it("should return value for Ok", async () => {
+      const result = Result.Ok(42);
+      const factory = mock((_e: string) => 999);
+      const value = result.unwrapOrElse(factory);
       expect(value).toBe(42);
+      expect(factory).not.toHaveBeenCalled();
     });
 
     it("should call factory with error for Err", async () => {
-      const result = Result.Ok(5)
-        .map(async (x) => x * 2)
-        .flatMap(() => Result.Err("oops") as Result<number, string>);
-
-      const resolved = await result.toPromise();
+      const result: Result<number, string> = Result.Err("error");
       const factory = mock((_e: string) => 999);
-      const value = resolved.unwrapOrElse(factory);
+      const value = result.unwrapOrElse(factory);
       expect(value).toBe(999);
-      expect(factory).toHaveBeenCalledWith("oops");
+      expect(factory).toHaveBeenCalledWith("error");
     });
   });
 
   describe("safeUnwrap with async Result", () => {
-    it("should return Promise resolving to value for Ok", async () => {
-      const result = Result.Ok(Promise.resolve(42));
-      const value = await result.safeUnwrap();
+    it("should return value for Ok", async () => {
+      const result = Result.Ok(42);
+      const value = result.safeUnwrap();
       expect(value).toBe(42);
     });
 
-    it("should return Promise resolving to null for Err", async () => {
-      const result: Result<Promise<number>, string> = Result.Err("error");
-      const value = await result.safeUnwrap();
+    it("should return null for Err", async () => {
+      const result: Result<number, string> = Result.Err("error");
+      const value = result.safeUnwrap();
       expect(value).toBe(null);
     });
   });
 
   describe("tap with async Result", () => {
-    it("should receive resolved value", async () => {
+    it("should receive value", async () => {
       const sideEffect = mock((_x: number) => {});
-      const result = await Result.Ok(Promise.resolve(42))
-        .tap(sideEffect)
-        .toPromise();
+      const result = Result.Ok(42).tap(sideEffect);
 
       expect(sideEffect).toHaveBeenCalledWith(42);
       expect(result.unwrap()).toBe(42);
@@ -952,7 +876,7 @@ describe("Async-Aware Extraction Methods", () => {
 
     it("should not call tap for Err", async () => {
       const sideEffect = mock((_x: number) => {});
-      const result: Result<Promise<number>, string> = Result.Err("error");
+      const result: Result<number, string> = Result.Err("error");
 
       result.tap(sideEffect);
       expect(sideEffect).not.toHaveBeenCalled();
@@ -962,11 +886,10 @@ describe("Async-Aware Extraction Methods", () => {
       const taps: number[] = [];
 
       const result = await Result.Ok(5)
-        .map(async (x) => x * 2)
-        .tap((x) => taps.push(x))
-        .map((x) => x + 1)
-        .tap((x) => taps.push(x))
-        .toPromise();
+        .mapAsync(async (x) => x * 2)
+        .then((r) => r.tap((x) => taps.push(x)))
+        .then((r) => r.map((x) => x + 1))
+        .then((r) => r.tap((x) => taps.push(x)));
 
       expect(result.unwrap()).toBe(11);
       expect(taps).toEqual([10, 11]);

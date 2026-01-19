@@ -35,17 +35,8 @@ const chained = Result.Ok(1)
 
 console.log("4. Chained flatZip:", chained.unwrap()); // [[1, 2], 3]
 
-// Example 5: flatZip with async Result-returning function
-const asyncFlatZip = Result.Ok(5).flatZip(async (x) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return Result.Ok(x * 2);
-});
-// flatZip with async functions returns a Result containing a Promise
-// Use unwrap() to get the Promise, then await it
-(async () => {
-  const value = await asyncFlatZip.unwrap();
-  console.log("5. Async flatZip resolved:", value); // [5, 10]
-})();
+// Example 5: flatZip is synchronous - for async operations, use gen.async* methods
+// See 07-asyncGen.ts and 08-asyncGenAdapter.ts for async patterns
 
 // Example 6: Practical - User and their posts
 type UserId = number;
@@ -136,42 +127,14 @@ console.log(
   createPersonWithAddress({ name: "Alice", age: 25 }).unwrap(),
 ); // { name: "Alice", age: 25, address: { street: "123 Main St", city: "Anytown" } }
 
-// Example 10: flatZip for sequential API calls
-const fetchOrder = async (orderId: number) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return { id: orderId, customerId: 1, total: 100 };
-};
-
-const fetchCustomer = async (
-  _orderId: number,
-  order: { customerId: number },
-) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return { id: order.customerId, name: "Customer 1" };
-};
-
-const orderWithCustomer = Result.Ok(123)
-  .flatZip((orderId) => Result.fromPromise(fetchOrder(orderId).then(Result.Ok)))
-  .flatMap(([orderId, order]) =>
-    Result.fromPromise(
-      fetchCustomer(orderId, order).then((customer) =>
-        Result.Ok([orderId, order, customer] as const),
-      ),
-    ),
-  );
-
-orderWithCustomer.unwrap().then((value) => {
-  console.log("10. Order with customer:", value); // [123, { id: 123, customerId: 1, total: 100 }, { id: 1, name: "Customer 1" }]
-});
-
-// Example 11: flatZip vs flatMap - preserving original
+// Example 10: flatZip vs flatMap - preserving original
 const flatMapResult = Result.Ok(5).flatMap((x) => Result.Ok(x * 2)); // Result<number, never>
 const flatZipResult = Result.Ok(5).flatZip((x) => Result.Ok(x * 2)); // Result<[5, 10], never>
 
-console.log("11. flatMap loses original:", flatMapResult.unwrap()); // 10
+console.log("10. flatMap loses original:", flatMapResult.unwrap()); // 10
 console.log("    flatZip preserves:", flatZipResult.unwrap()); // [5, 10]
 
-// Example 12: flatZip for collecting audit trail
+// Example 11: flatZip for collecting audit trail
 type AuditLog<T> = { timestamp: number; data: T };
 
 const withAudit = <T, E>(result: Result<T, E>): Result<[T, AuditLog<T>], E> => {
@@ -180,9 +143,9 @@ const withAudit = <T, E>(result: Result<T, E>): Result<[T, AuditLog<T>], E> => {
 };
 
 const auditedResult = withAudit(Result.Ok({ value: 42 }));
-console.log("12. Audited result:", auditedResult.unwrap()); // [{ value: 42 }, { timestamp: ..., data: { value: 42 } }]
+console.log("11. Audited result:", auditedResult.unwrap()); // [{ value: 42 }, { timestamp: ..., data: { value: 42 } }]
 
-// Example 13: flatZip for maintaining context through transformations
+// Example 12: flatZip for maintaining context through transformations
 type Context<T> = { original: T; current: T };
 
 const withContext = <T>(value: T): Result<Context<T>, never> => {
@@ -207,9 +170,9 @@ const result = transformWithContext(withContext(10), (n) =>
   transformWithContext(Result.Ok(ctx), (n) => Result.Ok(n + 5)),
 );
 
-console.log("13. Context through transformations:", result.unwrap()); // { original: 10, current: 25 }
+console.log("12. Context through transformations:", result.unwrap()); // { original: 10, current: 25 }
 
-// Example 14: flatZip for branching logic
+// Example 13: flatZip for branching logic
 const getConfig = (key: string): Result<string, "config_not_found"> => {
   const configs: Record<string, string> = {
     api_key: "secret123",
@@ -234,10 +197,10 @@ const getConfigValue = (
   return getConfig(key).flatZip((value) => parseTimeout(value));
 };
 
-console.log("14. Config value:", getConfigValue("timeout").unwrap()); // ["5000", 5000]
+console.log("13. Config value:", getConfigValue("timeout").unwrap()); // ["5000", 5000]
 console.log("    Invalid config:", getConfigValue("api_key").unwrapErr()); // "invalid_timeout" (because "secret123" is not a number)
 
-// Example 15: flatZip for multi-step validation pipeline
+// Example 14: flatZip for multi-step validation pipeline
 type ValidationResult<T> = Result<T, ValidationError>;
 
 interface UserData {
@@ -272,7 +235,7 @@ const validateAge = (age: number): ValidationResult<number> => {
 };
 
 console.log(
-  "15. Valid user:",
+  "14. Valid user:",
   validateUserData({
     email: "test@example.com",
     password: "password123",

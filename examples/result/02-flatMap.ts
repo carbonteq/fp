@@ -87,19 +87,8 @@ const resultWithUnionError = parseNumber("invalid").flatMap((n) =>
 // Type is Result<number, "parse_error" | "not_positive">
 console.log("6. Union error type:", resultWithUnionError.unwrapErr()); // "parse_error"
 
-// Example 7: flatMap with async function
-// async flatMap returns Result<Promise<T>, E | E2>
-const asyncValidate = async (
-  n: number,
-): Promise<Result<number, "async_error">> => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return n > 0 ? Result.Ok(n) : Result.Err("async_error");
-};
-
-const asyncResult = Result.Ok(5).flatMap((n) => asyncValidate(n));
-console.log("7. Async flatMap:", asyncResult._tag); // "Ok" - contains Promise<number>
-const resolvedValue = await asyncResult.unwrap();
-console.log("   Resolved:", resolvedValue); // 5
+// Example 7: flatMap is synchronous - for async operations, use gen.async* methods
+// See 07-asyncGen.ts and 08-asyncGenAdapter.ts for async patterns
 
 // Example 8: Using flatMap for validation pipeline
 type ValidationError = { field: string; message: string };

@@ -33,19 +33,7 @@ const chained = Option.Some(1)
 
 console.log("4. Chained flatZip:", chained.unwrap()); // [[1, 2], 3]
 
-// Example 5: flatZip with async Option-returning function
-const asyncFlatZip = Option.Some(5).flatZip(async (x) => {
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  return Option.Some(x * 2);
-});
-console.log("5. Async flatZip:", asyncFlatZip); // Option<Promise<[5, 10]>>
-
-(async () => {
-  const value = await asyncFlatZip.unwrap();
-  console.log("   Resolved:", value); // [5, 10]
-})();
-
-// Example 6: Practical - User and their posts
+// Example 5: Practical - User and their posts
 type UserId = number;
 type User = { id: UserId; name: string };
 type Post = { id: number; authorId: UserId; title: string };
@@ -61,9 +49,9 @@ const getUserPosts = (user: User): Option<Post[]> => {
 };
 
 const userWithPosts = getUser(1).flatZip((user) => getUserPosts(user));
-console.log("6. User with posts:", userWithPosts.unwrap()); // [{ id: 1, name: "User 1" }, [{ ... }]]
+console.log("5. User with posts:", userWithPosts.unwrap()); // [{ id: 1, name: "User 1" }, [{ ... }]]
 
-// Example 7: flatZip for dependent lookups
+// Example 6: flatZip for dependent lookups
 type ProductId = number;
 type Product = { id: ProductId; name: string; price: number };
 type Inventory = { productId: ProductId; quantity: number };
@@ -79,9 +67,9 @@ const getInventory = (product: Product): Option<Inventory> => {
 const productWithInventory = getProduct(1).flatZip((product) =>
   getInventory(product),
 );
-console.log("7. Product with inventory:", productWithInventory.unwrap()); // [{ id: 1, name: "Widget", price: 10 }, { productId: 1, quantity: 100 }]
+console.log("6. Product with inventory:", productWithInventory.unwrap()); // [{ id: 1, name: "Widget", price: 10 }, { productId: 1, quantity: 100 }]
 
-// Example 8: flatZip for validation with context preservation
+// Example 7: flatZip for validation with context preservation
 const validateEmailBasic = (email: string): Option<string> => {
   return email.includes("@") ? Option.Some(email) : Option.None;
 };
@@ -94,9 +82,9 @@ const emailWithValidation = Option.Some("USER@EXAMPLE.COM")
   .flatZip((email) => normalizeEmail(email))
   .flatZip(([_original, normalized]) => validateEmailBasic(normalized));
 
-console.log("8. Email validation chain:", emailWithValidation.unwrap()); // [["USER@EXAMPLE.COM", "user@example.com"], "user@example.com"]
+console.log("7. Email validation chain:", emailWithValidation.unwrap()); // [["USER@EXAMPLE.COM", "user@example.com"], "user@example.com"]
 
-// Example 9: flatZip for building complex objects step by step
+// Example 8: flatZip for building complex objects step by step
 type Address = { street: string; city: string };
 type Person = { name: string; age: number };
 
@@ -112,7 +100,7 @@ const fetchAddress = (_person: Person): Option<Address> => {
 };
 
 const createPersonWithAddress = (data: { name: string; age: number }) => {
-  return validatePerson(data).flatZip((person) =>
+  return validatePerson(data).flatMap((person) =>
     fetchAddress(person).map((address) => ({
       ...person,
       address,
@@ -121,18 +109,18 @@ const createPersonWithAddress = (data: { name: string; age: number }) => {
 };
 
 console.log(
-  "9. Person with address:",
+  "8. Person with address:",
   createPersonWithAddress({ name: "Alice", age: 25 }).unwrap(),
 ); // { name: "Alice", age: 25, address: { street: "123 Main St", city: "Anytown" } }
 
-// Example 10: flatZip vs flatMap - preserving original
+// Example 9: flatZip vs flatMap - preserving original
 const flatMapResult = Option.Some(5).flatMap((x) => Option.Some(x * 2)); // Option<number>
 const flatZipResult = Option.Some(5).flatZip((x) => Option.Some(x * 2)); // Option<[5, 10]>
 
-console.log("10. flatMap loses original:", flatMapResult.unwrap()); // 10
+console.log("9. flatMap loses original:", flatMapResult.unwrap()); // 10
 console.log("    flatZip preserves:", flatZipResult.unwrap()); // [5, 10]
 
-// Example 11: flatZip for collecting audit trail
+// Example 10: flatZip for collecting audit trail
 type AuditLog<T> = { timestamp: number; data: T };
 
 const withAudit = <T>(option: Option<T>): Option<[T, AuditLog<T>]> => {
@@ -141,9 +129,9 @@ const withAudit = <T>(option: Option<T>): Option<[T, AuditLog<T>]> => {
 };
 
 const auditedResult = withAudit(Option.Some({ value: 42 }));
-console.log("11. Audited result:", auditedResult.unwrap()); // [{ value: 42 }, { timestamp: ..., data: { value: 42 } }]
+console.log("10. Audited result:", auditedResult.unwrap()); // [{ value: 42 }, { timestamp: ..., data: { value: 42 } }]
 
-// Example 12: flatZip for maintaining context through transformations
+// Example 11: flatZip for maintaining context through transformations
 type Context<T> = { original: T; current: T };
 
 const withContext = <T>(value: T): Option<Context<T>> => {
@@ -168,9 +156,9 @@ const result2 = transformWithContext(withContext(10), (n) =>
   transformWithContext(Option.Some(ctx), (n) => Option.Some(n + 5)),
 );
 
-console.log("12. Context through transformations:", result2.unwrap()); // { original: 10, current: 25 }
+console.log("11. Context through transformations:", result2.unwrap()); // { original: 10, current: 25 }
 
-// Example 13: flatZip for branching logic
+// Example 12: flatZip for branching logic
 const getConfig = (key: string): Option<string> => {
   const configs: Record<string, string> = {
     api_key: "secret123",
@@ -189,10 +177,10 @@ const getConfigValue = (key: string): Option<[string, number]> => {
   return getConfig(key).flatZip((value) => parseTimeout(value));
 };
 
-console.log("13. Config value:", getConfigValue("timeout").unwrap()); // ["5000", 5000]
+console.log("12. Config value:", getConfigValue("timeout").unwrap()); // ["5000", 5000]
 console.log("    Invalid config:", getConfigValue("api_key")._tag); // "None" (because "secret123" is not a number)
 
-// Example 14: flatZip for multi-step validation pipeline
+// Example 13: flatZip for multi-step validation pipeline
 interface UserData {
   email: string;
   password: string;
@@ -219,7 +207,7 @@ const validateUserData = (data: UserData): Option<UserData> => {
 };
 
 console.log(
-  "14. Valid user:",
+  "13. Valid user:",
   validateUserData({
     email: "test@example.com",
     password: "password123",
@@ -235,7 +223,7 @@ console.log(
   })._tag,
 ); // "None"
 
-// Example 15: flatZip for safe nested access with context
+// Example 14: flatZip for safe nested access with context
 type Department = { name: string; manager?: Employee };
 type Employee = { name: string; department?: Department };
 
@@ -250,17 +238,14 @@ const getEmployeeDepartment = (emp: Employee): Option<Department> => {
 const getManagerWithEmployee = (
   emp: Employee,
 ): Option<[Employee, Employee]> => {
-  return getEmployeeDepartment(emp).flatZip((dept) =>
-    getDepartmentManager(dept),
+  return Option.Some(emp).flatZip((emp) =>
+    getEmployeeDepartment(emp).flatMap((dept) => getDepartmentManager(dept)),
   );
 };
 
 const dept: Department = { name: "Engineering", manager: { name: "Alice" } };
 const emp: Employee = { name: "Bob", department: dept };
 
-console.log("15. Manager with employee:", getManagerWithEmployee(emp).unwrap()); // [emp, manager]
+console.log("14. Manager with employee:", getManagerWithEmployee(emp).unwrap()); // [emp, manager]
 
 console.log("\n=== All flatZip examples completed ===");
-
-// Wait for async examples to complete
-await new Promise((resolve) => setTimeout(resolve, 50));

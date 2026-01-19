@@ -152,17 +152,19 @@ const getUserWithPostsAsync = async (userId: number) => {
 };
 console.log("10. User with posts:", (await getUserWithPostsAsync(1)).unwrap());
 
-// Example 11: asyncGen with async map chains
+// Example 11: asyncGen with async transformation
+const asyncTransform = async (arr: number[]): Promise<number[]> => {
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  return arr.map((n) => n * 2);
+};
+
 const asyncMapChain = await Option.asyncGen(async function* () {
-  // Option.map with async function returns Option<Promise<T>>
-  const result = yield* Option.Some([1, 2, 3]).map(async (arr) => {
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    return arr.map((n) => n * 2);
-  });
-  // result is number[], not Promise<number[]>
+  const arr = yield* Option.Some([1, 2, 3]);
+  // Do async transformation outside of Option wrapper
+  const result = await asyncTransform(arr);
   return result.reduce((sum, n) => sum + n, 0);
 });
-console.log("11. Async map chain:", asyncMapChain.unwrap()); // 12
+console.log("11. Async transformation:", asyncMapChain.unwrap()); // 12
 
 // Example 12: asyncGen for complex async workflows
 type Order = { id: number; total: number };
@@ -198,19 +200,18 @@ const processOrderAsync = async (orderId: number) => {
 };
 console.log("12. Complex workflow:", (await processOrderAsync(1)).unwrap());
 
-// Example 13: asyncGen with toPromise conversion
-const toPromiseExample = await Option.asyncGen(async function* () {
-  // Convert Option<Promise<T>> to Option<T>
-  const items = yield* await Option.Some([1, 2, 3])
-    .map(async (arr) => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      return arr.map((n) => n * 2);
-    })
-    .toPromise();
+// Example 13: asyncGen with async transformation
+const transformItems = async (items: number[]): Promise<Option<number[]>> => {
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  return Option.Some(items.map((n) => n * 2));
+};
 
+const toPromiseExample = await Option.asyncGen(async function* () {
+  const arr = yield* Option.Some([1, 2, 3]);
+  const items = yield* await transformItems(arr);
   return items.reduce((sum, n) => sum + n, 0);
 });
-console.log("13. With toPromise:", toPromiseExample.unwrap()); // 12
+console.log("13. Async transform pattern:", toPromiseExample.unwrap()); // 12
 
 // Example 14: asyncGen short-circuits on first None - demonstrates early termination
 const tryFetch = async (

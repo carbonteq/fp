@@ -42,9 +42,10 @@ describe("README Examples - Result Type", () => {
         name: string,
         age: number,
       ): Promise<Result<string, Error>> => {
-        const validationResult = await validateUserData(name, age)
-          .flatMap(saveUserData)
-          .toPromise();
+        const validationResult = await validateUserData(name, age).flatMapAsync(
+          saveUserData,
+        );
+
         return validationResult;
       };
 
@@ -71,10 +72,34 @@ describe("README Examples - Result Type", () => {
         productId: string,
       ): Promise<Result<[number, number], Error>> {
         const originalPrice = await Result.Ok(productId)
-          .flatMap(fetchProductPrice)
-          .zip((price) => price * 0.9)
-          .toPromise();
+          .flatMapAsync(fetchProductPrice)
+          .then((r) => r.zip((price) => price * 0.9));
+
         return originalPrice;
+      }
+
+      const result = await applyDiscount("123");
+      expect(result.isOk()).toBe(true);
+      expect(result.unwrap()).toEqual([100, 90]);
+    });
+
+    it("should pair original price with discounted price (using Result.asyncGen)", async () => {
+      async function fetchProductPrice(
+        _productId: string,
+      ): Promise<Result<number, Error>> {
+        return Result.Ok(100);
+      }
+
+      async function applyDiscount(
+        productId: string,
+      ): Promise<Result<[number, number], Error>> {
+        const r = await Result.asyncGen(async function* () {
+          const price = yield* await fetchProductPrice(productId);
+
+          return [price, price * 0.9] as [number, number];
+        });
+
+        return r;
       }
 
       const result = await applyDiscount("123");
@@ -110,7 +135,7 @@ describe("README Examples - Result Type", () => {
   });
 
   describe("all", () => {
-    it("should aggregate multiple Results successfully", async () => {
+    describe("should aggregate multiple Results successfully", () => {
       type User = {
         userId: string;
         userName: string;
@@ -175,26 +200,53 @@ describe("README Examples - Result Type", () => {
         return Result.Ok(`${userId}_HASH_VALUE`);
       }
 
-      async function getUserData(userId: string) {
-        const userIdRes = Result.Ok(userId);
+      it("using normal composition", async () => {
+        async function getUserData(userId: string) {
+          const userIdRes = Result.Ok(userId);
 
-        const user = userIdRes.flatMap(fetchUser);
-        const posts = userIdRes.flatMap(fetchPosts);
-        const likes = userIdRes.flatMap(fetchLikes);
-        const replies = userIdRes.flatMap(fetchReplies);
-        const hash = userIdRes.flatMap(generateHash);
+          const user = await userIdRes.flatMapAsync(fetchUser);
+          const posts = await userIdRes.flatMapAsync(fetchPosts);
+          const likes = await userIdRes.flatMapAsync(fetchLikes);
+          const replies = await userIdRes.flatMapAsync(fetchReplies);
+          const hash = userIdRes.flatMap(generateHash);
 
-        return await Result.all(user, posts, likes, replies, hash).toPromise();
-      }
+          return Result.all(user, posts, likes, replies, hash);
+        }
 
-      const result = await getUserData("USER_ID");
-      expect(result.isOk()).toBe(true);
+        const result = await getUserData("USER_ID");
+        expect(result.isOk()).toBe(true);
 
-      const [user, posts, _likes, _replies, hash] = result.unwrap();
-      expect(user.userName).toBe("Functional Programmer");
-      expect(posts).toHaveLength(1);
-      expect(posts[0].postId).toBe("1");
-      expect(hash).toBe("USER_ID_HASH_VALUE");
+        const [user, posts, _likes, _replies, hash] = result.unwrap();
+        expect(user.userName).toBe("Functional Programmer");
+        expect(posts).toHaveLength(1);
+        expect(posts[0].postId).toBe("1");
+        expect(hash).toBe("USER_ID_HASH_VALUE");
+      });
+
+      it("using Result.asyncGen", async () => {
+        const getUserData = async (userId: string) => {
+          const r = await Result.asyncGen(async function* () {
+            const user = yield* await fetchUser(userId);
+            const posts = yield* await fetchPosts(userId);
+            const likes = yield* await fetchLikes(userId);
+            const replies = yield* await fetchReplies(userId);
+            const hash = yield* generateHash(userId);
+
+            return [user, posts, likes, replies, hash] as const;
+          });
+
+          return r;
+        };
+
+        const result = await getUserData("USER_ID");
+        expect(result.isOk()).toBe(true);
+
+        const [user, posts, _likes, _replies, hash] = result.unwrap();
+        expect(user.userName).toBe("Functional Programmer");
+        expect(posts).toHaveLength(1);
+        expect(posts[0].postId).toBe("1");
+        expect(hash).toBe("USER_ID_HASH_VALUE");
+      });
     });
 
     it("should accumulate errors from multiple Results", async () => {
@@ -209,12 +261,12 @@ describe("README Examples - Result Type", () => {
         return Result.Err("User has no replies!");
       }
 
-      // Match the pattern from README - use flatMap to get Result<Promise<T>, E>
+      // Use flatMapAsync for async functions
       const user = Result.Ok("user");
-      const posts = user.flatMap(() => fetchPosts());
-      const replies = user.flatMap(() => fetchReplies());
+      const posts = await user.flatMapAsync(() => fetchPosts());
+      const replies = await user.flatMapAsync(() => fetchReplies());
 
-      const result = await Result.all(user, posts, replies).toPromise();
+      const result = Result.all(user, posts, replies);
 
       expect(result.isErr()).toBe(true);
       expect(result.unwrapErr()).toEqual([
@@ -303,9 +355,11 @@ describe("README Examples - Result Type", () => {
         return Result.Ok(true);
       }
 
-      const validatedErrs = await Result.Ok("password123!")
-        .validate([hasMinimumLength, hasSpecialCharacters, isNotSameAsPrevious])
-        .toPromise();
+      const validatedErrs = await Result.Ok("password123!").validateAsync([
+        (p) => Promise.resolve(hasMinimumLength(p)),
+        (p) => Promise.resolve(hasSpecialCharacters(p)),
+        isNotSameAsPrevious,
+      ]);
       expect(validatedErrs.isErr()).toBe(true);
       const errors = validatedErrs.unwrapErr();
       expect(errors[errors.length - 1].message).toBe(
@@ -396,9 +450,9 @@ describe("README Examples - Result Type", () => {
     });
 
     it("should wrap async operation in tryAsyncCatch", async () => {
-      function fetchUserData(
+      async function fetchUserData(
         _id: string,
-      ): Result<Promise<{ name: string }>, Error> {
+      ): Promise<Result<{ name: string }, Error>> {
         return Result.tryAsyncCatch(
           async () => {
             return { name: "Test User" };
@@ -407,8 +461,9 @@ describe("README Examples - Result Type", () => {
         );
       }
 
-      const result = await fetchUserData("123").unwrap();
-      expect(result.name).toBe("Test User");
+      const result = await fetchUserData("123");
+      expect(result.isOk()).toBe(true);
+      expect(result.unwrap().name).toBe("Test User");
     });
   });
 
@@ -451,26 +506,24 @@ describe("README Examples - Result Type", () => {
       expect(optFromErr.isNone()).toBe(true);
     });
 
-    it("should wrap Promise in Result", async () => {
+    it("should await async Result-returning function", async () => {
       async function fetchData(id: string): Promise<Result<string, Error>> {
         return id === "1"
           ? Result.Ok("Data")
           : Result.Err(new Error("Not found"));
       }
 
-      const dataRes = Result.fromPromise(fetchData("1"));
+      const dataRes = await fetchData("1");
       expect(dataRes.isOk()).toBe(true);
-
-      const inner = await dataRes.unwrap();
-      expect(inner).toBe("Data");
+      expect(dataRes.unwrap()).toBe("Data");
     });
 
-    it("should zipErr - validate permissions", () => {
+    it("should flatMap - validate permissions", () => {
       const checkPermissions = (userId: string) =>
-        Result.Ok(userId).zipErr((id) =>
+        Result.Ok(userId).flatMap((id) =>
           id === "guest"
             ? Result.Err("Guest users have limited access")
-            : Result.Ok(undefined),
+            : Result.Ok(id),
         );
 
       const admin = checkPermissions("admin-123");
@@ -481,18 +534,18 @@ describe("README Examples - Result Type", () => {
       expect(guest.isErr()).toBe(true);
       expect(guest.unwrapErr()).toBe("Guest users have limited access");
 
-      const okNoChange = Result.Ok("42").zipErr((id) => Result.Ok(id.length));
+      const okNoChange = Result.Ok("42").flatMap((id) => Result.Ok(id.length));
       expect(okNoChange.isOk()).toBe(true);
-      expect(okNoChange.unwrap()).toBe("42");
+      expect(okNoChange.unwrap()).toBe(2);
 
-      const alreadyFailed = Result.Err<string, string>("Network error").zipErr(
+      const alreadyFailed = Result.Err<string, string>("Network error").flatMap(
         () => Result.Err("Validation error"),
       );
       expect(alreadyFailed.isErr()).toBe(true);
       expect(alreadyFailed.unwrapErr()).toBe("Network error");
     });
 
-    it("should demonstrate mapErr vs zipErr difference", () => {
+    it("should demonstrate mapErr vs flatMap difference", () => {
       // Note: README has Result.Err<number, Error> but correct type is Result.Err<Error, number>
       // since Err<E, T> signature has E (error) first, T (success) second
       const res = Result.Err<Error, number>(new Error("boom")).mapErr(
@@ -501,13 +554,13 @@ describe("README Examples - Result Type", () => {
       expect(res.isErr()).toBe(true);
       expect(res.unwrapErr()).toBe("boom");
 
-      const ok = Result.Ok("42").zipErr((value) =>
+      const ok = Result.Ok("42").flatMap((value) =>
         value === "0" ? Result.Err("invalid") : Result.Ok(value.length),
       );
       expect(ok.isOk()).toBe(true);
-      expect(ok.unwrap()).toBe("42");
+      expect(ok.unwrap()).toBe(2);
 
-      const err = Result.Ok("0").zipErr((value) =>
+      const err = Result.Ok("0").flatMap((value) =>
         value === "0" ? Result.Err("invalid") : Result.Ok(value.length),
       );
       expect(err.isErr()).toBe(true);
@@ -533,9 +586,8 @@ describe("README Examples - Result Type", () => {
 
       function findUserById(
         userId: number,
-      ): Result<Promise<Record<string, number>>, string> {
-        const p = Promise.resolve({ id: userId, balance: 100 });
-        return Result.Ok(p);
+      ): Promise<Result<Record<string, number>, string>> {
+        return Promise.resolve(Result.Ok({ id: userId, balance: 100 }));
       }
 
       function updateBalance(
@@ -545,16 +597,15 @@ describe("README Examples - Result Type", () => {
         return Result.Ok({ ...user, balance: user.balance - amount });
       }
 
-      const res = await findUserById(1)
-        .tap((user) => logs.push(`[Audit] User found: ${user.id}`))
-        .flatMap((user) => updateBalance(user, 10))
-        .tap((updated) =>
-          logs.push(`[Transaction] New balance: $${updated.balance}`),
-        )
-        .toPromise();
+      const userResult = await findUserById(1);
+      const user = userResult.unwrap();
+      logs.push(`[Audit] User found: ${user.id}`);
+      const balanceResult = updateBalance(user, 10);
+      const updated = balanceResult.unwrap();
+      logs.push(`[Transaction] New balance: $${updated.balance}`);
 
-      expect(res.isOk()).toBe(true);
-      expect(res.unwrap()).toEqual({ id: 1, balance: 90 });
+      expect(balanceResult.isOk()).toBe(true);
+      expect(balanceResult.unwrap()).toEqual({ id: 1, balance: 90 });
       expect(logs).toEqual([
         "[Audit] User found: 1",
         "[Transaction] New balance: $90",
@@ -783,17 +834,15 @@ describe("README Examples - Result Type", () => {
       async function registerUser(
         input: UserInput,
       ): Promise<Result<UserProfile, string | string[]>> {
-        const res = await Result.Ok(input)
-          .validate([
-            ({ email }) => guardEmail(email),
-            ({ email }) => guardEmailAvailability(email),
-            ({ password }) => guardPassword(password),
-          ])
-          .flatMap(createUserProfile)
-          .flatMap(sendVerificationEmail)
-          .toPromise();
+        const validated = await Result.Ok(input).validateAsync([
+          ({ email }) => Promise.resolve(guardEmail(email)),
+          ({ email }) => guardEmailAvailability(email),
+          ({ password }) => Promise.resolve(guardPassword(password)),
+        ]);
+        const created = await validated.flatMapAsync(createUserProfile);
+        const res = await created.flatMapAsync(sendVerificationEmail);
 
-        return res;
+        return res as Result<UserProfile, string | string[]>;
       }
 
       const userInput: UserInput = {
@@ -831,12 +880,10 @@ describe("README Examples - Result Type", () => {
         name: "John Doe",
       };
 
-      const res = await Result.Ok(invalidInput)
-        .validate([
-          ({ email }) => guardEmail(email),
-          ({ password }) => guardPassword(password),
-        ])
-        .toPromise();
+      const res = Result.Ok(invalidInput).validate([
+        ({ email }) => guardEmail(email),
+        ({ password }) => guardPassword(password),
+      ]);
 
       expect(res.isErr()).toBe(true);
       expect(res.unwrapErr()).toEqual(["Invalid email format"]);
