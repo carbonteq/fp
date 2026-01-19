@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
-
-id: expect-to-be-after
-language: TypeScript
-rule:
-  pattern: expect($OBJ).toBeAfter($LATER)
-fix: assert.ok($OBJ instanceof Date && $OBJ.getTime() > $LATER.getTime() )

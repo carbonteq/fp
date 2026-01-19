@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
-
-id: expect-throws
-language: TypeScript
-rule:
-  pattern: expect($OBJ).toThrow($ERR)
-fix: assert.throws($OBJ, $ERR)

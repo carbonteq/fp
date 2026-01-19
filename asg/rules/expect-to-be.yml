@@ -1,9 +1,0 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
-
-id: expect-to-be
-language: TypeScript
-rule:
-  pattern: expect($OBJ).toBe($OTHER)
-fix: assert.strictEqual($OBJ, $OTHER)
-# utils: Extract repeated rule as local utility here.
-
