@@ -7,7 +7,7 @@
  * - If Result.Err(e) is yielded -> returns Result.Err(e)
  */
 
-import { Flow, Option, Result } from "../../src/index.js";
+import { Flow, Option, Result } from "../../dist/index.mjs";
 
 // ============================================================================
 // Flow.gen - Direct usage (simpler, good for simple chains)
@@ -28,12 +28,13 @@ const basicGen = Flow.gen(function* () {
   return a + b + c;
 });
 
-console.log("Basic Gen:", basicGen.unwrap()); // 60
+console.log("Basic Gen:", basicGen.safeUnwrap()); // 60
 
 // Error Handling: Option.None
 const noneError = Flow.gen(function* () {
   const a = yield* Option.Some(1);
   yield* Option.None; // Stops here
+
   return a + 10;
 });
 

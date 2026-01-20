@@ -4,10 +4,12 @@
  * Handles Promise<Option>, Promise<Result>, and async operations.
  */
 
-import { Flow, Option, Result } from "../../src/index.js";
+import { Flow, Option, Result } from "../../dist/index.mjs";
+
+type User = { id: number; name: string };
 
 // Mock async functions
-const fetchUser = async (id: number) => {
+const fetchUser = async (id: number): Promise<Result<User, string>> => {
   await new Promise((r) => setTimeout(r, 10));
   return id === 1
     ? Result.Ok({ id, name: "Alice" })
@@ -50,7 +52,7 @@ const asyncAdapter = await Flow.asyncGenAdapter(async function* ($) {
   const settings = yield* $(fetchSettings(user.id));
 
   // 3. Wrap sync values
-  const multiplier = yield* $(Result.Ok(2));
+  const multiplier = yield* $(Result.Ok<number, Error>(2));
 
   return {
     user,
@@ -59,7 +61,7 @@ const asyncAdapter = await Flow.asyncGenAdapter(async function* ($) {
   };
 });
 
-console.log("Async Adapter:", asyncAdapter.unwrap());
+console.log("Async Adapter:", asyncAdapter.safeUnwrap());
 
 // Error propagation in Async
 const asyncError = await Flow.asyncGenAdapter(async function* ($) {

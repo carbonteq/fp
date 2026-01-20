@@ -4,7 +4,7 @@
  * Examples of how to handle errors and perform recovery (orElse) within Flow generators.
  */
 
-import { Flow, Option, Result } from "../../src/index.js";
+import { Flow, Result } from "../../dist/index.mjs";
 
 // Mock operations
 const mayFail = (id: number): Result<number, string> =>
@@ -43,17 +43,22 @@ console.log("Simple Recovery:", simpleRecovery.unwrap());
 // ============================================================================
 
 const manualRecovery = Flow.gen(function* () {
-  const result = mayFail(-1); // Don't yield yet!
+  // const result = mayFail(-1); // Don't yield yet!
+  //
+  // let val: number;
+  // if (result.isOk()) {
+  //   val = result.unwrap();
+  // } else {
+  //   // Perform complex recovery logic here
+  //   const fallback = yield* Option.Some(99);
+  //   val = fallback + 1; // 100
+  // }
 
-  let val: number;
-  if (result.isOk()) {
-    val = result.unwrap();
-  } else {
-    // Perform complex recovery logic here
+  const val = yield* mayFail(-1).orElse(() => {
     console.log("Failed, recovering...");
-    const fallback = yield* Option.Some(99);
-    val = fallback + 1; // 100
-  }
+
+    return Result.Ok(100);
+  });
 
   return val;
 });
@@ -66,15 +71,17 @@ console.log("Manual Recovery:", manualRecovery.unwrap());
 // ============================================================================
 
 const asyncRecovery = await Flow.asyncGen(async function* () {
-  const res = mayFail(-5);
+  // const res = mayFail(-5);
+  //
+  // let val: number;
+  // if (res.isOk()) {
+  //   val = res.unwrap();
+  // } else {
+  //   // You can yield async recovery operations here
+  //   val = yield* await complexRecovery(res.unwrapErr());
+  // }
 
-  let val: number;
-  if (res.isOk()) {
-    val = res.unwrap();
-  } else {
-    // You can yield async recovery operations here
-    val = yield* await complexRecovery(res.unwrapErr());
-  }
+  const val = yield* await mayFail(-5).orElseAsync(complexRecovery);
 
   return val;
 });

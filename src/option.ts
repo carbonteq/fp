@@ -76,10 +76,10 @@ class AsyncOptionYieldWrap<T> {
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
     AsyncOptionYieldWrap<T>,
-    T,
+    Awaited<T>,
     unknown
   > {
-    return (yield this) as T;
+    return (yield this) as Awaited<T>;
   }
 }
 
@@ -626,7 +626,7 @@ export class Option<T> {
       }
 
       // Unwrap the Some value
-      nextArg = option.unwrap();
+      nextArg = await option.unwrap();
     }
 
     return currentResult;
@@ -722,7 +722,7 @@ export class Option<T> {
       }
 
       // Unwrap the Some value
-      nextArg = option.unwrap();
+      nextArg = await option.unwrap();
     }
 
     return currentResult;
@@ -1633,7 +1633,11 @@ export class Option<T> {
    *
    * @internal
    */
-  async *[Symbol.asyncIterator](): AsyncGenerator<Option<T>, T, unknown> {
-    return (yield this) as T;
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    Option<T>,
+    Awaited<T>,
+    unknown
+  > {
+    return (yield this) as Awaited<T>;
   }
 }

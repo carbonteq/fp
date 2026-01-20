@@ -77,6 +77,7 @@ console.log("5. Async validation pipeline:", validate.unwrap()); // 8
 const mixed = await Option.asyncGen(async function* () {
   const a = yield* Option.Some(5); // sync
   const b = yield* Option.Some(Promise.resolve(10)); // async, auto-awaited
+
   return a + b;
 });
 console.log("6. Mixed sync/async:", mixed.unwrap()); // 15
@@ -121,9 +122,10 @@ const promiseChain = await Option.asyncGen(async function* () {
   // First value is sync
   const a = yield* Option.Some(5);
   // Second value wraps a promise
-  const b = yield* Option.Some(Promise.resolve(10));
+  const b = yield* Option.Some(Promise.resolve(10)); // inner promise is auto-awaited
   // Third value is sync
   const c = yield* Option.Some(15);
+
   return a + b + c;
 });
 console.log("9. Promise in chain:", promiseChain.unwrap()); // 30
