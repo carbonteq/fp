@@ -3,12 +3,12 @@
  *
  * Demonstrates:
  * - Orchestrating multiple async services (Database, External APIs)
- * - Error handling with custom typed errors
+ * - Error handling with custom typed errors using FlowError
  * - Mixing Result (fallible) and Option (nullable) types
- * - Using Flow.asyncGenAdapter for clean, declarative control flow
+ * - Using Flow.asyncGen with direct error yielding via FlowError
  */
 
-import { Flow, Option, Result } from "../../dist/index.mjs";
+import { Flow, FlowError, Option, Result } from "../../src/index.js";
 
 // ============================================================================
 // 1. Domain Types & Errors
@@ -41,28 +41,28 @@ interface EnrichedUser {
   lifetimeValue: number;
 }
 
-// Custom Errors
-class NotFoundError extends Error {
+// Custom Errors - extend FlowError for direct yielding in Flow generators
+class NotFoundError extends FlowError {
   readonly _tag = "NotFoundError";
   constructor(message: string) {
     super(message);
-    this.name = "NotFoundError";
+    Object.defineProperty(this, "name", { value: "NotFoundError" });
   }
 }
 
-class ValidationError extends Error {
+class ValidationError extends FlowError {
   readonly _tag = "ValidationError";
   constructor(message: string) {
     super(message);
-    this.name = "ValidationError";
+    Object.defineProperty(this, "name", { value: "ValidationError" });
   }
 }
 
-class ServiceUnavailableError extends Error {
+class ServiceUnavailableError extends FlowError {
   readonly _tag = "ServiceUnavailableError";
   constructor(service: string) {
     super(`${service} unavailable`);
-    this.name = "ServiceUnavailableError";
+    Object.defineProperty(this, "name", { value: "ServiceUnavailableError" });
   }
 }
 
@@ -148,15 +148,16 @@ const DEFAULT_PREFS: UserPreferences = {
 
 const enrichUser = async (userId: number) => {
   return await Flow.asyncGen(async function* () {
+    // Direct error yielding with FlowError - no Result.Err wrapper needed!
     if (userId <= 0) {
-      yield* Result.Err(new ValidationError("UserID must be positive"));
+      yield* new ValidationError("UserID must be positive");
     }
 
     console.log(`[Flow] Fetching user ${userId}...`);
     const user = yield* await UserRepository.findById(userId);
 
     if (!user.isActive) {
-      yield* Result.Err(new ValidationError("User account is inactive"));
+      yield* new ValidationError("User account is inactive");
     }
 
     console.log(`[Flow] Fetching details for ${user.username}...`);
@@ -194,28 +195,28 @@ async function runDemo() {
    */
   res1.match({
     Ok: (data) => console.log("SUCCESS:", JSON.stringify(data, null, 2)),
-    Err: (err) => console.error("FAILURE:", err.message),
+    Err: (err) => console.error("FAILURE:", (err as Error).message),
   });
 
   console.log("\n--- Scenario 2: User Not Found (ID 99) ---");
   const res2 = await enrichUser(99);
   console.log(
     "Result:",
-    res2.isErr() ? `Left(${res2.unwrapErr().message})` : "Ok",
+    res2.isErr() ? `Left(${(res2.unwrapErr() as Error).message})` : "Ok",
   );
 
   console.log("\n--- Scenario 3: Validation Error (ID -5) ---");
   const res3 = await enrichUser(-5);
   console.log(
     "Result:",
-    res3.isErr() ? `Left(${res3.unwrapErr().message})` : "Ok",
+    res3.isErr() ? `Left(${(res3.unwrapErr() as Error).message})` : "Ok",
   );
 
   console.log("\n--- Scenario 4: Logical Validation (Bob - Inactive) ---");
   const res4 = await enrichUser(2);
   console.log(
     "Result:",
-    res4.isErr() ? `Left(${res4.unwrapErr().message})` : "Ok",
+    res4.isErr() ? `Left(${(res4.unwrapErr() as Error).message})` : "Ok",
   );
 }
 

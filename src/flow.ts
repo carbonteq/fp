@@ -10,6 +10,45 @@ function isResult<T, E>(value: unknown): value is Result<T, E> {
   return value instanceof Result;
 }
 
+/**
+ * Base class for errors that can be directly yielded in Flow generators.
+ * Extend this class instead of Error to enable `yield* new MyError(...)`
+ * in `Flow.gen` and `Flow.asyncGen`.
+ *
+ * @example
+ * ```typescript
+ * class ValidationError extends FlowError {
+ *   readonly _tag = "ValidationError";
+ *   constructor(message: string) {
+ *     super(message);
+ *     this.name = "ValidationError";
+ *   }
+ * }
+ *
+ * const result = Flow.gen(function* () {
+ *   if (value < 0) {
+ *     yield* new ValidationError("Value must be positive");
+ *   }
+ *   return value * 2;
+ * });
+ * ```
+ */
+export class FlowError extends Error {
+  *[Symbol.iterator](): Generator<this, never, unknown> {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as this) as never;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<this, never, unknown> {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as this) as never;
+  }
+}
+
+function isFlowError(value: unknown): value is FlowError {
+  return value instanceof FlowError;
+}
+
 type ExtractFlowError<Y> =
   // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
   Y extends Option<any>
@@ -17,7 +56,9 @@ type ExtractFlowError<Y> =
     : // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
       Y extends Result<any, infer E>
       ? E
-      : never;
+      : Y extends FlowError
+        ? Y
+        : never;
 
 class FlowYieldWrap<T, E> {
   constructor(readonly value: Option<T> | Result<T, E>) {}
@@ -58,18 +99,20 @@ class AsyncFlowYieldWrap<T, E> {
 type ExtractWrapError<Y> =
   // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
   Y extends FlowYieldWrap<any, infer E>
-    ? E | UnwrappedNone // Wrappers tracking Options need UnwrappedNone added
+    ? E // UnwrappedNone is added via adapter overload for Option
     : never;
 
 type ExtractAsyncWrapError<Y> =
   // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
-  Y extends AsyncFlowYieldWrap<any, infer E> ? E | UnwrappedNone : never;
+  Y extends AsyncFlowYieldWrap<any, infer E>
+    ? E // UnwrappedNone is added via adapter overload for Option
+    : never;
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
 export class Flow {
   // Direct generator (no adapter)
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
-  static gen<Eff extends Option<any> | Result<any, any>, T>(
+  static gen<Eff extends Option<any> | Result<any, any> | FlowError, T>(
     genFn: () => Generator<Eff, T, unknown>,
   ): Result<T, ExtractFlowError<Eff>> {
     const iterator = genFn();
@@ -87,7 +130,20 @@ export class Flow {
         value = value.value as Eff;
       }
 
-      if (isOption(value)) {
+      if (isFlowError(value)) {
+        // Handle FlowError - short-circuit with the error
+        if (stack) {
+          const stackLines = stack.split("\n");
+          // stackLines[0] is "Error"
+          // stackLines[1] is the internal FlowError.[Symbol.iterator] frame
+          // We want to keep from stackLines[2] onwards
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            value.stack = `${value.name}: ${value.message}\n${userStack}`;
+          }
+        }
+        return Result.Err(value) as Result<T, ExtractFlowError<Eff>>;
+      } else if (isOption(value)) {
         if (value.isNone()) {
           const err = new UnwrappedNone();
           if (stack) {
@@ -128,12 +184,18 @@ export class Flow {
   // Adapter generator
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static genAdapter<Eff extends FlowYieldWrap<any, any>, T>(
-    genFn: (
-      adapter: <A, E>(val: Option<A> | Result<A, E>) => FlowYieldWrap<A, E>,
-    ) => Generator<Eff, T, unknown>,
+    genFn: (adapter: {
+      <A>(val: Option<A>): FlowYieldWrap<A, UnwrappedNone>;
+      <A, E>(val: Result<A, E>): FlowYieldWrap<A, E>;
+      fail: <E extends Error>(error: E) => FlowYieldWrap<never, E>;
+    }) => Generator<Eff, T, unknown>,
   ): Result<T, ExtractWrapError<Eff>> {
-    const adapter = <A, E>(val: Option<A> | Result<A, E>) =>
+    const baseAdapter = <A, E>(val: Option<A> | Result<A, E>) =>
       new FlowYieldWrap(val);
+    const adapter = Object.assign(baseAdapter, {
+      fail: <E extends Error>(error: E) =>
+        new FlowYieldWrap<never, E>(Result.Err(error)),
+    });
     const iterator = genFn(adapter);
     let nextArg: unknown;
 
@@ -189,7 +251,10 @@ export class Flow {
 
   // Async variants...
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
-  static async asyncGen<Eff extends Option<any> | Result<any, any>, T>(
+  static async asyncGen<
+    Eff extends Option<any> | Result<any, any> | FlowError,
+    T,
+  >(
     genFn: () => AsyncGenerator<Eff, T, unknown>,
   ): Promise<Result<T, ExtractFlowError<Eff>>> {
     const iterator = genFn();
@@ -207,7 +272,20 @@ export class Flow {
         value = value.value as Eff;
       }
 
-      if (isOption(value)) {
+      if (isFlowError(value)) {
+        // Handle FlowError - short-circuit with the error
+        if (stack) {
+          const stackLines = stack.split("\n");
+          // stackLines[0] is "Error"
+          // stackLines[1] is the internal FlowError.[Symbol.asyncIterator] frame
+          // We want to keep from stackLines[2] onwards
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            value.stack = `${value.name}: ${value.message}\n${userStack}`;
+          }
+        }
+        return Result.Err(value) as Result<T, ExtractFlowError<Eff>>;
+      } else if (isOption(value)) {
         if (value.isNone()) {
           const err = new UnwrappedNone();
           if (stack) {
@@ -242,15 +320,23 @@ export class Flow {
 
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGenAdapter<Eff extends AsyncFlowYieldWrap<any, any>, T>(
-    genFn: (
-      adapter: <A, E>(
-        val: Option<A> | Result<A, E> | Promise<Option<A> | Result<A, E>>,
-      ) => AsyncFlowYieldWrap<A, E>,
-    ) => AsyncGenerator<Eff, T, unknown>,
+    genFn: (adapter: {
+      <A>(
+        val: Option<A> | Promise<Option<A>>,
+      ): AsyncFlowYieldWrap<A, UnwrappedNone>;
+      <A, E>(
+        val: Result<A, E> | Promise<Result<A, E>>,
+      ): AsyncFlowYieldWrap<A, E>;
+      fail: <E extends Error>(error: E) => AsyncFlowYieldWrap<never, E>;
+    }) => AsyncGenerator<Eff, T, unknown>,
   ): Promise<Result<T, ExtractAsyncWrapError<Eff>>> {
-    const adapter = <A, E>(
+    const baseAdapter = <A, E>(
       val: Option<A> | Result<A, E> | Promise<Option<A> | Result<A, E>>,
     ) => new AsyncFlowYieldWrap(val);
+    const adapter = Object.assign(baseAdapter, {
+      fail: <E extends Error>(error: E) =>
+        new AsyncFlowYieldWrap<never, E>(Result.Err(error)),
+    });
     const iterator = genFn(adapter);
     let nextArg: unknown;
 
