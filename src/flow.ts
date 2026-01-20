@@ -1,6 +1,6 @@
 import { Option, UnwrappedNone } from "./option.js";
 import { Result } from "./result.js";
-import { isPromiseLike } from "./utils.js";
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
 
 function isOption<T>(value: unknown): value is Option<T> {
   return value instanceof Option;
@@ -23,7 +23,11 @@ class FlowYieldWrap<T, E> {
   constructor(readonly value: Option<T> | Result<T, E>) {}
 
   *[Symbol.iterator](): Generator<FlowYieldWrap<T, E>, T, unknown> {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as FlowYieldWrap<
+      T,
+      E
+    >) as T;
   }
 }
 
@@ -43,7 +47,11 @@ class AsyncFlowYieldWrap<T, E> {
     T,
     unknown
   > {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(
+      this,
+      trace,
+    ) as unknown as AsyncFlowYieldWrap<T, E>) as T;
   }
 }
 
@@ -71,18 +79,42 @@ export class Flow {
       const next = iterator.next(nextArg);
       if (next.done) return Result.Ok(next.value);
 
-      const value = next.value;
+      let value = next.value;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(value)) {
+        stack = value.stack;
+        value = value.value as Eff;
+      }
 
       if (isOption(value)) {
-        if (value.isNone())
-          return Result.Err(new UnwrappedNone()) as Result<
-            T,
-            ExtractFlowError<Eff>
-          >;
+        if (value.isNone()) {
+          const err = new UnwrappedNone();
+          if (stack) {
+            const stackLines = stack.split("\n");
+            // stackLines[0] is "Error"
+            // stackLines[1] is the internal Option.[Symbol.iterator] frame
+            // We want to keep from stackLines[2] onwards
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
+          return Result.Err(err) as Result<T, ExtractFlowError<Eff>>;
+        }
         nextArg = value.unwrap();
       } else if (isResult(value)) {
-        if (value.isErr())
+        if (value.isErr()) {
+          const err = value.unwrapErr();
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n");
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
           return value as unknown as Result<T, ExtractFlowError<Eff>>;
+        }
         nextArg = value.unwrap();
       } else {
         // Should not happen if types are correct, but runtime safe
@@ -109,19 +141,47 @@ export class Flow {
       const next = iterator.next(nextArg);
       if (next.done) return Result.Ok(next.value);
 
-      const wrapped = next.value;
+      // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+      let wrapped = next.value as any;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(wrapped)) {
+        stack = wrapped.stack;
+        wrapped = wrapped.value as FlowYieldWrap<unknown, unknown>;
+      } else {
+        wrapped = wrapped as FlowYieldWrap<unknown, unknown>;
+      }
+
       const value = wrapped.value;
 
       if (isOption(value)) {
-        if (value.isNone())
-          return Result.Err(new UnwrappedNone()) as Result<
-            T,
-            ExtractWrapError<Eff>
-          >;
+        if (value.isNone()) {
+          const err = new UnwrappedNone();
+          if (stack) {
+            const stackLines = stack.split("\n");
+            // stackLines[0] is "Error"
+            // stackLines[1] is the internal FlowYieldWrap.[Symbol.iterator] frame
+            // We want to keep from stackLines[2] onwards
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
+          return Result.Err(err) as Result<T, ExtractWrapError<Eff>>;
+        }
         nextArg = value.unwrap();
       } else if (isResult(value)) {
-        if (value.isErr())
+        if (value.isErr()) {
+          const err = value.unwrapErr();
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n");
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
           return value as unknown as Result<T, ExtractWrapError<Eff>>;
+        }
         nextArg = value.unwrap();
       }
     }
@@ -139,17 +199,42 @@ export class Flow {
       const next = await iterator.next(nextArg);
       if (next.done) return Result.Ok(next.value);
 
-      const value = next.value;
+      let value = next.value;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(value)) {
+        stack = value.stack;
+        value = value.value as Eff;
+      }
+
       if (isOption(value)) {
-        if (value.isNone())
-          return Result.Err(new UnwrappedNone()) as Result<
-            T,
-            ExtractFlowError<Eff>
-          >;
+        if (value.isNone()) {
+          const err = new UnwrappedNone();
+          if (stack) {
+            const stackLines = stack.split("\n");
+            // stackLines[0] is "Error"
+            // stackLines[1] is the internal Option.[Symbol.iterator] frame
+            // We want to keep from stackLines[2] onwards
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
+          return Result.Err(err) as Result<T, ExtractFlowError<Eff>>;
+        }
         nextArg = value.unwrap();
       } else if (isResult(value)) {
-        if (value.isErr())
+        if (value.isErr()) {
+          const err = value.unwrapErr();
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n");
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
           return value as unknown as Result<T, ExtractFlowError<Eff>>;
+        }
         nextArg = value.unwrap();
       }
     }
@@ -173,19 +258,44 @@ export class Flow {
       const next = await iterator.next(nextArg);
       if (next.done) return Result.Ok(next.value);
 
-      const wrapped = next.value;
+      // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+      let wrapped = next.value as any;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(wrapped)) {
+        stack = wrapped.stack;
+        wrapped = wrapped.value as AsyncFlowYieldWrap<unknown, unknown>;
+      } else {
+        wrapped = wrapped as AsyncFlowYieldWrap<unknown, unknown>;
+      }
+
       const value = await wrapped.value;
 
       if (isOption(value)) {
-        if (value.isNone())
-          return Result.Err(new UnwrappedNone()) as Result<
-            T,
-            ExtractAsyncWrapError<Eff>
-          >;
+        if (value.isNone()) {
+          const err = new UnwrappedNone();
+          if (stack) {
+            const stackLines = stack.split("\n");
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
+          return Result.Err(err) as Result<T, ExtractAsyncWrapError<Eff>>;
+        }
         nextArg = value.unwrap();
       } else if (isResult(value)) {
-        if (value.isErr())
+        if (value.isErr()) {
+          const err = value.unwrapErr();
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n");
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n");
+              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            }
+          }
           return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>;
+        }
         nextArg = value.unwrap();
       }
     }

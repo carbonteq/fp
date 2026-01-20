@@ -1,6 +1,6 @@
 import { Result } from "./result.js";
 import { UNIT } from "./unit.js";
-import { isPromiseLike } from "./utils.js";
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
 
 type Predicate<T> = (val: T) => boolean;
 type Falsy = false | 0 | "" | null | undefined;
@@ -440,7 +440,11 @@ export class Option<T> {
       }
 
       // next.value is the Option that was yielded
-      const yielded = next.value as Option<unknown>;
+      let yielded = next.value as Option<unknown>;
+
+      if (isCapturedTrace(yielded)) {
+        yielded = yielded.value as Option<unknown>;
+      }
 
       if (yielded.isNone()) {
         // Early termination on None - return singleton None
@@ -526,7 +530,12 @@ export class Option<T> {
 
       // next.value is the OptionYieldWrap that was yielded
       const wrapped = next.value as OptionYieldWrap<unknown>;
-      const option = wrapped.option;
+      let option = wrapped.option;
+
+      if (isCapturedTrace(option)) {
+        option = (option as unknown as CapturedTrace<Option<unknown>>)
+          .value as Option<unknown>;
+      }
 
       if (option.isNone()) {
         // Early termination on None - return singleton None
@@ -617,7 +626,11 @@ export class Option<T> {
       }
 
       // next.value is an Option (user awaits promises before yielding)
-      const option = next.value as Option<unknown>;
+      let option = next.value as Option<unknown>;
+
+      if (isCapturedTrace(option)) {
+        option = option.value as Option<unknown>;
+      }
 
       if (option.isNone()) {
         // Early termination on None - return singleton None
@@ -713,7 +726,12 @@ export class Option<T> {
 
       // next.value is the AsyncOptionYieldWrap that was yielded
       const wrapped = next.value as AsyncOptionYieldWrap<unknown>;
-      const option = await wrapped.option;
+      let option = await wrapped.option;
+
+      if (isCapturedTrace(option)) {
+        option = (option as unknown as CapturedTrace<Option<unknown>>)
+          .value as Option<unknown>;
+      }
 
       if (option.isNone()) {
         // Early termination on None - return singleton None
@@ -1613,7 +1631,8 @@ export class Option<T> {
    * @internal
    */
   *[Symbol.iterator](): Generator<Option<T>, T, unknown> {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as Option<T>) as T;
   }
 
   /**
@@ -1638,6 +1657,10 @@ export class Option<T> {
     Awaited<T>,
     unknown
   > {
-    return (yield this) as Awaited<T>;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(
+      this,
+      trace,
+    ) as unknown as Option<T>) as Awaited<T>;
   }
 }

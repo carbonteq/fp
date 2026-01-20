@@ -1,6 +1,7 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
+import { CapturedTrace, isCapturedTrace, } from "./utils.js";
 
 export type UnitResult<E = never> = Result<UNIT, E>;
 
@@ -37,7 +38,11 @@ class ResultYieldWrap<T, E> {
   constructor(readonly result: Result<T, E>) {}
 
   *[Symbol.iterator](): Generator<ResultYieldWrap<T, E>, T, unknown> {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as ResultYieldWrap<
+      T,
+      E
+    >) as T;
   }
 }
 
@@ -55,7 +60,11 @@ class AsyncResultYieldWrap<T, E> {
     T,
     unknown
   > {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(
+      this,
+      trace,
+    ) as unknown as AsyncResultYieldWrap<T, E>) as T;
   }
 }
 
@@ -1263,7 +1272,11 @@ export class Result<T, E> {
    * ```
    */
   *[Symbol.iterator](): Generator<Result<T, E>, T, unknown> {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as Result<
+      T,
+      E
+    >) as T;
   }
 
   /**
@@ -1279,7 +1292,11 @@ export class Result<T, E> {
    * ```
    */
   async *[Symbol.asyncIterator](): AsyncGenerator<Result<T, E>, T, unknown> {
-    return (yield this) as T;
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as Result<
+      T,
+      E
+    >) as T;
   }
 
   // Static constructors
@@ -1374,9 +1391,23 @@ export namespace Result {
       }
 
       // next.value is the Result that was yielded
-      const yielded = next.value as Result<unknown, unknown>;
+      let yielded = next.value as Result<unknown, unknown>;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(yielded)) {
+        stack = yielded.stack;
+        yielded = yielded.value as Result<unknown, unknown>;
+      }
 
       if (yielded.isErr()) {
+        const err = yielded.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
         // Early termination on error - return the Err result
         currentResult = yielded as unknown as Result<T, ExtractError<Eff>>;
         break;
@@ -1433,9 +1464,24 @@ export namespace Result {
 
       // next.value is the ResultYieldWrap that was yielded
       const wrapped = next.value as ResultYieldWrap<unknown, unknown>;
-      const result = wrapped.result;
+      let result = wrapped.result;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(wrapped)) {
+        stack = wrapped.stack;
+        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+        result = (wrapped as any).value.result;
+      }
 
       if (result.isErr()) {
+        const err = result.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
         // Early termination on error - return the Err result
         currentResult = result as unknown as Result<T, ExtractResultError<Eff>>;
         break;
@@ -1487,9 +1533,23 @@ export namespace Result {
       }
 
       // next.value is a Result (user awaits promises before yielding)
-      const result = next.value as Result<unknown, unknown>;
+      let result = next.value as Result<unknown, unknown>;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(result)) {
+        stack = result.stack;
+        result = result.value as Result<unknown, unknown>;
+      }
 
       if (result.isErr()) {
+        const err = result.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
         // Early termination on error - return the Err result
         currentResult = result as unknown as Result<T, ExtractError<Eff>>;
         break;
@@ -1555,9 +1615,26 @@ export namespace Result {
 
       // next.value is the AsyncResultYieldWrap that was yielded
       const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>;
-      const result = await wrapped.result;
+      let result: Result<unknown, unknown>;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(wrapped)) {
+        stack = wrapped.stack;
+        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+        result = await (wrapped as any).value.result;
+      } else {
+        result = await wrapped.result;
+      }
 
       if (result.isErr()) {
+        const err = result.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
         // Early termination on error - return the Err result
         currentResult = result as unknown as Result<
           T,
