@@ -1,7 +1,7 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
-import { CapturedTrace, isCapturedTrace, } from "./utils.js";
+import { CapturedTrace, isCapturedTrace } from "./utils.js";
 
 export type UnitResult<E = never> = Result<UNIT, E>;
 
