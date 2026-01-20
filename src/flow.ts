@@ -250,8 +250,8 @@ export class Flow {
   }
 
   // Async variants...
-  // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGen<
+    // biome-ignore lint/suspicious/noExplicitAny: inference
     Eff extends Option<any> | Result<any, any> | FlowError,
     T,
   >(

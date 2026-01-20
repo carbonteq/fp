@@ -368,6 +368,165 @@ export class Result<T, E> {
   }
 
   /**
+   * Pattern matches using positional arguments (FP convention alias for `match`).
+   *
+   * This is a more concise alternative to `match` using positional arguments
+   * instead of an object. Familiar to developers from Scala, Haskell, and other FP languages.
+   *
+   * @template U - The result type of both branches
+   * @param onOk - Handler called with the value if `Ok`
+   * @param onErr - Handler called with the error if `Err`
+   * @returns The result of calling the appropriate handler
+   *
+   * @example
+   * ```ts
+   * const result = Result.Ok(42).fold(
+   *   (value) => `Success: ${value}`,
+   *   (error) => `Failed: ${error}`
+   * );
+   * // "Success: 42"
+   *
+   * const errResult = Result.Err("network error").fold(
+   *   (value) => `Success: ${value}`,
+   *   (error) => `Failed: ${error}`
+   * );
+   * // "Failed: network error"
+   *
+   * // Equivalent to match:
+   * result.fold(onOk, onErr);
+   * result.match({ Ok: onOk, Err: onErr });
+   * ```
+   *
+   * @see {@link match} for object-based pattern matching
+   * @see {@link foldAsync} for async handlers
+   */
+  fold<U>(onOk: (val: T) => U, onErr: (err: E) => U): U {
+    if (this.isErr()) {
+      return onErr(this.#err);
+    }
+    return onOk(this.#val);
+  }
+
+  /**
+   * Async pattern matching using positional arguments.
+   *
+   * Async variant of `fold` for when handlers return Promises.
+   *
+   * @template U - The result type of both branches
+   * @param onOk - Async handler called with the value if `Ok`
+   * @param onErr - Async handler called with the error if `Err`
+   * @returns Promise resolving to the result of the appropriate handler
+   *
+   * @example
+   * ```ts
+   * const result = await Result.Ok(userId).foldAsync(
+   *   async (id) => await fetchUserData(id),
+   *   async (error) => await logAndGetFallback(error)
+   * );
+   *
+   * // Error recovery with logging
+   * const data = await apiResult.foldAsync(
+   *   async (response) => await processResponse(response),
+   *   async (error) => {
+   *     await reportError(error);
+   *     return getDefaultData();
+   *   }
+   * );
+   * ```
+   *
+   * @see {@link fold} for synchronous handlers
+   * @see {@link matchAsync} for object-based async pattern matching
+   */
+  async foldAsync<U>(
+    onOk: (val: T) => Promise<U>,
+    onErr: (err: E) => Promise<U>,
+  ): Promise<U> {
+    if (this.isErr()) {
+      return onErr(this.#err);
+    }
+    return onOk(this.#val).catch((e) => onErr(e as E));
+  }
+
+  /**
+   * Async pattern matching on both states of the Result.
+   *
+   * Async variant of `match` for when handlers return Promises.
+   *
+   * @template U - The result type of both branches
+   * @param cases - Object containing async handlers for both states
+   * @returns Promise resolving to the result of the appropriate handler
+   *
+   * @example
+   * ```ts
+   * const result = await apiResult.matchAsync({
+   *   Ok: async (data) => await processData(data),
+   *   Err: async (error) => await handleError(error)
+   * });
+   *
+   * // With database operations
+   * const user = await findUserResult.matchAsync({
+   *   Ok: async (user) => await enrichUserData(user),
+   *   Err: async (error) => {
+   *     await logError(error);
+   *     return createGuestUser();
+   *   }
+   * });
+   * ```
+   *
+   * @see {@link match} for synchronous pattern matching
+   * @see {@link foldAsync} for positional-argument async matching
+   */
+  async matchAsync<U>(cases: {
+    Ok: (val: T) => Promise<U>;
+    Err: (err: E) => Promise<U>;
+  }): Promise<U> {
+    if (this.isErr()) {
+      return cases.Err(this.#err);
+    }
+    return cases.Ok(this.#val).catch((_) => cases.Err(this.#err));
+  }
+
+  /**
+   * Pattern matches with a subset of cases, using a default for unhandled cases.
+   *
+   * Unlike `match` which requires all cases, `matchPartial` allows handling
+   * only specific cases with a fallback default value or function.
+   *
+   * @template U - The result type
+   * @param cases - Partial object with optional `Ok` and `Err` handlers
+   * @param defaultValue - Value to return for unhandled cases
+   * @returns The result of the matching handler or the default
+   *
+   * @example
+   * ```ts
+   * // Only handle Ok, default for Err
+   * Result.Ok(42).matchPartial({ Ok: (v) => v * 2 }, 0);     // 84
+   * Result.Err("fail").matchPartial({ Ok: (v) => v * 2 }, 0); // 0
+   *
+   * // Only handle Err for logging
+   * result.matchPartial(
+   *   { Err: (e) => { logError(e); return null; } },
+   *   (v) => v  // pass through Ok values
+   * );
+   *
+   * // Lazy default with function
+   * result.matchPartial(
+   *   { Ok: (v) => process(v) },
+   *   () => computeExpensiveDefault()
+   * );
+   * ```
+   *
+   * @see {@link match} for exhaustive pattern matching
+   */
+  matchPartial<U>(cases: Partial<MatchCases<T, E, U>>, getDefault: () => U): U {
+    if (this.isErr()) {
+      return cases.Err ? cases.Err(this.#err) : getDefault();
+    }
+
+    return cases.Ok ? cases.Ok(this.#val) : getDefault();
+  }
+
+  /**
    * Transforms the success value using the provided function.
    *
    * If the Result is Ok, applies the function to the value and wraps the result

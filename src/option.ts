@@ -986,6 +986,165 @@ export class Option<T> {
   }
 
   /**
+   * Pattern matches using positional arguments (FP convention alias for `match`).
+   *
+   * This is a more concise alternative to `match` using positional arguments
+   * instead of an object. Familiar to developers from Scala, Haskell, and other FP languages.
+   *
+   * @template U - The result type of both branches
+   * @param onSome - Handler called with the value if `Some`
+   * @param onNone - Handler called if `None`
+   * @returns The result of calling the appropriate handler
+   *
+   * @example
+   * ```ts
+   * const result = Option.Some(42).fold(
+   *   (value) => `Got: ${value}`,
+   *   () => "Got nothing"
+   * );
+   * // "Got: 42"
+   *
+   * const noneResult = Option.None.fold(
+   *   (value) => `Got: ${value}`,
+   *   () => "Got nothing"
+   * );
+   * // "Got nothing"
+   *
+   * // Equivalent to match:
+   * option.fold(onSome, onNone);
+   * option.match({ Some: onSome, None: onNone });
+   * ```
+   *
+   * @see {@link match} for object-based pattern matching
+   * @see {@link foldAsync} for async handlers
+   */
+  fold<U>(onSome: (val: T) => U, onNone: () => U): U {
+    if (this.isNone()) {
+      return onNone();
+    }
+    return onSome(this.#val);
+  }
+
+  /**
+   * Async pattern matching using positional arguments.
+   *
+   * Async variant of `fold` for when handlers return Promises.
+   *
+   * @template U - The result type of both branches
+   * @param onSome - Async handler called with the value if `Some`
+   * @param onNone - Async handler called if `None`
+   * @returns Promise resolving to the result of the appropriate handler
+   *
+   * @example
+   * ```ts
+   * const result = await Option.Some(userId).foldAsync(
+   *   async (id) => await fetchUser(id),
+   *   async () => await getDefaultUser()
+   * );
+   *
+   * // With database lookup
+   * const user = await Option.fromNullable(sessionUserId).foldAsync(
+   *   async (id) => await db.users.findById(id),
+   *   async () => ({ id: 0, name: "Guest" })
+   * );
+   * ```
+   *
+   * @see {@link fold} for synchronous handlers
+   * @see {@link matchAsync} for object-based async pattern matching
+   */
+  async foldAsync<U>(
+    onSome: (val: T) => Promise<U>,
+    onNone: () => Promise<U>,
+  ): Promise<U> {
+    if (this.isNone()) {
+      return onNone();
+    }
+
+    return onSome(this.#val).catch((_) => onNone());
+  }
+
+  /**
+   * Async pattern matching on both states of the Option.
+   *
+   * Async variant of `match` for when handlers return Promises.
+   *
+   * @template U - The result type of both branches
+   * @param cases - Object containing async handlers for both states
+   * @returns Promise resolving to the result of the appropriate handler
+   *
+   * @example
+   * ```ts
+   * const result = await Option.Some(userId).matchAsync({
+   *   Some: async (id) => await fetchUser(id),
+   *   None: async () => await getDefaultUser()
+   * });
+   *
+   * // With API calls
+   * const data = await maybeConfig.matchAsync({
+   *   Some: async (config) => await loadWithConfig(config),
+   *   None: async () => await loadDefaults()
+   * });
+   * ```
+   *
+   * @see {@link match} for synchronous pattern matching
+   * @see {@link foldAsync} for positional-argument async matching
+   */
+  async matchAsync<U>(cases: {
+    Some: (val: T) => Promise<U>;
+    None: () => Promise<U>;
+  }): Promise<U> {
+    if (this.isNone()) {
+      return cases.None();
+    }
+    return cases.Some(this.#val).catch((_) => cases.None());
+  }
+
+  /**
+   * Pattern matches with a subset of cases, using a default for unhandled cases.
+   *
+   * Unlike `match` which requires all cases, `matchPartial` allows handling
+   * only specific cases with a fallback default value or function.
+   *
+   * @template U - The result type
+   * @param cases - Partial object with optional `Some` and `None` handlers
+   * @param defaultValue - Value to return for unhandled cases
+   * @returns The result of the matching handler or the default
+   *
+   * @example
+   * ```ts
+   * // Only handle Some, default for None
+   * Option.Some(42).matchPartial({ Some: (v) => v * 2 }, 0);  // 84
+   * Option.None.matchPartial({ Some: (v) => v * 2 }, 0);      // 0
+   *
+   * // Only handle None
+   * Option.Some(42).matchPartial({ None: () => -1 }, 100);    // 100
+   * Option.None.matchPartial({ None: () => -1 }, 100);        // -1
+   *
+   * // Lazy default with function
+   * option.matchPartial(
+   *   { Some: (v) => process(v) },
+   *   () => computeExpensiveDefault()
+   * );
+   * ```
+   *
+   * @see {@link match} for exhaustive pattern matching
+   */
+
+  matchPartial<U>(
+    cases: {
+      Some?: (val: T) => NoInfer<U>;
+      None?: () => NoInfer<U>;
+    },
+    getDefault: () => U,
+  ): U {
+    if (this.isNone()) {
+      return cases.None ? cases.None() : getDefault();
+    }
+
+    return cases.Some ? cases.Some(this.#val) : getDefault();
+  }
+
+  /**
    * Transforms the contained value using the provided function.
    *
    * If `Some`, applies the function and wraps the result in a new `Some`.
