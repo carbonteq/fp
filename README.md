@@ -88,6 +88,7 @@ matchOpt(res, {
 - [Usage](#usage)
   - [The `Result` type](#the-result-type)
   - [The `Option` type](#the-option-type)
+  - [The `Flow` namespace](#the-flow-namespace)
   - [Cheatsheet](#cheatsheet)
     - [map](#map)
     - [flatMap](#flatmap)
@@ -160,6 +161,62 @@ Option.Some(5).mapAsync(async (x) => x * 2);      // Promise<Option<number>>
 Option.Some(5).flatMapAsync(async (x) => Option.Some(x * 2));
 Option.Some(5).filterAsync(async (x) => x > 3);
 Option.Some(5).mapOrAsync(0, async (x) => x * 2);
+```
+
+---
+
+## The `Flow` namespace
+
+`Flow` provides a unified generator interface for working with both `Option` and `Result` types simultaneously. It allows you to yield both types in the same generator, automatically short-circuiting on `Option.None` or `Result.Err`.
+
+The return type of a `Flow` generator is always a `Result<T, E | UnwrappedNone>`, where:
+
+- `T` is the return value of the generator function.
+- `E` is the union of all error types yielded from `Result`s.
+- `UnwrappedNone` is included if any `Option`s were yielded (representing the case where `None` caused a short-circuit).
+
+```typescript
+import { Flow, Option, Result, UnwrappedNone } from "@carbonteq/fp";
+
+// Basic usage mixing Option and Result
+const result = Flow.gen(function* () {
+  const a = yield* Option.Some(5);        // Unwraps Option<number> -> number
+  const b = yield* Result.Ok(10);         // Unwraps Result<number, never> -> number
+
+  // If this was None, the flow would stop and return Result.Err(new UnwrappedNone())
+  const c = yield* Option.fromNullable(20);
+
+  return a + b + c;
+});
+
+console.log(result.unwrap()); // 35
+```
+
+### Async Flow
+
+`Flow.asyncGen` works similarly but allows awaiting promises and yielding async operations.
+
+```typescript
+const result = await Flow.asyncGen(async function* () {
+  const user = yield* Option.Some({ id: 1 });
+
+  // You can await async functions returning Result/Option before yielding
+  const profile = yield* await fetchProfile(user.id);
+
+  return profile;
+});
+```
+
+### Adapter Variant (`genAdapter`)
+
+For better type inference in complex chains, use `genAdapter` (or `asyncGenAdapter`). It provides an adapter function (`$`) to wrap yielded values.
+
+```typescript
+const result = Flow.genAdapter(function* ($) {
+  const val1 = yield* $(Option.Some(10));
+  const val2 = yield* $(Result.Ok(20));
+  return val1 + val2;
+});
 ```
 
 ---
