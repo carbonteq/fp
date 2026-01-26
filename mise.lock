@@ -4,5 +4,6 @@ backend = "core:bun"
 "platforms.linux-x64" = { checksum = "blake3:dddfffe2a80a43b4a71b1a72dcf48f2b1be308e43e2047b18839412f11adcb9e"}
 
 [[tools.node]]
-version = "20.18.1"
+version = "20.20.0"
 backend = "core:node"
+"platforms.linux-x64" = { checksum = "sha256:92dfd59fb4837230abba5d6dd717b882ca897e22fde2f9268e1aac2c4bde0f5b", url = "https://nodejs.org/dist/v20.20.0/node-v20.20.0-linux-x64.tar.gz"}

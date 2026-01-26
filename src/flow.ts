@@ -1,5 +1,8 @@
-import { Option, UnwrappedNone } from "./option.js";
-import { Result } from "./result.js";
+import {
+  ExperimentalOption as Option,
+  UnwrappedNone,
+} from "./option-experimental.js";
+import { ExperimentalResult as Result } from "./result-experimental.js";
 import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
 
 function isOption<T>(value: unknown): value is Option<T> {

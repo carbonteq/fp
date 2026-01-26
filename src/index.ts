@@ -1,7 +1,9 @@
 export * from "./flow.js";
 export * from "./match.js";
 export * from "./option.js";
+export { ExperimentalOption } from "./option-experimental.js";
 export * from "./result.js";
+export { ExperimentalResult } from "./result-experimental.js";
 export * from "./tuple.js";
 export * from "./unit.js";
 export * from "./utils.js";

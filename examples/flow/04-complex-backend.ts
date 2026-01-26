@@ -8,7 +8,11 @@
  * - Using Flow.asyncGenAdapter for clean, declarative control flow
  */
 
-import { Flow, Option, Result } from "../../dist/index.mjs";
+import {
+  Flow,
+  ExperimentalOption as Option,
+  ExperimentalResult as Result,
+} from "../../dist/index.mjs";
 
 // ============================================================================
 // 1. Domain Types & Errors

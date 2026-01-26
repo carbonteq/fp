@@ -77,6 +77,26 @@
         "types": "./dist/flow.d.mts",
         "default": "./dist/flow.mjs"
       }
+    },
+    "./result-experimental": {
+      "require": {
+        "types": "./dist/result-experimental.d.cts",
+        "default": "./dist/result-experimental.cjs"
+      },
+      "import": {
+        "types": "./dist/result-experimental.d.mts",
+        "default": "./dist/result-experimental.mjs"
+      }
+    },
+    "./option-experimental": {
+      "require": {
+        "types": "./dist/option-experimental.d.cts",
+        "default": "./dist/option-experimental.cjs"
+      },
+      "import": {
+        "types": "./dist/option-experimental.d.mts",
+        "default": "./dist/option-experimental.mjs"
+      }
     }
   },
   "homepage": "https://github.com/carbonteq/fp#readme",

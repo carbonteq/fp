@@ -4,7 +4,7 @@
  * Examples of how to handle errors and perform recovery (orElse) within Flow generators.
  */
 
-import { Flow, Result } from "../../dist/index.mjs";
+import { Flow, ExperimentalResult as Result } from "../../dist/index.mjs";
 
 // Mock operations
 const mayFail = (id: number): Result<number, string> =>

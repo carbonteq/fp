@@ -7,7 +7,11 @@
  * - If Result.Err(e) is yielded -> returns Result.Err(e)
  */
 
-import { Flow, Option, Result } from "../../dist/index.mjs";
+import {
+  Flow,
+  ExperimentalOption as Option,
+  ExperimentalResult as Result,
+} from "../../dist/index.mjs";
 
 // ============================================================================
 // Flow.gen - Direct usage (simpler, good for simple chains)

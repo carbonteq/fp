@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Flow, FlowError } from "../../src/flow.js";
-import { Option, UnwrappedNone } from "../../src/option.js";
-import { Result } from "../../src/result.js";
+import { Flow, FlowError } from "@/flow.js";
+import {
+  ExperimentalOption as Option,
+  UnwrappedNone,
+} from "@/option-experimental.js";
+import { ExperimentalResult as Result } from "@/result-experimental.js";
 
 class ValidationError extends FlowError {
   readonly _tag = "ValidationError";

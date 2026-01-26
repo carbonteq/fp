@@ -4,7 +4,11 @@
  * Handles Promise<Option>, Promise<Result>, and async operations.
  */
 
-import { Flow, Option, Result } from "../../dist/index.mjs";
+import {
+  Flow,
+  ExperimentalOption as Option,
+  ExperimentalResult as Result,
+} from "../../dist/index.mjs";
 
 type User = { id: number; name: string };
 

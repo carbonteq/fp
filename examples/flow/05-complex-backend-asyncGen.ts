@@ -8,7 +8,12 @@
  * - Using Flow.asyncGen with direct error yielding via FlowError
  */
 
-import { Flow, FlowError, Option, Result } from "../../src/index.js";
+import {
+  Flow,
+  FlowError,
+  ExperimentalOption as Option,
+  ExperimentalResult as Result,
+} from "../../src/index.js";
 
 // ============================================================================
 // 1. Domain Types & Errors
