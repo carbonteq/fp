@@ -1,5 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
-import { match, Option, P, Result } from "@/index.js";
+import {
+  match,
+  ExperimentalOption as Option,
+  P,
+  ExperimentalResult as Result,
+} from "@/index.js";
 
 // =============================================================================
 // Type Definitions

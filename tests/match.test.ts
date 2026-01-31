@@ -5,9 +5,9 @@ import {
   matchOption,
   matchRes,
   matchResult,
-  Option,
+  ExperimentalOption as Option,
   P,
-  Result,
+  ExperimentalResult as Result,
   UnmatchedCaseError,
 } from "@/index.js";
 

@@ -1,5 +1,13 @@
-import type { Option } from "./option.js";
-import type { Result } from "./result.js";
+import type { Option as OldOption } from "./option.js";
+import type { ExperimentalOption } from "./option-experimental.js";
+import type { Result as OldResult } from "./result.js";
+import type { ExperimentalResult } from "./result-experimental.js";
+
+type Result<T, E> = ExperimentalResult<T, E>;
+type Option<T> = ExperimentalOption<T>;
+
+type LegacyResult<T, E> = OldResult<T, E> | ExperimentalResult<T, E>;
+type LegacyOption<T> = OldOption<T> | ExperimentalOption<T>;
 
 // =============================================================================
 // Type Utilities
@@ -581,7 +589,7 @@ export function match<T extends { readonly _tag: string }>(
  * ```
  */
 export const matchRes = <T, E, U>(
-  r: Result<T, E>,
+  r: LegacyResult<T, E>,
   branches: { Ok: (val: T) => U; Err: (err: E) => U },
 ): U => {
   return r.match(branches);
@@ -604,7 +612,7 @@ export const matchRes = <T, E, U>(
  * ```
  */
 export const matchOpt = <T, U>(
-  o: Option<T>,
+  o: LegacyOption<T>,
   branches: { Some: (val: T) => U; None: () => U },
 ): U => {
   return o.match(branches);
