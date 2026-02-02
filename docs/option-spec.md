@@ -20,7 +20,7 @@ The `Option<T>` type provides a **type-safe way to encode the presence or absenc
 States must be explicitly represented and checkable at both compile-time and runtime:
 
 ```typescript
-type Option<T> = Some<T> | None
+type Option<T> = Some<T> | None;
 ```
 
 ### 2. Referential Transparency
@@ -35,7 +35,7 @@ All transformation methods must be pure - given the same input, they produce the
 Operations on `None` propagate without executing transformation functions:
 
 ```typescript
-Option.None.map(x => expensiveComputation(x))  // Never calls expensiveComputation
+Option.None.map((x) => expensiveComputation(x)); // Never calls expensiveComputation
 ```
 
 ### 4. Explicit Promise Returns
@@ -61,7 +61,7 @@ Option should be covariant in `T` to support subtyping.
 ## Core Definition
 
 ```typescript
-type Option<T> = Some<T> | None
+type Option<T> = Some<T> | None;
 
 interface Some<T> {
   readonly _tag: "Some";
@@ -89,24 +89,24 @@ interface None {
 
 ```typescript
 // Direct construction
-const some = Option.Some(42);           // Some(42)
-const none = Option.None;               // None
+const some = Option.Some(42); // Some(42)
+const none = Option.None; // None
 
 // From nullable values
-Option.fromNullable(user.name);         // Some("John") or None
-Option.fromNullable(null);              // None
-Option.fromNullable(undefined);         // None
-Option.fromNullable(0);                 // Some(0) - 0 is not nullish
-Option.fromNullable("");                // Some("") - "" is not nullish
+Option.fromNullable(user.name); // Some("John") or None
+Option.fromNullable(null); // None
+Option.fromNullable(undefined); // None
+Option.fromNullable(0); // Some(0) - 0 is not nullish
+Option.fromNullable(""); // Some("") - "" is not nullish
 
 // From falsy values
-Option.fromFalsy(0);                    // None
-Option.fromFalsy("");                   // None
-Option.fromFalsy(false);                // None
-Option.fromFalsy(42);                   // Some(42)
+Option.fromFalsy(0); // None
+Option.fromFalsy(""); // None
+Option.fromFalsy(false); // None
+Option.fromFalsy(42); // Some(42)
 
 // From predicate
-Option.fromPredicate(age, x => x >= 18);  // Some(age) if >= 18, else None
+Option.fromPredicate(age, (x) => x >= 18); // Some(age) if >= 18, else None
 ```
 
 ---
@@ -126,7 +126,7 @@ const opt = Option.Some(42);
 
 if (opt.isSome()) {
   // TypeScript knows opt.value is accessible here
-  console.log(opt.value);  // 42
+  console.log(opt.value); // 42
 }
 
 if (opt.isNone()) {
@@ -154,24 +154,24 @@ const some = Option.Some(42);
 const none = Option.None;
 
 // unwrap - throws on None
-some.unwrap();                          // 42
-none.unwrap();                          // throws UnwrapError
+some.unwrap(); // 42
+none.unwrap(); // throws UnwrapError
 
 // unwrapOr - safe with default
-some.unwrapOr(0);                       // 42
-none.unwrapOr(0);                       // 0
+some.unwrapOr(0); // 42
+none.unwrapOr(0); // 0
 
 // unwrapOrElse - lazy default
 none.unwrapOrElse(() => computeDefault()); // calls computeDefault()
 
 // safeUnwrap - returns null for None
-some.safeUnwrap();                      // 42
-none.safeUnwrap();                      // null
+some.safeUnwrap(); // 42
+none.safeUnwrap(); // null
 
 // match - exhaustive pattern matching
 const result = opt.match({
   Some: (value) => `Got ${value}`,
-  None: () => "Nothing"
+  None: () => "Nothing",
 });
 ```
 
@@ -199,8 +199,8 @@ map<U>(fn: (val: T) => U): Option<U>;
 **Examples:**
 
 ```typescript
-Some(5).map(x => x * 2)                    // Some(10)
-None.map(x => x * 2)                       // None
+Some(5).map((x) => x * 2); // Some(10)
+None.map((x) => x * 2); // None
 ```
 
 ### `mapAsync<U>(fn): Promise<Option<U>>`
@@ -216,13 +216,13 @@ mapAsync<U>(fn: (val: T) => Promise<U>): Promise<Option<U>>;
 **Examples:**
 
 ```typescript
-Some(5).mapAsync(async x => x * 2)         // Promise<Some(10)>
+Some(5).mapAsync(async (x) => x * 2); // Promise<Some(10)>
 
 // Async chaining with explicit promises
 Some(5)
-  .map(x => x * 2)                         // Some(10)
-  .mapAsync(async x => await fetchData(x)) // Promise<Some<Data>>
-  .then(o => o.map(d => d.name))           // Promise<Some<string>>
+  .map((x) => x * 2) // Some(10)
+  .mapAsync(async (x) => await fetchData(x)) // Promise<Some<Data>>
+  .then((o) => o.map((d) => d.name)); // Promise<Some<string>>
 ```
 
 ### `flatMap<U>(fn): Option<U>`
@@ -243,18 +243,18 @@ flatMap<U>(fn: (val: T) => Option<U>): Option<U>;
 **Examples:**
 
 ```typescript
-Some(5).flatMap(x => Some(x + 1))          // Some(6)
-Some(5).flatMap(x => None)                 // None
-None.flatMap(x => Some(x + 1))             // None
+Some(5).flatMap((x) => Some(x + 1)); // Some(6)
+Some(5).flatMap((x) => None); // None
+None.flatMap((x) => Some(x + 1)); // None
 
 // Chaining optional operations
 findUser(id)
-  .flatMap(user => Option.fromNullable(user.profile))
-  .flatMap(profile => Option.fromNullable(profile.avatar))
-  .map(avatar => avatar.url);
+  .flatMap((user) => Option.fromNullable(user.profile))
+  .flatMap((profile) => Option.fromNullable(profile.avatar))
+  .map((avatar) => avatar.url);
 
 // Async flatMap via flatMapAsync
-Some(userId).flatMapAsync(async id => await findUser(id));  // Promise<Option<User>>
+Some(userId).flatMapAsync(async (id) => await findUser(id)); // Promise<Option<User>>
 ```
 
 ### `flatMapAsync<U>(fn): Promise<Option<U>>`
@@ -285,14 +285,14 @@ zip<U>(fn: (val: T) => U): Option<[T, U]>;
 **Examples:**
 
 ```typescript
-Some(5).zip(x => x * 2)                    // Some([5, 10])
-None.zip(x => x * 2)                       // None
+Some(5).zip((x) => x * 2); // Some([5, 10])
+None.zip((x) => x * 2); // None
 
 // Keep original while computing derived value
-Some(user).zip(u => u.permissions.length)  // Some([user, 5])
+Some(user).zip((u) => u.permissions.length); // Some([user, 5])
 
 // Async version
-Some(user).zipAsync(async u => await fetchCount(u))  // Promise<Some<[user, number]>>
+Some(user).zipAsync(async (u) => await fetchCount(u)); // Promise<Some<[user, number]>>
 ```
 
 ### `zipAsync<U>(fn): Promise<Option<[T, U]>>`
@@ -324,10 +324,10 @@ flatZip<U>(fn: (val: T) => Option<U>): Option<[T, U]>;
 **Examples:**
 
 ```typescript
-Some(userId).flatZip(id => findUser(id))   // Some([userId, user]) or None
+Some(userId).flatZip((id) => findUser(id)); // Some([userId, user]) or None
 
 // Async flatZip
-Some(userId).flatZipAsync(async id => await fetchUser(id));  // Promise<Option<[userId, User]>>
+Some(userId).flatZipAsync(async (id) => await fetchUser(id)); // Promise<Option<[userId, User]>>
 ```
 
 ### `flatZipAsync<U>(fn): Promise<Option<[T, U]>>`
@@ -358,12 +358,12 @@ filter(pred: (val: T) => boolean): Option<T>;
 **Examples:**
 
 ```typescript
-Some(5).filter(x => x > 3)                 // Some(5)
-Some(5).filter(x => x > 10)                // None
-None.filter(x => x > 3)                    // None
+Some(5).filter((x) => x > 3); // Some(5)
+Some(5).filter((x) => x > 10); // None
+None.filter((x) => x > 3); // None
 
 // Async filter
-Some(age).filterAsync(async x => await isAdult(x));  // Promise<Option<number>>
+Some(age).filterAsync(async (x) => await isAdult(x)); // Promise<Option<number>>
 ```
 
 ### `filterAsync(pred): Promise<Option<T>>`
@@ -394,11 +394,11 @@ mapOr<U>(defaultValue: U, fn: (val: T) => U): U;
 **Examples:**
 
 ```typescript
-Some(5).mapOr(0, x => x * 2)               // 10
-None.mapOr(0, x => x * 2)                  // 0
+Some(5).mapOr(0, (x) => x * 2); // 10
+None.mapOr(0, (x) => x * 2); // 0
 
 // Async version
-Some(5).mapOrAsync(0, async x => await fetch(x));  // Promise<number>
+Some(5).mapOrAsync(0, async (x) => await fetch(x)); // Promise<number>
 ```
 
 ### `mapOrAsync<U>(defaultValue, fn): Promise<U>`
@@ -425,9 +425,9 @@ Combines multiple Options into a single Option of array.
 - Any None → `None`
 
 ```typescript
-Option.all(Some(1), Some(2), Some(3))      // Some([1, 2, 3])
-Option.all(Some(1), None, Some(3))         // None
-Option.all()                               // Some([]) - vacuous truth
+Option.all(Some(1), Some(2), Some(3)); // Some([1, 2, 3])
+Option.all(Some(1), None, Some(3)); // None
+Option.all(); // Some([]) - vacuous truth
 ```
 
 ### `Option.any(...options): Option<T>`
@@ -435,9 +435,9 @@ Option.all()                               // Some([]) - vacuous truth
 Returns the first Some, or None if all are None.
 
 ```typescript
-Option.any(None, Some(2), Some(3))         // Some(2)
-Option.any(None, None, None)               // None
-Option.any()                               // None
+Option.any(None, Some(2), Some(3)); // Some(2)
+Option.any(None, None, None); // None
+Option.any(); // None
 ```
 
 ---
@@ -474,8 +474,8 @@ const result = Option.gen(function* () {
 // None short-circuit
 const result = Option.gen(function* () {
   const a = yield* Option.Some(1);
-  const b = yield* Option.None;            // Short-circuits here
-  const c = yield* Option.Some(3);         // Never executes
+  const b = yield* Option.None; // Short-circuits here
+  const c = yield* Option.Some(3); // Never executes
   return a + b + c;
 });
 // Option<number> -> None
@@ -573,7 +573,7 @@ asyncGen<T>(
 // Simple async chain
 const result = await Option.asyncGen(async function* () {
   const a = yield* Option.Some(1);
-  const b = yield* await asyncOperation(a);    // await Promise<Option> first
+  const b = yield* await asyncOperation(a); // await Promise<Option> first
   const c = yield* Option.Some(3);
   return a + b + c;
 });
@@ -582,16 +582,16 @@ const result = await Option.asyncGen(async function* () {
 // None short-circuit in async
 const result = await Option.asyncGen(async function* () {
   const data = yield* await fetchOptionalData();
-  const parsed = yield* parse(data);           // Short-circuits on None
-  const validated = yield* validate(parsed);   // Never executes
+  const parsed = yield* parse(data); // Short-circuits on None
+  const validated = yield* validate(parsed); // Never executes
   return validated;
 });
 // Promise<Option<Validated>> -> None
 
 // Mixed sync/async workflow
 const result = await Option.asyncGen(async function* () {
-  const id = yield* Option.Some(parseInt(input));  // sync
-  const user = yield* await fetchUser(id);         // async
+  const id = yield* Option.Some(parseInt(input)); // sync
+  const user = yield* await fetchUser(id); // async
   const profile = yield* Option.fromNullable(user?.profile); // sync
   const enriched = yield* await enrichProfile(profile); // async
   return enriched;
@@ -638,24 +638,26 @@ asyncGenAdapter<T>(
 ```typescript
 // No need to manually await - adapter handles it
 const result = await Option.asyncGenAdapter(async function* ($) {
-  const a = yield* $(Option.Some(1));              // sync Option
-  const b = yield* $(asyncOperation(a));            // Promise<Option> - auto-awaited
+  const a = yield* $(Option.Some(1)); // sync Option
+  const b = yield* $(asyncOperation(a)); // Promise<Option> - auto-awaited
   const c = yield* $(Option.Some(3));
   return a + b + c;
 });
 
 // Complex workflow with database and API calls
 const userData = await Option.asyncGenAdapter(async function* ($) {
-  const session = yield* $(getSession());                  // Promise<Option<Session>>
+  const session = yield* $(getSession()); // Promise<Option<Session>>
   const userId = yield* $(Option.fromNullable(session?.userId));
-  const profile = yield* $(await fetchProfile(userId));    // Promise<Option<Profile>>
+  const profile = yield* $(await fetchProfile(userId)); // Promise<Option<Profile>>
   const preferences = yield* $(Option.fromNullable(profile?.preferences));
   const enriched = yield* $(await enrichPreferences(preferences)); // Promise<Option<Preferences>>
   return enriched;
 });
 
 // Real-world: Optional data enrichment
-async function getProductDetails(productId: string): Promise<Option<ProductDetails>> {
+async function getProductDetails(
+  productId: string,
+): Promise<Option<ProductDetails>> {
   return await Option.asyncGenAdapter(async function* ($) {
     const product = yield* $(await fetchProduct(productId));
     const pricing = yield* $(await fetchPricing(product.sku));
@@ -705,20 +707,20 @@ async function getProductDetails(productId: string): Promise<Option<ProductDetai
 ```typescript
 // tap - side effects without breaking chain
 Some(user)
-  .tap(u => console.log(`Processing ${u.name}`))
-  .map(u => u.email);
+  .tap((u) => console.log(`Processing ${u.name}`))
+  .map((u) => u.email);
 
 // toResult - convert to Result
-Some(42).toResult("was none")              // Ok(42)
-None.toResult("was none")                  // Err("was none")
+Some(42).toResult("was none"); // Ok(42)
+None.toResult("was none"); // Err("was none")
 
 // innerMap - map over array contents
-Some([1, 2, 3]).innerMap(x => x * 2)       // Some([2, 4, 6])
-None.innerMap(x => x * 2)                  // None
+Some([1, 2, 3]).innerMap((x) => x * 2); // Some([2, 4, 6])
+None.innerMap((x) => x * 2); // None
 
 // toString
-Some(42).toString()                        // "Some(42)"
-None.toString()                            // "None"
+Some(42).toString(); // "Some(42)"
+None.toString(); // "None"
 ```
 
 ---
@@ -730,10 +732,10 @@ None.toString()                            // "None"
 ```typescript
 // Once you hit an async operation, use standard Promise chaining
 Some(5)
-  .map(x => x * 2)                         // Option<number>
-  .mapAsync(async x => await fetchData(x)) // Promise<Option<Data>>
-  .then(o => o.map(d => d.name))           // Promise<Option<string>>
-  .then(o => {
+  .map((x) => x * 2) // Option<number>
+  .mapAsync(async (x) => await fetchData(x)) // Promise<Option<Data>>
+  .then((o) => o.map((d) => d.name)) // Promise<Option<string>>
+  .then((o) => {
     if (o.isSome()) {
       console.log(o.unwrap());
     }
@@ -745,7 +747,9 @@ Some(5)
 
 ```typescript
 // Generators shine for complex async workflows with many optional steps
-async function enrichUserProfile(userId: string): Promise<Option<EnrichedProfile>> {
+async function enrichUserProfile(
+  userId: string,
+): Promise<Option<EnrichedProfile>> {
   return await Option.asyncGenAdapter(async function* ($) {
     const user = yield* $(await fetchUser(userId));
     const profile = yield* $(Option.fromNullable(user?.profile));
@@ -770,9 +774,7 @@ async function enrichUserProfile(userId: string): Promise<Option<EnrichedProfile
 
 ```typescript
 // Use method chaining for simple transformations
-const parsed = input
-  .map(i => i.trim())
-  .flatMap(s => parseInteger(s));
+const parsed = input.map((i) => i.trim()).flatMap((s) => parseInteger(s));
 
 // Switch to generator for complex optional workflow
 const result = await Option.asyncGenAdapter(async function* ($) {
@@ -789,10 +791,10 @@ const result = await Option.asyncGenAdapter(async function* ($) {
 
 ```typescript
 const email = user
-  .flatMap(u => Option.fromNullable(u.profile))
-  .flatMap(p => Option.fromNullable(p.settings))
-  .flatMap(s => Option.fromNullable(s.notifications))
-  .flatMap(n => Option.fromNullable(n.email));
+  .flatMap((u) => Option.fromNullable(u.profile))
+  .flatMap((p) => Option.fromNullable(p.settings))
+  .flatMap((s) => Option.fromNullable(s.notifications))
+  .flatMap((n) => Option.fromNullable(n.email));
 ```
 
 **After (with gen):**
@@ -927,8 +929,8 @@ interface Config {
 
 // Method chaining (verbose)
 const host = Option.fromNullable(config.database)
-  .flatMap(db => Option.fromNullable(db.connection))
-  .map(conn => conn.host)
+  .flatMap((db) => Option.fromNullable(db.connection))
+  .map((conn) => conn.host)
   .unwrapOr("localhost");
 
 // With gen (cleaner)
@@ -957,19 +959,19 @@ interface ApiResponse {
     profile?: {
       avatar?: string;
       settings?: {
-        theme?: 'light' | 'dark';
+        theme?: "light" | "dark";
       };
     };
   };
 }
 
-async function getUserTheme(userId: string): Promise<'light' | 'dark'> {
+async function getUserTheme(userId: string): Promise<"light" | "dark"> {
   return await Option.asyncGenAdapter(async function* ($) {
     const response = yield* $(await fetchUser(userId));
     const profile = yield* $(Option.fromNullable(response.user?.profile));
     const settings = yield* $(Option.fromNullable(profile.settings));
-    return settings.theme ?? 'light';
-  }).unwrapOr('light');
+    return settings.theme ?? "light";
+  }).unwrapOr("light");
 }
 ```
 
@@ -978,9 +980,9 @@ async function getUserTheme(userId: string): Promise<'light' | 'dark'> {
 ```typescript
 async function processForm(formData: FormData): Promise<Option<ProcessedData>> {
   return await Option.asyncGenAdapter(async function* ($) {
-    const email = yield* $(validateEmail(formData.get('email')));
-    const age = yield* $(validateAge(formData.get('age')));
-    const country = yield* $(validateCountry(formData.get('country')));
+    const email = yield* $(validateEmail(formData.get("email")));
+    const age = yield* $(validateAge(formData.get("age")));
+    const country = yield* $(validateCountry(formData.get("country")));
 
     const verified = yield* $(await verifyEmail(email));
     const enriched = yield* $(await enrichWithCountryData(verified, country));
@@ -1032,22 +1034,24 @@ async function getDataWithCache(key: string): Promise<Option<Data>> {
     // Try memory cache first
     const memCached = yield* $(Option.fromNullable(memoryCache.get(key)));
     return memCached;
-  }).orElse(async () =>
-    Option.asyncGenAdapter(async function* ($) {
-      // Try Redis cache
-      const redisCached = yield* $(await redisGet(key));
-      memoryCache.set(key, redisCached);
-      return redisCached;
-    })
-  ).orElse(async () =>
-    Option.asyncGenAdapter(async function* ($) {
-      // Fetch from database
-      const dbData = yield* $(await dbFetch(key));
-      await redisSet(key, dbData);
-      memoryCache.set(key, dbData);
-      return dbData;
-    })
-  );
+  })
+    .orElse(async () =>
+      Option.asyncGenAdapter(async function* ($) {
+        // Try Redis cache
+        const redisCached = yield* $(await redisGet(key));
+        memoryCache.set(key, redisCached);
+        return redisCached;
+      }),
+    )
+    .orElse(async () =>
+      Option.asyncGenAdapter(async function* ($) {
+        // Fetch from database
+        const dbData = yield* $(await dbFetch(key));
+        await redisSet(key, dbData);
+        memoryCache.set(key, dbData);
+        return dbData;
+      }),
+    );
 }
 ```
 

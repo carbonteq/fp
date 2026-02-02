@@ -21,7 +21,7 @@ The `Result<T, E>` type provides a **type-safe, composable way to handle operati
 States must be explicitly represented and checkable at both compile-time and runtime:
 
 ```typescript
-type Result<T, E> = Ok<T, E> | Err<T, E>
+type Result<T, E> = Ok<T, E> | Err<T, E>;
 ```
 
 ### 2. Referential Transparency
@@ -36,7 +36,7 @@ All transformation methods must be pure - given the same input, they produce the
 Operations on the error track propagate without executing transformation functions:
 
 ```typescript
-Result.Err("fail").map(x => expensiveComputation(x))  // Never calls expensiveComputation
+Result.Err("fail").map((x) => expensiveComputation(x)); // Never calls expensiveComputation
 ```
 
 ### 4. Type-Level Async Tracking
@@ -66,7 +66,7 @@ Result should be covariant in `T` and `E` to support subtyping.
 ## Core Definition
 
 ```typescript
-type Result<T, E> = Ok<T, E> | Err<T, E>
+type Result<T, E> = Ok<T, E> | Err<T, E>;
 
 interface Ok<T, E> {
   readonly _tag: "Ok";
@@ -105,23 +105,26 @@ Result.UNIT_RESULT: Result<Unit, never>  // Singleton for void-success
 
 ```typescript
 // Direct construction
-const ok = Result.Ok(42);                  // Ok(42)
-const err = Result.Err("failed");          // Err("failed")
+const ok = Result.Ok(42); // Ok(42)
+const err = Result.Err("failed"); // Err("failed")
 
 // From nullable values
-Result.fromNullable(user, "User not found");  // Ok(user) or Err("User not found")
-Result.fromNullable(null, "Not found");       // Err("Not found")
+Result.fromNullable(user, "User not found"); // Ok(user) or Err("User not found")
+Result.fromNullable(null, "Not found"); // Err("Not found")
 
 // From predicate
-Result.fromPredicate(age, x => x >= 18, "Must be adult");  // Ok or Err
+Result.fromPredicate(age, (x) => x >= 18, "Must be adult"); // Ok or Err
 
 // From throwing function
-Result.tryCatch(() => JSON.parse(data), e => new ParseError(e));
+Result.tryCatch(
+  () => JSON.parse(data),
+  (e) => new ParseError(e),
+);
 
 // From async throwing function
 Result.tryAsyncCatch(
-  () => fetch(url).then(r => r.json()),
-  e => new NetworkError(e)
+  () => fetch(url).then((r) => r.json()),
+  (e) => new NetworkError(e),
 );
 
 // Unit result for void operations
@@ -148,7 +151,7 @@ const result = Result.Ok(42);
 
 if (result.isOk()) {
   // TypeScript knows result.value is accessible
-  console.log(result.value);  // 42
+  console.log(result.value); // 42
 }
 
 if (result.isErr()) {
@@ -177,28 +180,28 @@ const ok = Result.Ok(42);
 const err = Result.Err(new Error("failed"));
 
 // unwrap - throws on Err
-ok.unwrap();                               // 42
-err.unwrap();                              // re-throws Error (preserves stack)
+ok.unwrap(); // 42
+err.unwrap(); // re-throws Error (preserves stack)
 
 // unwrapOr - safe with default
-ok.unwrapOr(0);                            // 42
-err.unwrapOr(0);                           // 0
+ok.unwrapOr(0); // 42
+err.unwrapOr(0); // 0
 
 // unwrapOrElse - compute recovery from error
-err.unwrapOrElse(e => computeFallback(e)); // calls with error
+err.unwrapOrElse((e) => computeFallback(e)); // calls with error
 
 // unwrapErr - get error value
-err.unwrapErr();                           // Error("failed")
-ok.unwrapErr();                            // throws UnwrapError
+err.unwrapErr(); // Error("failed")
+ok.unwrapErr(); // throws UnwrapError
 
 // safeUnwrap - null for Err
-ok.safeUnwrap();                           // 42
-err.safeUnwrap();                          // null
+ok.safeUnwrap(); // 42
+err.safeUnwrap(); // null
 
 // match - exhaustive pattern matching
 const message = result.match({
   Ok: (value) => `Success: ${value}`,
-  Err: (error) => `Failed: ${error.message}`
+  Err: (error) => `Failed: ${error.message}`,
 });
 ```
 
@@ -227,10 +230,10 @@ map<U>(this: Result<T, E>, fn: (val: T) => U): Result<U, E>;
 **Examples:**
 
 ```typescript
-Ok(42).map(x => x * 2)                     // Ok(84)
-Err("error").map(x => x * 2)               // Err("error")
-Ok(42).map(async x => x + 10)              // Ok(Promise<52>)
-Ok(Promise.resolve(42)).map(x => x * 2)    // Ok(Promise<84>)
+Ok(42).map((x) => x * 2); // Ok(84)
+Err("error").map((x) => x * 2); // Err("error")
+Ok(42).map(async (x) => x + 10); // Ok(Promise<52>)
+Ok(Promise.resolve(42)).map((x) => x * 2); // Ok(Promise<84>)
 ```
 
 ### `flatMap<U, E2>(fn): Result<U, E | E2>`
@@ -256,20 +259,20 @@ flatMap<U, E2>(this: Result<T, E>, fn: (val: T) => Result<U, E2>): Result<U, E |
 ```typescript
 // Success chain
 Ok(42)
-  .flatMap(x => Ok(x + 1))                 // Ok(43)
-  .flatMap(x => Err("too big"));           // Err("too big")
+  .flatMap((x) => Ok(x + 1)) // Ok(43)
+  .flatMap((x) => Err("too big")); // Err("too big")
 
 // Error propagation
-Err("initial").flatMap(x => Ok(x + 1));    // Err("initial")
+Err("initial").flatMap((x) => Ok(x + 1)); // Err("initial")
 
 // Async support
-Ok(42).flatMap(async x => Ok(x * 3));      // Result<Promise<126>, string>
+Ok(42).flatMap(async (x) => Ok(x * 3)); // Result<Promise<126>, string>
 
 // Chaining fallible operations
 parseUserId(input)
-  .flatMap(id => fetchUser(id))
-  .flatMap(user => validatePermissions(user))
-  .map(user => user.email);
+  .flatMap((id) => fetchUser(id))
+  .flatMap((user) => validatePermissions(user))
+  .map((user) => user.email);
 ```
 
 ### `zip<U>(fn): Result<[T, U], E>`
@@ -288,11 +291,11 @@ zip<U>(this: Result<T, E>, fn: (val: T) => U): Result<[T, U], E>;
 **Examples:**
 
 ```typescript
-Ok(42).zip(x => x * 10)                    // Ok([42, 420])
-Err("error").zip(x => x * 10)              // Err("error")
+Ok(42).zip((x) => x * 10); // Ok([42, 420])
+Err("error").zip((x) => x * 10); // Err("error")
 
 // Keep original while computing derived
-Ok(user).zip(u => u.permissions.length)    // Ok([user, 5])
+Ok(user).zip((u) => u.permissions.length); // Ok([user, 5])
 ```
 
 ### `flatZip<U, E2>(fn): Result<[T, U], E | E2>`
@@ -312,8 +315,8 @@ flatZip<U, E2>(this: Result<T, E>, fn: (val: T) => Result<U, E2>): Result<[T, U]
 
 ```typescript
 Ok(42)
-  .flatZip(x => Ok(x + 5))                 // Ok([42, 47])
-  .flatZip(([a, b]) => Err("invalid"));    // Err("invalid")
+  .flatZip((x) => Ok(x + 5)) // Ok([42, 47])
+  .flatZip(([a, b]) => Err("invalid")); // Err("invalid")
 ```
 
 ---
@@ -339,12 +342,11 @@ mapErr<E2>(fn: (err: E) => Promise<E2>): Result<T, Promise<E2>>;
 **Examples:**
 
 ```typescript
-Err("network error").mapErr(e => `Network: ${e}`);  // Err("Network: network error")
-Ok(42).mapErr(e => `Error: ${e}`);                   // Ok(42)
+Err("network error").mapErr((e) => `Network: ${e}`); // Err("Network: network error")
+Ok(42).mapErr((e) => `Error: ${e}`); // Ok(42)
 
 // Add context to errors
-fetchData()
-  .mapErr(e => new ContextualError("Failed to fetch data", e));
+fetchData().mapErr((e) => new ContextualError("Failed to fetch data", e));
 ```
 
 ### `mapBoth<T2, E2>(fnOk, fnErr): Result<T2, E2>`
@@ -361,14 +363,14 @@ mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (err: E) => E2): Result<T2, E2>;
 
 ```typescript
 Ok(42).mapBoth(
-  val => `Success: ${val}`,
-  err => `Failure: ${err}`
-);  // Ok("Success: 42")
+  (val) => `Success: ${val}`,
+  (err) => `Failure: ${err}`,
+); // Ok("Success: 42")
 
 Err("timeout").mapBoth(
-  val => `Success: ${val}`,
-  err => `Failure: ${err}`
-);  // Err("Failure: timeout")
+  (val) => `Success: ${val}`,
+  (err) => `Failure: ${err}`,
+); // Err("Failure: timeout")
 ```
 
 ### `orElse<T2, E2>(fn): Result<T | T2, E2>`
@@ -391,11 +393,11 @@ orElse<T2, E2>(fn: (err: E) => Result<T2, E2>): Result<T | T2, E2>;
 ```typescript
 // Recovery with fallback
 fetchFromPrimary()
-  .orElse(e => fetchFromBackup())
-  .orElse(e => Ok(defaultValue));
+  .orElse((e) => fetchFromBackup())
+  .orElse((e) => Ok(defaultValue));
 
 // Transform error type
-Err("not found").orElse(e => Err(new NotFoundError(e)));
+Err("not found").orElse((e) => Err(new NotFoundError(e)));
 ```
 
 ### `zipErr<E2>(fn): Result<T, E | E2>`
@@ -412,9 +414,9 @@ zipErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
 **Examples:**
 
 ```typescript
-Ok(42).zipErr(x => Ok(x * 10));            // Ok(42)
-Ok(42).zipErr(x => Err("validation"));     // Err("validation")
-Err("initial").zipErr(x => Err("second")); // Err("initial")
+Ok(42).zipErr((x) => Ok(x * 10)); // Ok(42)
+Ok(42).zipErr((x) => Err("validation")); // Err("validation")
+Err("initial").zipErr((x) => Err("second")); // Err("initial")
 ```
 
 ---
@@ -440,21 +442,17 @@ validate<VE>(validators: Array<(val: T) => Result<unknown, VE>>): Result<T, E | 
 
 ```typescript
 const validators = [
-  (x: number) => x > 0 ? Ok(true) : Err("must be positive"),
-  (x: number) => x < 100 ? Ok(true) : Err("must be < 100"),
-  (x: number) => x % 2 === 0 ? Ok(true) : Err("must be even"),
+  (x: number) => (x > 0 ? Ok(true) : Err("must be positive")),
+  (x: number) => (x < 100 ? Ok(true) : Err("must be < 100")),
+  (x: number) => (x % 2 === 0 ? Ok(true) : Err("must be even")),
 ];
 
-Ok(42).validate(validators)                // Ok(42)
-Ok(101).validate(validators)               // Err(["must be < 100"])
-Ok(-5).validate(validators)                // Err(["must be positive", "must be even"])
+Ok(42).validate(validators); // Ok(42)
+Ok(101).validate(validators); // Err(["must be < 100"])
+Ok(-5).validate(validators); // Err(["must be positive", "must be even"])
 
 // Form validation
-Ok(formData).validate([
-  validateEmail,
-  validatePassword,
-  validateUsername,
-]);
+Ok(formData).validate([validateEmail, validatePassword, validateUsername]);
 ```
 
 ---
@@ -471,23 +469,15 @@ Combines multiple Results into one.
 - Any Err → `Err([...errors])` collecting ALL errors
 
 ```typescript
-Result.all(Ok(1), Ok(2), Ok(3))            // Ok([1, 2, 3])
-Result.all(Ok(1), Err("a"), Err("b"))      // Err(["a", "b"])
-Result.all()                               // Ok([]) - vacuous truth
+Result.all(Ok(1), Ok(2), Ok(3)); // Ok([1, 2, 3])
+Result.all(Ok(1), Err("a"), Err("b")); // Err(["a", "b"])
+Result.all(); // Ok([]) - vacuous truth
 
 // Mixed sync/async
-Result.all(
-  Ok(1),
-  Ok(Promise.resolve(2)),
-  Err("error")
-);  // Result<Promise<[1, 2]>, ["error"]>
+Result.all(Ok(1), Ok(Promise.resolve(2)), Err("error")); // Result<Promise<[1, 2]>, ["error"]>
 
 // Parallel validation
-Result.all(
-  validateEmail(email),
-  validatePassword(password),
-  validateAge(age)
-);
+Result.all(validateEmail(email), validatePassword(password), validateAge(age));
 ```
 
 ### `Result.any(...results): Result<T, E[]>`
@@ -495,16 +485,12 @@ Result.all(
 Returns first Ok, or collects all errors.
 
 ```typescript
-Result.any(Err("a"), Ok(2), Ok(3))         // Ok(2)
-Result.any(Err("a"), Err("b"), Err("c"))   // Err(["a", "b", "c"])
-Result.any()                               // Err([]) - no success possible
+Result.any(Err("a"), Ok(2), Ok(3)); // Ok(2)
+Result.any(Err("a"), Err("b"), Err("c")); // Err(["a", "b", "c"])
+Result.any(); // Err([]) - no success possible
 
 // Fallback chain
-Result.any(
-  fetchFromCache(key),
-  fetchFromDb(key),
-  fetchFromRemote(key)
-);
+Result.any(fetchFromCache(key), fetchFromDb(key), fetchFromRemote(key));
 ```
 
 ---
@@ -526,29 +512,29 @@ Result.any(
 ```typescript
 // tap - logging without breaking chain
 Ok(user)
-  .tap(u => console.log(`Processing ${u.name}`))
-  .tapErr(e => console.error(`Failed: ${e}`))
-  .map(u => u.email);
+  .tap((u) => console.log(`Processing ${u.name}`))
+  .tapErr((e) => console.error(`Failed: ${e}`))
+  .map((u) => u.email);
 
 // flip - swap success and error
-Ok(42).flip()                              // Err(42)
-Err("x").flip()                            // Ok("x")
+Ok(42).flip(); // Err(42)
+Err("x").flip(); // Ok("x")
 
 // toOption - discard error info
-Ok(42).toOption()                          // Some(42)
-Err("x").toOption()                        // None
+Ok(42).toOption(); // Some(42)
+Err("x").toOption(); // None
 
 // toPromise - resolve inner promise
 const result: Result<Promise<number>, string> = Ok(Promise.resolve(42));
-await result.toPromise();                  // Ok(42)
+await result.toPromise(); // Ok(42)
 
 // innerMap - map over array contents
-Ok([1, 2, 3]).innerMap(x => x * 2)         // Ok([2, 4, 6])
-Err("x").innerMap(x => x * 2)              // Err("x")
+Ok([1, 2, 3]).innerMap((x) => x * 2); // Ok([2, 4, 6])
+Err("x").innerMap((x) => x * 2); // Err("x")
 
 // toString
-Ok(42).toString()                          // "Ok(42)"
-Err("fail").toString()                     // "Err(fail)"
+Ok(42).toString(); // "Ok(42)"
+Err("fail").toString(); // "Err(fail)"
 ```
 
 ---
@@ -579,9 +565,9 @@ Result uses the **inner-promise model** where async operations result in `Result
 Use `toPromise()` to resolve inner promises:
 
 ```typescript
-const result: Result<Promise<number>, string> = Ok(5).map(async x => x * 2);
+const result: Result<Promise<number>, string> = Ok(5).map(async (x) => x * 2);
 const resolved: Promise<Result<number, string>> = result.toPromise();
-const final: Result<number, string> = await resolved;  // Ok(10)
+const final: Result<number, string> = await resolved; // Ok(10)
 ```
 
 ### Err Short-Circuit with Async
@@ -589,8 +575,10 @@ const final: Result<number, string> = await resolved;  // Ok(10)
 When async is involved but state is Err, the promise should resolve immediately:
 
 ```typescript
-const result: Result<Promise<number>, string> = Err("fail").map(async x => x * 2);
-const resolved = await result.toPromise();  // Err("fail") (no async work done)
+const result: Result<Promise<number>, string> = Err("fail").map(
+  async (x) => x * 2,
+);
+const resolved = await result.toPromise(); // Err("fail") (no async work done)
 ```
 
 ### Async/Sync Interleaved Chaining
@@ -600,13 +588,13 @@ A critical capability is **seamless interleaving of sync and async operations** 
 #### Type Progression Through Chains
 
 ```typescript
-Ok(5)                                      // Result<number, never>
-  .map(x => x * 2)                         // Result<number, never> - sync
-  .map(async x => fetchData(x))            // Result<Promise<Data>, never> - becomes async
-  .map(data => data.name)                  // Result<Promise<string>, never> - sync lifted
-  .flatMap(name => validateName(name))     // Result<Promise<string>, ValidationError> - sync lifted
-  .mapErr(e => new AppError(e))            // Result<Promise<string>, AppError> - error track
-  .toPromise()                             // Promise<Result<string, AppError>>
+Ok(5) // Result<number, never>
+  .map((x) => x * 2) // Result<number, never> - sync
+  .map(async (x) => fetchData(x)) // Result<Promise<Data>, never> - becomes async
+  .map((data) => data.name) // Result<Promise<string>, never> - sync lifted
+  .flatMap((name) => validateName(name)) // Result<Promise<string>, ValidationError> - sync lifted
+  .mapErr((e) => new AppError(e)) // Result<Promise<string>, AppError> - error track
+  .toPromise(); // Promise<Result<string, AppError>>
 ```
 
 #### Detailed Type Inference
@@ -643,18 +631,23 @@ For `Result<Promise<T>, E>.map(f: T => U)`:
 
 ```typescript
 // Conceptually:
-Ok(promise).map(f) === Ok(promise.then(f))
-Err(e).map(f) === Err(e)  // f never called, no promise created
+Ok(promise).map(f) === Ok(promise.then(f));
+Err(e).map(f) === Err(e); // f never called, no promise created
 ```
 
 For `Result<Promise<T>, E>.flatMap(f: T => Result<U, E2>)`:
 
 ```typescript
 // Conceptually:
-Ok(promise).flatMap(f) === Ok(promise.then(v => {
-  const result = f(v);
-  return result.isOk() ? result.unwrap() : PROPAGATE_ERR(result.unwrapErr());
-}))
+Ok(promise).flatMap(f) ===
+  Ok(
+    promise.then((v) => {
+      const result = f(v);
+      return result.isOk()
+        ? result.unwrap()
+        : PROPAGATE_ERR(result.unwrapErr());
+    }),
+  );
 // Error from inner Result must be captured and propagated
 ```
 
@@ -664,27 +657,27 @@ Ok(promise).flatMap(f) === Ok(promise.then(v => {
 // Mixed sync/async pipeline with error handling
 function processOrder(orderId: string): Promise<Result<Receipt, OrderError>> {
   return Ok(orderId)
-    .map(id => parseInt(id, 10))                    // sync: parse ID
-    .flatMap(id => isNaN(id) 
-      ? Err(new ValidationError("Invalid ID")) 
-      : Ok(id))                                     // sync: validate
-    .map(async id => await fetchOrder(id))          // async: fetch
-    .map(order => order.items)                      // sync: extract (lifted)
-    .flatMap(items => items.length > 0 
-      ? Ok(items) 
-      : Err(new ValidationError("Empty order")))   // sync: validate (lifted)
-    .map(async items => await calculateTotal(items)) // async: calculate
-    .flatMap(async total => await processPayment(total)) // async: payment
-    .map(payment => ({ orderId, payment, timestamp: Date.now() })) // sync: receipt
-    .mapErr(e => new OrderError("Order processing failed", e))     // wrap errors
+    .map((id) => parseInt(id, 10)) // sync: parse ID
+    .flatMap((id) =>
+      isNaN(id) ? Err(new ValidationError("Invalid ID")) : Ok(id),
+    ) // sync: validate
+    .map(async (id) => await fetchOrder(id)) // async: fetch
+    .map((order) => order.items) // sync: extract (lifted)
+    .flatMap((items) =>
+      items.length > 0 ? Ok(items) : Err(new ValidationError("Empty order")),
+    ) // sync: validate (lifted)
+    .map(async (items) => await calculateTotal(items)) // async: calculate
+    .flatMap(async (total) => await processPayment(total)) // async: payment
+    .map((payment) => ({ orderId, payment, timestamp: Date.now() })) // sync: receipt
+    .mapErr((e) => new OrderError("Order processing failed", e)) // wrap errors
     .toPromise();
 }
 
 // Usage
 const result = await processOrder("123");
 result.match({
-  Ok: receipt => console.log("Success:", receipt),
-  Err: error => console.error("Failed:", error.message)
+  Ok: (receipt) => console.log("Success:", receipt),
+  Err: (error) => console.error("Failed:", error.message),
 });
 ```
 
@@ -694,11 +687,11 @@ When an async operation throws or rejects, the behavior depends on where it occu
 
 ```typescript
 Ok(5)
-  .map(async x => {
-    if (x < 0) throw new Error("negative");  // This becomes a rejected promise
+  .map(async (x) => {
+    if (x < 0) throw new Error("negative"); // This becomes a rejected promise
     return x * 2;
   })
-  .toPromise()  // Promise rejects with Error("negative")
+  .toPromise(); // Promise rejects with Error("negative")
 ```
 
 To capture async errors as `Err` values, use `Result.tryAsyncCatch` or handle at the boundary:
@@ -706,17 +699,19 @@ To capture async errors as `Err` values, use `Result.tryAsyncCatch` or handle at
 ```typescript
 // Option 1: Use tryAsyncCatch for individual operations
 Ok(5)
-  .flatMap(x => Result.tryAsyncCatch(
-    async () => riskyOperation(x),
-    e => new OperationError(e)
-  ))
-  .toPromise()
+  .flatMap((x) =>
+    Result.tryAsyncCatch(
+      async () => riskyOperation(x),
+      (e) => new OperationError(e),
+    ),
+  )
+  .toPromise();
 
 // Option 2: Catch at the boundary
 Ok(5)
-  .map(async x => riskyOperation(x))
+  .map(async (x) => riskyOperation(x))
   .toPromise()
-  .catch(e => Err(new OperationError(e)))
+  .catch((e) => Err(new OperationError(e)));
 ```
 
 ---
@@ -804,9 +799,8 @@ interface Err<T, E> {
 ```typescript
 type UnitResult<E = never> = Result<Unit, E>;
 
-type UnwrapResult<R> = R extends Result<infer T, infer E> 
-  ? { ok: T; err: E } 
-  : never;
+type UnwrapResult<R> =
+  R extends Result<infer T, infer E> ? { ok: T; err: E } : never;
 
 type UnwrapResultOk<R> = R extends Result<infer T, unknown> ? T : never;
 type UnwrapResultErr<R> = R extends Result<unknown, infer E> ? E : never;
@@ -867,7 +861,7 @@ function parseJson(s: string): Data {
 function parseJson(s: string): Result<Data, ParseError> {
   return Result.tryCatch(
     () => JSON.parse(s),
-    e => new ParseError(e)
+    (e) => new ParseError(e),
   );
 }
 ```
@@ -898,9 +892,9 @@ const username = user?.profile?.settings?.username ?? "anonymous";
 
 // After
 const username = Result.Ok(user)
-  .map(u => u.profile)
-  .map(p => p.settings)
-  .map(s => s.username)
+  .map((u) => u.profile)
+  .map((p) => p.settings)
+  .map((s) => s.username)
   .unwrapOr("anonymous");
 ```
 
@@ -920,29 +914,34 @@ async function fetchUserData(userId: string): Promise<Result<User, ApiError>> {
       }
       return response.json();
     },
-    e => e instanceof HttpError ? e : new ApiError(String(e))
+    (e) => (e instanceof HttpError ? e : new ApiError(String(e))),
   ).toPromise();
 }
 
 // Usage
 const result = await fetchUserData("123");
 const userName = result
-  .map(user => user.name)
-  .map(name => name.toUpperCase())
-  .safeUnwrap();  // string | null
+  .map((user) => user.name)
+  .map((name) => name.toUpperCase())
+  .safeUnwrap(); // string | null
 ```
 
 ### Form Validation
 
 ```typescript
-function validateUser(data: { email: string; age: number }): Result<ValidUser, string[]> {
+function validateUser(data: {
+  email: string;
+  age: number;
+}): Result<ValidUser, string[]> {
   return Ok(data).validate([
-    d => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email) 
-      ? Ok(true) 
-      : Err("Invalid email format"),
-    d => d.age >= 0 && d.age <= 150 
-      ? Ok(true) 
-      : Err("Age must be between 0 and 150"),
+    (d) =>
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)
+        ? Ok(true)
+        : Err("Invalid email format"),
+    (d) =>
+      d.age >= 0 && d.age <= 150
+        ? Ok(true)
+        : Err("Age must be between 0 and 150"),
   ]);
 }
 ```
@@ -950,12 +949,14 @@ function validateUser(data: { email: string; age: number }): Result<ValidUser, s
 ### Async Operation Chaining
 
 ```typescript
-async function processOrder(orderId: string): Promise<Result<Confirmation, OrderError>> {
+async function processOrder(
+  orderId: string,
+): Promise<Result<Confirmation, OrderError>> {
   return fetchOrder(orderId)
-    .flatMap(order => validateOrder(order))
-    .flatMap(order => processPayment(order))
-    .flatMap(payment => updateInventory(payment))
-    .flatMap(result => sendConfirmation(result))
+    .flatMap((order) => validateOrder(order))
+    .flatMap((order) => processPayment(order))
+    .flatMap((payment) => updateInventory(payment))
+    .flatMap((result) => sendConfirmation(result))
     .toPromise();
 }
 ```

@@ -1,12 +1,15 @@
 /**
- * Result Examples Index
+ * ExperimentalResult Examples Index
  *
  * This file lists all available examples and demonstrates different
- * patterns for working with Result types.
+ * patterns for working with ExperimentalResult types.
+ *
+ * NOTE: These examples are experimental-only and may change.
+ * For stable Result examples, see README.md.
  *
  * Run examples with:
- *   bun run examples/result/01-map.ts
- *   bun run examples/result/02-flatMap.ts
+ *   bun run examples/result-experimental/01-map.ts
+ *   bun run examples/result-experimental/02-flatMap.ts
  *   etc.
  */
 
@@ -26,7 +29,7 @@
  * - Map with array operations
  * - Type transformations
  *
- * Run: bun run examples/result/01-map.ts
+ * Run: bun run examples/result-experimental/01-map.ts
  */
 
 /**
@@ -43,7 +46,7 @@
  * - flatMap vs map comparison
  * - Real-world user registration flow
  *
- * Run: bun run examples/result/02-flatMap.ts
+ * Run: bun run examples/result-experimental/02-flatMap.ts
  */
 
 /**
@@ -61,7 +64,7 @@
  * - Transformation history
  * - Async API call patterns
  *
- * Run: bun run examples/result/03-zip.ts
+ * Run: bun run examples/result-experimental/03-zip.ts
  */
 
 /**
@@ -82,7 +85,7 @@
  * - Context preservation
  * - Multi-step validation
  *
- * Run: bun run examples/result/04-flatZip.ts
+ * Run: bun run examples/result-experimental/04-flatZip.ts
  */
 
 // ============================================================================
@@ -111,7 +114,7 @@
  * - Sequential API patterns
  * - Accumulator patterns
  *
- * Run: bun run examples/result/05-gen.ts
+ * Run: bun run examples/result-experimental/05-gen.ts
  */
 
 /**
@@ -135,7 +138,7 @@
  * - Transaction-like operations
  * - gen vs genAdapter comparison
  *
- * Run: bun run examples/result/06-genAdapter.ts
+ * Run: bun run examples/result-experimental/06-genAdapter.ts
  */
 
 /**
@@ -159,7 +162,7 @@
  * - Conditional async operations
  * - Batch operations
  *
- * Run: bun run examples/result/07-asyncGen.ts
+ * Run: bun run examples/result-experimental/07-asyncGen.ts
  */
 
 /**
@@ -185,7 +188,7 @@
  * - Nested operations
  * - Streaming-like patterns
  *
- * Run: bun run examples/result/08-asyncGenAdapter.ts
+ * Run: bun run examples/result-experimental/08-asyncGenAdapter.ts
  */
 
 // ============================================================================
@@ -214,7 +217,7 @@
  * - Fetching and chaining
  * - Readability comparison
  *
- * Run: bun run examples/result/09-workflow-simple-sync.ts
+ * Run: bun run examples/result-experimental/09-workflow-simple-sync.ts
  */
 
 /**
@@ -244,7 +247,7 @@
  * - toPromise conversion
  * - Readability comparison
  *
- * Run: bun run examples/result/10-workflow-async.ts
+ * Run: bun run examples/result-experimental/10-workflow-async.ts
  */
 
 // ============================================================================

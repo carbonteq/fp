@@ -27,7 +27,7 @@ The `Flow` module normalizes "failure" states:
 This means a `Flow` generator always returns a `Result`:
 
 ```typescript
-type FlowReturn<T, E> = Result<T, E | UnwrappedNone>
+type FlowReturn<T, E> = Result<T, E | UnwrappedNone>;
 ```
 
 ### 2. Generator as "Do Notation"
@@ -36,8 +36,8 @@ type FlowReturn<T, E> = Result<T, E | UnwrappedNone>
 
 ```typescript
 const result = Flow.gen(function* () {
-  const x = yield* Result.Ok(10);        // unwrap Result
-  const y = yield* Option.Some(20);      // unwrap Option
+  const x = yield* Result.Ok(10); // unwrap Result
+  const y = yield* Option.Some(20); // unwrap Option
   return x + y;
 });
 // Result.Ok(30)
@@ -321,9 +321,7 @@ To handle errors within a generator:
 Recover *before* yielding.
 
 ```typescript
-const val = yield* $(
-  mayFail().orElse(() => Result.Ok(fallback))
-);
+const val = yield * $(mayFail().orElse(() => Result.Ok(fallback)));
 ```
 
 ### 2. Manual Branching
@@ -334,7 +332,7 @@ Do not yield immediately. Check the result state first.
 const result = mayFail();
 if (result.isErr()) {
   // handle error, maybe yield something else
-  yield* $(otherStrategy());
+  yield * $(otherStrategy());
 } else {
   // use value
   const val = result.unwrap();

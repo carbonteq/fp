@@ -1,12 +1,15 @@
 /**
- * Option Examples Index
+ * ExperimentalOption Examples Index
  *
  * This file lists all available examples and demonstrates different
- * patterns for working with Option types.
+ * patterns for working with ExperimentalOption types.
+ *
+ * NOTE: These examples are experimental-only and may change.
+ * For stable Option examples, see README.md.
  *
  * Run examples with:
- *   bun run examples/option/01-map.ts
- *   bun run examples/option/02-flatMap.ts
+ *   bun run examples/option-experimental/01-map.ts
+ *   bun run examples/option-experimental/02-flatMap.ts
  *   etc.
  */
 
@@ -28,7 +31,7 @@
  * - mapOr for default values
  * - Async mapOr
  *
- * Run: bun run examples/option/01-map.ts
+ * Run: bun run examples/option-experimental/01-map.ts
  */
 
 /**
@@ -49,7 +52,7 @@
  * - JSON parsing and validation
  * - Configuration lookup
  *
- * Run: bun run examples/option/02-flatMap.ts
+ * Run: bun run examples/option-experimental/02-flatMap.ts
  */
 
 /**
@@ -70,7 +73,7 @@
  * - Value with metadata
  * - Safe division with context
  *
- * Run: bun run examples/option/03-zip.ts
+ * Run: bun run examples/option-experimental/03-zip.ts
  */
 
 /**
@@ -91,7 +94,7 @@
  * - Multi-step validation
  * - Branching logic
  *
- * Run: bun run examples/option/04-flatZip.ts
+ * Run: bun run examples/option-experimental/04-flatZip.ts
  */
 
 // ============================================================================
@@ -123,7 +126,7 @@
  * - Match in gen
  * - Complex pipelines
  *
- * Run: bun run examples/option/05-gen.ts
+ * Run: bun run examples/option-experimental/05-gen.ts
  */
 
 /**
@@ -145,7 +148,7 @@
  * - Nested operations
  * - FromPredicate usage
  *
- * Run: bun run examples/option/06-genAdapter.ts
+ * Run: bun run examples/option-experimental/06-genAdapter.ts
  */
 
 /**
@@ -169,7 +172,7 @@
  * - Conditional async operations
  * - Batch operations
  *
- * Run: bun run examples/option/07-asyncGen.ts
+ * Run: bun run examples/option-experimental/07-asyncGen.ts
  */
 
 /**
@@ -196,7 +199,7 @@
  * - Streaming-like patterns
  * - State management
  *
- * Run: bun run examples/option/08-asyncGenAdapter.ts
+ * Run: bun run examples/option-experimental/08-asyncGenAdapter.ts
  */
 
 // ============================================================================
@@ -229,7 +232,7 @@
  * - Product lookup with validation
  * - Readability comparison
  *
- * Run: bun run examples/option/09-workflow-simple-sync.ts
+ * Run: bun run examples/option-experimental/09-workflow-simple-sync.ts
  */
 
 /**
@@ -260,7 +263,7 @@
  * - Mixed sync/async operations
  * - Readability comparison
  *
- * Run: bun run examples/option/10-workflow-async.ts
+ * Run: bun run examples/option-experimental/10-workflow-async.ts
  */
 
 // ============================================================================

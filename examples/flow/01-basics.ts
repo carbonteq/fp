@@ -5,6 +5,8 @@
  * It automatically handles short-circuiting:
  * - If Option.None is yielded -> returns Result.Err(UnwrappedNone)
  * - If Result.Err(e) is yielded -> returns Result.Err(e)
+ *
+ * Uses ExperimentalOption and ExperimentalResult.
  */
 
 import {

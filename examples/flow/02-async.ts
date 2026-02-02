@@ -2,6 +2,7 @@
  * Async Flow - Unified Async Generator
  *
  * Handles Promise<Option>, Promise<Result>, and async operations.
+ * Uses ExperimentalOption and ExperimentalResult.
  */
 
 import {
