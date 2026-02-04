@@ -5,7 +5,11 @@
  * Uses ExperimentalOption and ExperimentalResult.
  */
 
-import { Flow, Option, Result } from "../../dist/index.mjs";
+import {
+  ExperimentalFlow as Flow,
+  ExperimentalOption as Option,
+  ExperimentalResult as Result,
+} from "../../dist/index.mjs";
 
 type User = { id: number; name: string };
 

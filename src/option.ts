@@ -1,6 +1,6 @@
 import { Result } from "./result.js";
 import { UNIT } from "./unit.js";
-import { isPromiseLike } from "./utils.js";
+import { CapturedTrace, isPromiseLike } from "./utils.js";
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -535,5 +535,56 @@ export class Option<T> {
   toString(): string {
     if (this.isNone()) return "Option::None";
     return `Option::Some(${String(this.#val)})`;
+  }
+
+  /**
+   * Makes ExperimentalOption iterable for use with generator-based syntax.
+   *
+   * Yields self and returns the unwrapped value when resumed.
+   * Used internally by {@link ExperimentalOption.gen} for `yield*` syntax.
+   *
+   * @example
+   * ```ts
+   * const result = ExperimentalOption.gen(function* () {
+   *   const value = yield* ExperimentalOption.Some(42);
+   *   return value * 2;
+   * });
+   * // Some(84)
+   * ```
+   *
+   * @internal
+   */
+  *[Symbol.iterator](): Generator<Option<T>, T, unknown> {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as Option<T>) as T;
+  }
+
+  /**
+   * Makes ExperimentalOption iterable for use with async generator-based syntax.
+   *
+   * Yields self and returns the unwrapped value when resumed.
+   * Used internally by {@link ExperimentalOption.asyncGen} for `yield*` syntax.
+   *
+   * @example
+   * ```ts
+   * const result = await ExperimentalOption.asyncGen(async function* () {
+   *   const value = yield* await Promise.resolve(ExperimentalOption.Some(42));
+   *   return value * 2;
+   * });
+   * // Some(84)
+   * ```
+   *
+   * @internal
+   */
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    Option<T>,
+    Awaited<T>,
+    unknown
+  > {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(
+      this,
+      trace,
+    ) as unknown as Option<T>) as Awaited<T>;
   }
 }

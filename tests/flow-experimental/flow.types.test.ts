@@ -6,23 +6,29 @@
  * and combinations thereof.
  */
 import { describe, expect, expectTypeOf, test } from "bun:test";
-import { Flow, FlowError } from "@/flow.js";
-import { Option, type UnwrappedNone } from "@/option.js";
-import { Result } from "@/result.js";
+import {
+  ExperimentalFlowError,
+  ExperimentalFlow as XFlow,
+} from "@/flow-experimental.js";
+import {
+  ExperimentalOption as Option,
+  type UnwrappedNone,
+} from "@/option-experimental.js";
+import { ExperimentalResult as Result } from "@/result-experimental.js";
 
 // ============================================================================
 // Test Error Hierarchy
 // ============================================================================
 
 // Level 1: Direct FlowError subclasses
-class AppError extends FlowError {
+class AppError extends ExperimentalFlowError {
   readonly _tag = "AppError" as const;
   constructor(message = "App error") {
     super(message);
   }
 }
 
-class NetworkError extends FlowError {
+class NetworkError extends ExperimentalFlowError {
   readonly _tag = "NetworkError" as const;
   constructor(message = "Network error") {
     super(message);
@@ -56,13 +62,13 @@ class FieldValidationError extends ValidationError {
 }
 
 // ============================================================================
-// Flow.gen Type Inference Tests
+// XFlow.gen Type Inference Tests
 // ============================================================================
 
-describe("Flow.gen type inference", () => {
+describe("XFlow.gen type inference", () => {
   describe("single error types", () => {
     test("infers direct FlowError subclass", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new AppError();
         return 1;
       });
@@ -72,7 +78,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers 2-level deep FlowError subclass", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new ValidationError();
         return 1;
       });
@@ -82,7 +88,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers 3-level deep FlowError subclass", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new FieldValidationError("email");
         return 1;
       });
@@ -94,7 +100,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers Result.Err error type", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* Result.Err("string error" as const);
         return 1;
       });
@@ -104,7 +110,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers UnwrappedNone from Option.None", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* Option.None;
         return 1;
       });
@@ -116,7 +122,7 @@ describe("Flow.gen type inference", () => {
 
   describe("union error types", () => {
     test("infers union of two FlowError subclasses", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new ValidationError();
         yield* new NotFoundError();
         return 1;
@@ -128,7 +134,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers union of sibling FlowError subclasses", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new AppError();
         yield* new NetworkError();
         return 1;
@@ -140,7 +146,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers union of FlowError and Result.Err", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new ValidationError();
         yield* Result.Err("string error" as const);
         return 1;
@@ -152,7 +158,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers union of FlowError and Option.None", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new ValidationError();
         yield* Option.None;
         return 1;
@@ -164,7 +170,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers union of all three: FlowError, Result.Err, Option.None", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new ValidationError();
         yield* Result.Err(42 as const);
         yield* Option.None;
@@ -177,7 +183,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers complex union with multiple FlowError subclasses", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         yield* new AppError();
         yield* new ValidationError();
         yield* new NotFoundError();
@@ -196,7 +202,7 @@ describe("Flow.gen type inference", () => {
   describe("conditional error types", () => {
     test("infers union from conditional yields", () => {
       const getValue = (input: number) =>
-        Flow.gen(function* () {
+        XFlow.gen(function* () {
           if (input < 0) {
             yield* new ValidationError("Must be positive");
           }
@@ -217,7 +223,7 @@ describe("Flow.gen type inference", () => {
 
     test("infers correct type when using Option.fromNullable", () => {
       const getValue = (input: number | null) =>
-        Flow.gen(function* () {
+        XFlow.gen(function* () {
           const value = yield* Option.fromNullable(input);
           if (value < 0) {
             yield* new ValidationError();
@@ -236,7 +242,7 @@ describe("Flow.gen type inference", () => {
 
   describe("return type inference", () => {
     test("infers correct success type", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         const a = yield* Option.Some(10);
         const b = yield* Result.Ok("hello");
         return { num: a, str: b };
@@ -249,7 +255,7 @@ describe("Flow.gen type inference", () => {
     });
 
     test("infers array return type", () => {
-      const result = Flow.gen(function* () {
+      const result = XFlow.gen(function* () {
         const a = yield* Option.Some([1, 2, 3]);
         return a.map((x) => x * 2);
       });
@@ -261,12 +267,12 @@ describe("Flow.gen type inference", () => {
 });
 
 // ============================================================================
-// Flow.asyncGen Type Inference Tests
+// XFlow.asyncGen Type Inference Tests
 // ============================================================================
 
 describe("Flow.asyncGen type inference", () => {
   test("infers FlowError subclass in async context", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       yield* new ValidationError();
       return 1;
     });
@@ -279,7 +285,7 @@ describe("Flow.asyncGen type inference", () => {
     const fetchData = async (): Promise<Result<string, NetworkError>> =>
       Result.Ok("data that is long enough");
 
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const data = yield* await fetchData();
       if (data.length < 10) {
         yield* new ValidationError("Too short");
@@ -294,7 +300,7 @@ describe("Flow.asyncGen type inference", () => {
   });
 
   test("infers deep inheritance in async context", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       yield* new FieldValidationError("email");
       return 1;
     });
@@ -305,12 +311,12 @@ describe("Flow.asyncGen type inference", () => {
 });
 
 // ============================================================================
-// Flow.genAdapter Type Inference Tests ($.fail)
+// XFlow.genAdapter Type Inference Tests ($.fail)
 // ============================================================================
 
 describe("Flow.genAdapter type inference with $.fail", () => {
   test("infers error type from $.fail", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       yield* $.fail(new ValidationError());
       return 1;
     });
@@ -320,7 +326,7 @@ describe("Flow.genAdapter type inference with $.fail", () => {
   });
 
   test("infers union of $.fail and $() errors", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       yield* $(Result.Err("string error" as const));
       yield* $.fail(new ValidationError());
       return 1;
@@ -332,7 +338,7 @@ describe("Flow.genAdapter type inference with $.fail", () => {
   });
 
   test("infers $.fail with deep inheritance", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       yield* $.fail(new FieldValidationError("email"));
       return 1;
     });
@@ -343,7 +349,7 @@ describe("Flow.genAdapter type inference with $.fail", () => {
 
   test("infers union from conditional $.fail", () => {
     const getValue = (input: number) =>
-      Flow.genAdapter(function* ($) {
+      XFlow.genAdapter(function* ($) {
         if (input < 0) {
           yield* $.fail(new ValidationError());
         }
@@ -364,12 +370,12 @@ describe("Flow.genAdapter type inference with $.fail", () => {
 });
 
 // ============================================================================
-// Flow.asyncGenAdapter Type Inference Tests ($.fail)
+// XFlow.asyncGenAdapter Type Inference Tests ($.fail)
 // ============================================================================
 
 describe("Flow.asyncGenAdapter type inference with $.fail", () => {
   test("infers error type from $.fail async", async () => {
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       yield* $.fail(new ValidationError());
       return 1;
     });
@@ -382,7 +388,7 @@ describe("Flow.asyncGenAdapter type inference with $.fail", () => {
     const fetchData = async (): Promise<Result<string, NetworkError>> =>
       Result.Ok("data that is long enough");
 
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       const data = yield* $(fetchData());
       if (data.length < 10) {
         yield* $.fail(new ValidationError("Too short"));
@@ -408,7 +414,7 @@ describe("Flow.asyncGenAdapter type inference with $.fail", () => {
       name ? Option.Some({ theme: "dark" }) : Option.None;
 
     const getEnrichedUser = async (userId: number) =>
-      Flow.asyncGenAdapter(async function* ($) {
+      XFlow.asyncGenAdapter(async function* ($) {
         if (userId <= 0) {
           yield* $.fail(new ValidationError("Invalid user ID"));
         }
@@ -437,7 +443,7 @@ describe("Flow.asyncGenAdapter type inference with $.fail", () => {
 
 describe("type inference edge cases", () => {
   test("only Option.Some yields infer UnwrappedNone", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const a = yield* Option.Some(1);
       const b = yield* Option.Some(2);
       return a + b;
@@ -450,7 +456,7 @@ describe("type inference edge cases", () => {
   });
 
   test("only Result.Ok yields infer never for error", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const a = yield* Result.Ok(1);
       const b = yield* Result.Ok(2);
       return a + b;
@@ -461,7 +467,7 @@ describe("type inference edge cases", () => {
   });
 
   test("preserves specific literal error types", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       yield* Result.Err("ERROR_A" as const);
       yield* Result.Err("ERROR_B" as const);
       return 1;
@@ -471,7 +477,7 @@ describe("type inference edge cases", () => {
   });
 
   test("preserves error object types", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       yield* Result.Err({ code: 404, message: "Not found" } as const);
       return 1;
     });

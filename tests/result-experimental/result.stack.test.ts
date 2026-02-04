@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { ExperimentalFlow as XFlow } from "@/flow-experimental.js";
 import { ExperimentalResult as Result } from "@/result-experimental.js";
-import { Flow } from "../../src/flow.js";
 
 describe("Result Stack Traces", () => {
   it("Result.gen should append yield location to stack trace", () => {
@@ -44,7 +44,7 @@ describe("Result Stack Traces", () => {
   it("Flow.gen should append yield location to Result.Err trace", () => {
     const err = Result.Err(new Error("Flow Error"));
 
-    const res = Flow.gen(function* () {
+    const res = XFlow.gen(function* () {
       yield* err;
       return 1;
     });
@@ -60,7 +60,7 @@ describe("Result Stack Traces", () => {
   it("Flow.genAdapter should append yield location to Result.Err trace", () => {
     const err = Result.Err(new Error("Flow Adapter Error"));
 
-    const res = Flow.genAdapter(function* ($) {
+    const res = XFlow.genAdapter(function* ($) {
       yield* $(err);
       return 1;
     });

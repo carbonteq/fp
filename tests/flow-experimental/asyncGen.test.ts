@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { Flow, FlowError } from "@/flow.js";
-import { Option, UnwrappedNone } from "@/option.js";
-import { Result } from "@/result.js";
+import {
+  ExperimentalFlowError,
+  ExperimentalFlow as XFlow,
+} from "@/flow-experimental.js";
+import {
+  ExperimentalOption as Option,
+  UnwrappedNone,
+} from "@/option-experimental.js";
+import { ExperimentalResult as Result } from "@/result-experimental.js";
 
-class ValidationError extends FlowError {
+class ValidationError extends ExperimentalFlowError {
   readonly _tag = "ValidationError";
   constructor(message: string) {
     super(message);
@@ -11,7 +17,7 @@ class ValidationError extends FlowError {
   }
 }
 
-class ServiceUnavailableError extends FlowError {
+class ServiceUnavailableError extends ExperimentalFlowError {
   readonly _tag = "ServiceUnavailableError";
   constructor(service: string) {
     super(`${service} unavailable`);
@@ -19,9 +25,9 @@ class ServiceUnavailableError extends FlowError {
   }
 }
 
-describe("Flow.asyncGen", () => {
+describe("XFlow.asyncGen", () => {
   test("handles all successes async", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const a = yield* Option.Some(1);
       const b = yield* Result.Ok(2);
       return a + b;
@@ -32,7 +38,7 @@ describe("Flow.asyncGen", () => {
   });
 
   test("handles awaited promises", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const a = yield* await Promise.resolve(Option.Some(1));
       const b = yield* await Promise.resolve(Result.Ok(2));
       return a + b;
@@ -43,7 +49,7 @@ describe("Flow.asyncGen", () => {
   });
 
   test("handles Option.None short-circuit async", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const a = yield* Option.Some(1);
       yield* Option.None;
       return a;
@@ -54,7 +60,7 @@ describe("Flow.asyncGen", () => {
   });
 
   test("handles Result.Err short-circuit async", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const a = yield* Option.Some(1);
       yield* Result.Err("error");
       return a;
@@ -65,7 +71,7 @@ describe("Flow.asyncGen", () => {
   });
 
   test("handles FlowError short-circuit async", async () => {
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const a = yield* Option.Some(1);
       yield* new ValidationError("Value must be positive");
       return a;
@@ -79,7 +85,7 @@ describe("Flow.asyncGen", () => {
   test("FlowError short-circuit stops execution async", async () => {
     let executedAfterError = false;
 
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       yield* new ServiceUnavailableError("Database");
       executedAfterError = true;
       return 1;
@@ -97,7 +103,7 @@ describe("Flow.asyncGen", () => {
       return Result.Ok(`data-${id}`);
     };
 
-    const result = await Flow.asyncGen(async function* () {
+    const result = await XFlow.asyncGen(async function* () {
       const data = yield* await fetchData(1);
 
       if (data.length < 10) {

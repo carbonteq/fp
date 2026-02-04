@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { Flow, FlowError } from "@/flow.js";
-import { Option, UnwrappedNone } from "@/option.js";
-import { Result } from "@/result.js";
+import {
+  ExperimentalFlowError,
+  ExperimentalFlow as XFlow,
+} from "@/flow-experimental.js";
+import {
+  ExperimentalOption as Option,
+  UnwrappedNone,
+} from "@/option-experimental.js";
+import { ExperimentalResult as Result } from "@/result-experimental.js";
 
-class ValidationError extends FlowError {
+class ValidationError extends ExperimentalFlowError {
   readonly _tag = "ValidationError";
   constructor(message: string) {
     super(message);
@@ -11,7 +17,7 @@ class ValidationError extends FlowError {
   }
 }
 
-class NotFoundError extends FlowError {
+class NotFoundError extends ExperimentalFlowError {
   readonly _tag = "NotFoundError";
   constructor(message: string) {
     super(message);
@@ -19,9 +25,9 @@ class NotFoundError extends FlowError {
   }
 }
 
-describe("Flow.gen", () => {
+describe("XFlow.gen", () => {
   test("handles all successes", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const a = yield* Option.Some(1);
       const b = yield* Result.Ok(2);
       return a + b;
@@ -32,7 +38,7 @@ describe("Flow.gen", () => {
   });
 
   test("handles Option.None short-circuit", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const a = yield* Option.Some(1);
       yield* Option.None;
       return a;
@@ -43,7 +49,7 @@ describe("Flow.gen", () => {
   });
 
   test("handles Result.Err short-circuit", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const a = yield* Option.Some(1);
       yield* Result.Err("error");
       return a;
@@ -54,7 +60,7 @@ describe("Flow.gen", () => {
   });
 
   test("handles mixed short-circuits (stops at first)", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       yield* Option.None;
       yield* Result.Err("error");
       return 1;
@@ -65,7 +71,7 @@ describe("Flow.gen", () => {
   });
 
   test("handles FlowError short-circuit", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const a = yield* Option.Some(1);
       yield* new ValidationError("Value must be positive");
       return a;
@@ -77,7 +83,7 @@ describe("Flow.gen", () => {
   });
 
   test("handles multiple FlowError types", () => {
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       const value = 0;
       if (value <= 0) {
         yield* new ValidationError("Value must be positive");
@@ -93,7 +99,7 @@ describe("Flow.gen", () => {
   test("FlowError short-circuit stops execution", () => {
     let executedAfterError = false;
 
-    const result = Flow.gen(function* () {
+    const result = XFlow.gen(function* () {
       yield* new NotFoundError("Resource not found");
       executedAfterError = true;
       return 1;
@@ -106,7 +112,7 @@ describe("Flow.gen", () => {
 
   test("FlowError preserves error type in union", () => {
     const getValue = (input: number) =>
-      Flow.gen(function* () {
+      XFlow.gen(function* () {
         if (input < 0) {
           yield* new ValidationError("negative");
         }

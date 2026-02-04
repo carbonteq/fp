@@ -1,7 +1,7 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
-import { isPromiseLike } from "./utils.js";
+import { CapturedTrace, isPromiseLike } from "./utils.js";
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -1209,5 +1209,45 @@ export class Result<T, E> {
       ctx,
       "Ok",
     );
+  }
+
+  /**
+   * Makes Result iterable for use with generator-based syntax.
+   * Yields self and returns the unwrapped value when resumed.
+   *
+   * @example
+   * ```ts
+   * const result = Result.gen(function* () {
+   *   const value = yield* ExperimentalResult.Ok(42);
+   *   return value * 2;
+   * });
+   * ```
+   */
+  *[Symbol.iterator](): Generator<Result<T, E>, T, unknown> {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as Result<
+      T,
+      E
+    >) as T;
+  }
+
+  /**
+   * Makes Result iterable for use with async generator-based syntax.
+   * Yields self and returns the unwrapped value when resumed.
+   *
+   * @example
+   * ```ts
+   * const result = await Result.asyncGen(async function* () {
+   *   const value = yield* $(ExperimentalResult.Ok(42));
+   *   return value * 2;
+   * });
+   * ```
+   */
+  async *[Symbol.asyncIterator](): AsyncGenerator<Result<T, E>, T, unknown> {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as Result<
+      T,
+      E
+    >) as T;
   }
 }

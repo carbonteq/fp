@@ -9,7 +9,12 @@
  * - Uses ExperimentalOption and ExperimentalResult
  */
 
-import { Flow, FlowError, Option, Result } from "../../src/index.js";
+import {
+  ExperimentalFlow as Flow,
+  ExperimentalFlowError as FlowError,
+  ExperimentalOption as Option,
+  ExperimentalResult as Result,
+} from "../../src/index.js";
 
 // ============================================================================
 // 1. Domain Types & Errors

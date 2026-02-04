@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Flow } from "@/flow.js";
-import { Option, UnwrappedNone } from "@/option.js";
-import { Result } from "@/result.js";
+import { ExperimentalFlow as XFlow } from "@/flow-experimental.js";
+import {
+  ExperimentalOption as Option,
+  UnwrappedNone,
+} from "@/option-experimental.js";
+import { ExperimentalResult as Result } from "@/result-experimental.js";
 
 class ValidationError extends Error {
   readonly _tag = "ValidationError";
@@ -19,9 +22,9 @@ class NotFoundError extends Error {
   }
 }
 
-describe("Flow.genAdapter", () => {
+describe("XFlow.genAdapter", () => {
   test("handles all successes with adapter", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       const a = yield* $(Option.Some(10));
       const b = yield* $(Result.Ok(20));
       return a + b;
@@ -32,7 +35,7 @@ describe("Flow.genAdapter", () => {
   });
 
   test("handles Option.None short-circuit with adapter", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       yield* $(Option.Some(1));
       yield* $(Option.None);
       return 0;
@@ -44,7 +47,7 @@ describe("Flow.genAdapter", () => {
 
   test("handles Result.Err short-circuit with adapter", () => {
     const err = new Error("oops");
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       yield* $(Option.Some(1));
       yield* $(Result.Err(err));
       return 0;
@@ -55,7 +58,7 @@ describe("Flow.genAdapter", () => {
   });
 
   test("handles $.fail() for direct error yielding", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       const a = yield* $(Option.Some(1));
       yield* $.fail(new ValidationError("Value must be positive"));
       return a;
@@ -71,7 +74,7 @@ describe("Flow.genAdapter", () => {
   test("$.fail() short-circuits execution", () => {
     let executedAfterError = false;
 
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       yield* $.fail(new NotFoundError("Resource not found"));
       executedAfterError = true;
       return 1;
@@ -84,7 +87,7 @@ describe("Flow.genAdapter", () => {
 
   test("$.fail() works with multiple error types", () => {
     const getValue = (input: number) =>
-      Flow.genAdapter(function* ($) {
+      XFlow.genAdapter(function* ($) {
         if (input < 0) {
           yield* $.fail(new ValidationError("negative"));
         }
@@ -108,7 +111,7 @@ describe("Flow.genAdapter", () => {
   });
 
   test("$.fail() can be mixed with $(Result) and $(Option)", () => {
-    const result = Flow.genAdapter(function* ($) {
+    const result = XFlow.genAdapter(function* ($) {
       const a = yield* $(Option.Some(10));
       const b = yield* $(Result.Ok(20));
 

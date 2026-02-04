@@ -9,11 +9,7 @@
  * - Uses ExperimentalOption and ExperimentalResult
  */
 
-import {
-  Flow,
-  ExperimentalOption as Option,
-  ExperimentalResult as Result,
-} from "../../dist/index.mjs";
+import { Flow, Option, Result } from "../../dist/index.mjs";
 
 // ============================================================================
 // 1. Domain Types & Errors

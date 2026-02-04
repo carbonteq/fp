@@ -1,4 +1,5 @@
 export * from "./flow.js";
+export * from "./flow-experimental.js";
 export * from "./match.js";
 export * from "./option.js";
 export { ExperimentalOption } from "./option-experimental.js";

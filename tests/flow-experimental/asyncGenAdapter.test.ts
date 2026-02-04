@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Flow } from "@/flow.js";
-import { Option, UnwrappedNone } from "@/option.js";
-import { Result } from "@/result.js";
+import { ExperimentalFlow as XFlow } from "@/flow-experimental.js";
+import {
+  ExperimentalOption as Option,
+  UnwrappedNone,
+} from "@/option-experimental.js";
+import { ExperimentalResult as Result } from "@/result-experimental.js";
 
 class ValidationError extends Error {
   readonly _tag = "ValidationError";
@@ -19,9 +22,9 @@ class ServiceUnavailableError extends Error {
   }
 }
 
-describe("Flow.asyncGenAdapter", () => {
+describe("XFlow.asyncGenAdapter", () => {
   test("handles all successes with adapter async", async () => {
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       const a = yield* $(Option.Some(10));
       const b = yield* $(Result.Ok(20));
       const c = yield* $(Promise.resolve(Option.Some(30)));
@@ -33,7 +36,7 @@ describe("Flow.asyncGenAdapter", () => {
   });
 
   test("handles Option.None short-circuit with adapter async", async () => {
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       yield* $(Option.Some(1));
       yield* $(Promise.resolve(Option.None));
       return 0;
@@ -45,7 +48,7 @@ describe("Flow.asyncGenAdapter", () => {
 
   test("handles Result.Err short-circuit with adapter async", async () => {
     const err = new Error("oops");
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       yield* $(Option.Some(1));
       yield* $(Promise.resolve(Result.Err(err)));
       return 0;
@@ -56,7 +59,7 @@ describe("Flow.asyncGenAdapter", () => {
   });
 
   test("handles $.fail() for direct error yielding async", async () => {
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       const a = yield* $(Option.Some(1));
       yield* $.fail(new ValidationError("Value must be positive"));
       return a;
@@ -72,7 +75,7 @@ describe("Flow.asyncGenAdapter", () => {
   test("$.fail() short-circuits execution async", async () => {
     let executedAfterError = false;
 
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       yield* $.fail(new ServiceUnavailableError("Database"));
       executedAfterError = true;
       return 1;
@@ -91,7 +94,7 @@ describe("Flow.asyncGenAdapter", () => {
       return Result.Ok(`data-${id}`);
     };
 
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       const data = yield* $(fetchData(1));
 
       if (data.length < 10) {
@@ -106,7 +109,7 @@ describe("Flow.asyncGenAdapter", () => {
   });
 
   test("$.fail() can be mixed with $() for Option, Result, and Promise", async () => {
-    const result = await Flow.asyncGenAdapter(async function* ($) {
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
       const a = yield* $(Option.Some(10));
       const b = yield* $(Result.Ok(20));
       const c = yield* $(Promise.resolve(Option.Some(5)));

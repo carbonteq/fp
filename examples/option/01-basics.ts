@@ -1,7 +1,7 @@
 import { Option } from "../../dist/option.mjs";
 
 const some = Option.Some(5);
-const none = Option.None;
+const none: Option<number> = Option.None;
 
 console.log("some isSome:", some.isSome());
 console.log("none isNone:", none.isNone());
