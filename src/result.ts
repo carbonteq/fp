@@ -1124,15 +1124,12 @@ export class Result<T, E> {
     if (this.isOk()) return this as unknown as Result<T | T2, E2>;
     return fn(this.getErr());
   }
-}
 
-// ==========================================================================
-// Static Constructors (added to Result namespace)
-// ==========================================================================
+  // Static Constructors
 
-export namespace Result {
   /** Create Result from nullable value - returns Err for null/undefined */
-  export function fromNullable<T, E>(
+  static fromNullable<T, E>(
+    this: void,
     val: T | null | undefined,
     error: E,
   ): Result<NonNullable<T>, E> {
@@ -1142,7 +1139,8 @@ export namespace Result {
   }
 
   /** Create Result based on predicate result */
-  export function fromPredicate<T, E>(
+  static fromPredicate<T, E>(
+    this: void,
     val: T,
     pred: (v: T) => boolean,
     error: E,
@@ -1151,7 +1149,8 @@ export namespace Result {
   }
 
   /** Wrap Promise<Result<T, E>> as Result<Promise<T>, E> */
-  export function fromPromise<U, F>(
+  static fromPromise<U, F>(
+    this: void,
     promise: Promise<Result<U, F>>,
   ): Result<Promise<U>, F> {
     const ctx: ResultCtx<F> = { asyncErr: NO_ERR };
@@ -1177,7 +1176,8 @@ export namespace Result {
   }
 
   /** Catches sync exceptions */
-  export function tryCatch<T, E = unknown>(
+  static tryCatch<T, E = unknown>(
+    this: void,
     fn: () => T,
     errorMapper?: (e: unknown) => E,
   ): Result<T, E> {
@@ -1189,7 +1189,8 @@ export namespace Result {
   }
 
   /** Catches async exceptions */
-  export function tryAsyncCatch<T, E = unknown>(
+  static tryAsyncCatch<T, E = unknown>(
+    this: void,
     fn: () => Promise<T>,
     errorMapper?: (e: unknown) => E,
   ): Result<Promise<T>, E> {
