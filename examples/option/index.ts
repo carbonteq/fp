@@ -46,4 +46,4 @@
  * Run: bun run examples/option/06-aggregation.ts
  */
 
-export {};
+export {}

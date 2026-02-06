@@ -1,9 +1,9 @@
-import { ExperimentalResult } from "./result-experimental.js";
-import { UNIT } from "./unit.js";
-import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
+import { ExperimentalResult } from "./result-experimental.js"
+import { UNIT } from "./unit.js"
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
 
-type Predicate<T> = (val: T) => boolean;
-type Falsy = false | 0 | "" | null | undefined;
+type Predicate<T> = (val: T) => boolean
+type Falsy = false | 0 | "" | null | undefined
 
 /**
  * Error thrown when attempting to unwrap a `None` value.
@@ -24,27 +24,27 @@ type Falsy = false | 0 | "" | null | undefined;
  * ```
  */
 export class UnwrappedNone extends Error {
-  readonly name = "UnwrapError";
+  readonly name = "UnwrapError"
 
   constructor() {
-    super("Attempted to unwrap ExperimentalOption::None");
+    super("Attempted to unwrap ExperimentalOption::None")
   }
 }
 
-const UNWRAPPED_NONE_ERR = new UnwrappedNone();
+const UNWRAPPED_NONE_ERR = new UnwrappedNone()
 
-const NONE_VAL = Symbol("ExperimentalOption::None");
+const NONE_VAL = Symbol("ExperimentalOption::None")
 
-export type UnitOption = ExperimentalOption<UNIT>;
-export type UnwrapOption<T> = T extends ExperimentalOption<infer R> ? R : never;
+export type UnitOption = ExperimentalOption<UNIT>
+export type UnwrapOption<T> = T extends ExperimentalOption<infer R> ? R : never
 
 type CombinedOptions<T extends ExperimentalOption<unknown>[]> = {
-  [K in keyof T]: UnwrapOption<T[K]>;
-};
+  [K in keyof T]: UnwrapOption<T[K]>
+}
 
 interface MatchCases<T, U> {
-  Some: (val: T) => U;
-  None: () => U;
+  Some: (val: T) => U
+  None: () => U
 }
 
 /**
@@ -56,7 +56,7 @@ class OptionYieldWrap<T> {
   constructor(readonly option: ExperimentalOption<T>) {}
 
   *[Symbol.iterator](): Generator<OptionYieldWrap<T>, T, unknown> {
-    return (yield this) as T;
+    return (yield this) as T
   }
 }
 
@@ -66,12 +66,12 @@ class OptionYieldWrap<T> {
  * @internal
  */
 class AsyncOptionYieldWrap<T> {
-  readonly option: Promise<ExperimentalOption<T>>;
+  readonly option: Promise<ExperimentalOption<T>>
 
   constructor(option: ExperimentalOption<T> | Promise<ExperimentalOption<T>>) {
     this.option = (
       isPromiseLike(option) ? option : Promise.resolve(option)
-    ) as Promise<ExperimentalOption<T>>;
+    ) as Promise<ExperimentalOption<T>>
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
@@ -79,7 +79,7 @@ class AsyncOptionYieldWrap<T> {
     Awaited<T>,
     unknown
   > {
-    return (yield this) as Awaited<T>;
+    return (yield this) as Awaited<T>
   }
 }
 
@@ -138,13 +138,13 @@ class AsyncOptionYieldWrap<T> {
  */
 export class ExperimentalOption<T> {
   /** Discriminant tag for type-level identification */
-  readonly _tag: "Some" | "None";
+  readonly _tag: "Some" | "None"
 
-  readonly #val: T;
+  readonly #val: T
 
   private constructor(val: T, tag: "Some" | "None") {
-    this.#val = val;
-    this._tag = tag;
+    this.#val = val
+    this._tag = tag
   }
 
   /**
@@ -162,7 +162,7 @@ export class ExperimentalOption<T> {
   static readonly None: ExperimentalOption<never> = new ExperimentalOption(
     NONE_VAL as never,
     "None",
-  );
+  )
 
   /**
    * Creates a `Some` variant containing the provided value.
@@ -179,7 +179,7 @@ export class ExperimentalOption<T> {
    * ```
    */
   static Some<Inner>(this: void, val: Inner): ExperimentalOption<Inner> {
-    return new ExperimentalOption(val, "Some");
+    return new ExperimentalOption(val, "Some")
   }
 
   /**
@@ -212,7 +212,7 @@ export class ExperimentalOption<T> {
   static fromNullable<T>(val: T): ExperimentalOption<NonNullable<T>> {
     return val === null || val === undefined
       ? ExperimentalOption.None
-      : ExperimentalOption.Some(val as NonNullable<T>);
+      : ExperimentalOption.Some(val as NonNullable<T>)
   }
 
   /**
@@ -239,7 +239,7 @@ export class ExperimentalOption<T> {
    * ```
    */
   static fromFalsy<T>(val: T | Falsy): ExperimentalOption<T> {
-    return val ? ExperimentalOption.Some(val as T) : ExperimentalOption.None;
+    return val ? ExperimentalOption.Some(val as T) : ExperimentalOption.None
   }
 
   /**
@@ -269,7 +269,7 @@ export class ExperimentalOption<T> {
    * ```
    */
   static fromPredicate<T>(val: T, pred: Predicate<T>): ExperimentalOption<T> {
-    return pred(val) ? ExperimentalOption.Some(val) : ExperimentalOption.None;
+    return pred(val) ? ExperimentalOption.Some(val) : ExperimentalOption.None
   }
 
   /**
@@ -316,14 +316,14 @@ export class ExperimentalOption<T> {
   static all<T extends ExperimentalOption<unknown>[]>(
     ...options: T
   ): ExperimentalOption<CombinedOptions<T>> {
-    const vals = [] as CombinedOptions<T>;
+    const vals = [] as CombinedOptions<T>
 
     for (const opt of options) {
-      if (opt.isNone()) return ExperimentalOption.None;
-      vals.push(opt.#val);
+      if (opt.isNone()) return ExperimentalOption.None
+      vals.push(opt.#val)
     }
 
-    return ExperimentalOption.Some(vals);
+    return ExperimentalOption.Some(vals)
   }
 
   /**
@@ -367,9 +367,9 @@ export class ExperimentalOption<T> {
    */
   static any<T>(...options: ExperimentalOption<T>[]): ExperimentalOption<T> {
     for (const opt of options) {
-      if (opt.isSome()) return opt;
+      if (opt.isSome()) return opt
     }
-    return ExperimentalOption.None;
+    return ExperimentalOption.None
   }
 
   /**
@@ -390,7 +390,7 @@ export class ExperimentalOption<T> {
    * ```
    */
   isSome(): this is ExperimentalOption<T> & { readonly _tag: "Some" } {
-    return this._tag === "Some" && this.#val !== NONE_VAL;
+    return this._tag === "Some" && this.#val !== NONE_VAL
   }
 
   /**
@@ -411,7 +411,7 @@ export class ExperimentalOption<T> {
    * ```
    */
   isNone(): this is ExperimentalOption<never> & { readonly _tag: "None" } {
-    return this._tag === "None" || this.#val === NONE_VAL;
+    return this._tag === "None" || this.#val === NONE_VAL
   }
 
   /**
@@ -432,7 +432,7 @@ export class ExperimentalOption<T> {
    * ```
    */
   isUnit(): this is ExperimentalOption<UNIT> {
-    return this.#val === UNIT;
+    return this.#val === UNIT
   }
 
   /**
@@ -463,9 +463,9 @@ export class ExperimentalOption<T> {
    */
   unwrap(): T {
     if (this.isNone()) {
-      throw UNWRAPPED_NONE_ERR;
+      throw UNWRAPPED_NONE_ERR
     }
-    return this.#val;
+    return this.#val
   }
 
   /**
@@ -493,8 +493,8 @@ export class ExperimentalOption<T> {
    * @see {@link safeUnwrap} for null-returning safe unwrap
    */
   unwrapOr(defaultValue: T): T {
-    if (this.isNone()) return defaultValue;
-    return this.#val;
+    if (this.isNone()) return defaultValue
+    return this.#val
   }
 
   /**
@@ -535,8 +535,8 @@ export class ExperimentalOption<T> {
    * @see {@link unwrap} for unsafe unwrapping
    */
   unwrapOrElse(fn: () => T): T {
-    if (this.isNone()) return fn();
-    return this.#val;
+    if (this.isNone()) return fn()
+    return this.#val
   }
 
   /**
@@ -567,8 +567,8 @@ export class ExperimentalOption<T> {
    * @see {@link unwrapOrElse} for lazy defaults
    */
   safeUnwrap(): T | null {
-    if (this.isNone()) return null;
-    return this.#val;
+    if (this.isNone()) return null
+    return this.#val
   }
 
   /**
@@ -606,9 +606,9 @@ export class ExperimentalOption<T> {
    */
   match<U>(cases: MatchCases<T, U>): U {
     if (this.isNone()) {
-      return cases.None();
+      return cases.None()
     }
-    return cases.Some(this.#val);
+    return cases.Some(this.#val)
   }
 
   /**
@@ -646,9 +646,9 @@ export class ExperimentalOption<T> {
    */
   fold<U>(onSome: (val: T) => U, onNone: () => U): U {
     if (this.isNone()) {
-      return onNone();
+      return onNone()
     }
-    return onSome(this.#val);
+    return onSome(this.#val)
   }
 
   /**
@@ -683,10 +683,10 @@ export class ExperimentalOption<T> {
     onNone: () => Promise<U>,
   ): Promise<U> {
     if (this.isNone()) {
-      return onNone();
+      return onNone()
     }
 
-    return onSome(this.#val).catch((_) => onNone());
+    return onSome(this.#val).catch((_) => onNone())
   }
 
   /**
@@ -716,13 +716,13 @@ export class ExperimentalOption<T> {
    * @see {@link foldAsync} for positional-argument async matching
    */
   async matchAsync<U>(cases: {
-    Some: (val: T) => Promise<U>;
-    None: () => Promise<U>;
+    Some: (val: T) => Promise<U>
+    None: () => Promise<U>
   }): Promise<U> {
     if (this.isNone()) {
-      return cases.None();
+      return cases.None()
     }
-    return cases.Some(this.#val).catch((_) => cases.None());
+    return cases.Some(this.#val).catch((_) => cases.None())
   }
 
   /**
@@ -758,16 +758,16 @@ export class ExperimentalOption<T> {
 
   matchPartial<U>(
     cases: {
-      Some?: (val: T) => NoInfer<U>;
-      None?: () => NoInfer<U>;
+      Some?: (val: T) => NoInfer<U>
+      None?: () => NoInfer<U>
     },
     getDefault: () => U,
   ): U {
     if (this.isNone()) {
-      return cases.None ? cases.None() : getDefault();
+      return cases.None ? cases.None() : getDefault()
     }
 
-    return cases.Some ? cases.Some(this.#val) : getDefault();
+    return cases.Some ? cases.Some(this.#val) : getDefault()
   }
 
   /**
@@ -804,14 +804,14 @@ export class ExperimentalOption<T> {
    * @see {@link flatMap} for chaining operations that return ExperimentalOptions
    * @see {@link mapOr} for unwrapping with transformation
    */
-  map<U>(fn: (val: T) => Promise<U>): never;
-  map<U>(fn: (val: T) => U): ExperimentalOption<U>;
+  map<U>(fn: (val: T) => Promise<U>): never
+  map<U>(fn: (val: T) => U): ExperimentalOption<U>
   map<U>(fn: (val: T) => U): ExperimentalOption<U> {
     if (this.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    return ExperimentalOption.Some(fn(this.#val));
+    return ExperimentalOption.Some(fn(this.#val))
   }
 
   /**
@@ -853,10 +853,10 @@ export class ExperimentalOption<T> {
     fn: (val: T) => Promise<U>,
   ): Promise<ExperimentalOption<U>> {
     if (this.isNone()) {
-      return Promise.resolve(ExperimentalOption.None);
+      return Promise.resolve(ExperimentalOption.None)
     }
 
-    return fn(this.#val).then((u) => ExperimentalOption.Some(u));
+    return fn(this.#val).then((u) => ExperimentalOption.Some(u))
   }
 
   /**
@@ -891,10 +891,10 @@ export class ExperimentalOption<T> {
    */
   mapOr<U>(defaultValue: U, fn: (val: T) => U): U {
     if (this.isNone()) {
-      return defaultValue;
+      return defaultValue
     }
 
-    return fn(this.#val);
+    return fn(this.#val)
   }
 
   /**
@@ -926,10 +926,10 @@ export class ExperimentalOption<T> {
    */
   async mapOrAsync<U>(defaultValue: U, fn: (val: T) => Promise<U>): Promise<U> {
     if (this.isNone()) {
-      return defaultValue;
+      return defaultValue
     }
 
-    return fn(this.#val);
+    return fn(this.#val)
   }
 
   /**
@@ -971,10 +971,10 @@ export class ExperimentalOption<T> {
    */
   flatMap<U>(fn: (val: T) => ExperimentalOption<U>): ExperimentalOption<U> {
     if (this.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    return fn(this.#val);
+    return fn(this.#val)
   }
 
   /**
@@ -1007,10 +1007,10 @@ export class ExperimentalOption<T> {
     fn: (val: T) => Promise<ExperimentalOption<U>>,
   ): Promise<ExperimentalOption<U>> {
     if (this.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    return fn(this.#val);
+    return fn(this.#val)
   }
 
   /**
@@ -1044,10 +1044,10 @@ export class ExperimentalOption<T> {
    */
   filter(pred: (val: T) => boolean): ExperimentalOption<T> {
     if (this.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    return pred(this.#val) ? this : ExperimentalOption.None;
+    return pred(this.#val) ? this : ExperimentalOption.None
   }
 
   /**
@@ -1073,12 +1073,12 @@ export class ExperimentalOption<T> {
     pred: (val: T) => Promise<boolean>,
   ): Promise<ExperimentalOption<T>> {
     if (this.isNone()) {
-      return Promise.resolve(ExperimentalOption.None);
+      return Promise.resolve(ExperimentalOption.None)
     }
 
     return pred(this.#val).then((passed) =>
       passed ? this : ExperimentalOption.None,
-    );
+    )
   }
 
   /**
@@ -1118,14 +1118,14 @@ export class ExperimentalOption<T> {
    * @see {@link zipAsync} for async derivation
    * @see {@link flatZip} for combining with another ExperimentalOption
    */
-  zip<U>(fn: (val: T) => Promise<U>): never;
-  zip<U>(fn: (val: T) => U): ExperimentalOption<[prev: T, curr: U]>;
+  zip<U>(fn: (val: T) => Promise<U>): never
+  zip<U>(fn: (val: T) => U): ExperimentalOption<[prev: T, curr: U]>
   zip<U>(fn: (val: T) => U): ExperimentalOption<[T, U]> {
     if (this.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    return ExperimentalOption.Some([this.#val, fn(this.#val)]);
+    return ExperimentalOption.Some([this.#val, fn(this.#val)])
   }
 
   /**
@@ -1154,10 +1154,10 @@ export class ExperimentalOption<T> {
     fn: (val: T) => Promise<U>,
   ): Promise<ExperimentalOption<[T, U]>> {
     if (this.isNone()) {
-      return Promise.resolve(ExperimentalOption.None);
+      return Promise.resolve(ExperimentalOption.None)
     }
 
-    return fn(this.#val).then((u) => ExperimentalOption.Some([this.#val, u]));
+    return fn(this.#val).then((u) => ExperimentalOption.Some([this.#val, u]))
   }
 
   /**
@@ -1197,15 +1197,15 @@ export class ExperimentalOption<T> {
     fn: (val: T) => ExperimentalOption<U>,
   ): ExperimentalOption<[T, U]> {
     if (this.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    const other = fn(this.#val);
+    const other = fn(this.#val)
     if (other.isNone()) {
-      return ExperimentalOption.None;
+      return ExperimentalOption.None
     }
 
-    return ExperimentalOption.Some([this.#val, other.unwrap()]);
+    return ExperimentalOption.Some([this.#val, other.unwrap()])
   }
 
   /**
@@ -1235,15 +1235,15 @@ export class ExperimentalOption<T> {
     fn: (val: T) => Promise<ExperimentalOption<U>>,
   ): Promise<ExperimentalOption<[T, U]>> {
     if (this.isNone()) {
-      return Promise.resolve(ExperimentalOption.None);
+      return Promise.resolve(ExperimentalOption.None)
     }
 
     return fn(this.#val).then((other) => {
       if (other.isNone()) {
-        return ExperimentalOption.None;
+        return ExperimentalOption.None
       }
-      return ExperimentalOption.Some([this.#val, other.unwrap()]);
-    });
+      return ExperimentalOption.Some([this.#val, other.unwrap()])
+    })
   }
 
   /**
@@ -1279,9 +1279,9 @@ export class ExperimentalOption<T> {
    */
   tap(fn: (val: T) => void): ExperimentalOption<T> {
     if (this.isSome()) {
-      fn(this.#val);
+      fn(this.#val)
     }
-    return this;
+    return this
   }
 
   /**
@@ -1310,9 +1310,9 @@ export class ExperimentalOption<T> {
     fn: (val: T) => Promise<void>,
   ): Promise<ExperimentalOption<T>> {
     if (this.isSome()) {
-      return fn(this.#val).then(() => this);
+      return fn(this.#val).then(() => this)
     }
-    return Promise.resolve(this);
+    return Promise.resolve(this)
   }
 
   /**
@@ -1342,9 +1342,9 @@ export class ExperimentalOption<T> {
    */
   toResult<E>(error: E): ExperimentalResult<T, E> {
     if (this.isNone()) {
-      return ExperimentalResult.Err(error);
+      return ExperimentalResult.Err(error)
     }
-    return ExperimentalResult.Ok(this.#val);
+    return ExperimentalResult.Ok(this.#val)
   }
 
   /**
@@ -1384,15 +1384,15 @@ export class ExperimentalOption<T> {
     this: ExperimentalOption<Array<Inner>>,
     mapper: (val: Inner) => Out,
   ): ExperimentalOption<Out[]> {
-    if (this.isNone()) return ExperimentalOption.None;
+    if (this.isNone()) return ExperimentalOption.None
 
     if (!Array.isArray(this.#val)) {
       throw new TypeError(
         "innerMap can only be called on ExperimentalOption<Array<T>>",
-      );
+      )
     }
 
-    return ExperimentalOption.Some((this.#val as Inner[]).map(mapper));
+    return ExperimentalOption.Some((this.#val as Inner[]).map(mapper))
   }
 
   /**
@@ -1408,8 +1408,8 @@ export class ExperimentalOption<T> {
    * ```
    */
   toString(): string {
-    if (this.isNone()) return "ExperimentalOption::None";
-    return `ExperimentalOption::Some(${String(this.#val)})`;
+    if (this.isNone()) return "ExperimentalOption::None"
+    return `ExperimentalOption::Some(${String(this.#val)})`
   }
 
   /**
@@ -1430,11 +1430,11 @@ export class ExperimentalOption<T> {
    * @internal
    */
   *[Symbol.iterator](): Generator<ExperimentalOption<T>, T, unknown> {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as ExperimentalOption<T>) as T;
+    ) as unknown as ExperimentalOption<T>) as T
   }
 
   /**
@@ -1459,11 +1459,11 @@ export class ExperimentalOption<T> {
     Awaited<T>,
     unknown
   > {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as ExperimentalOption<T>) as Awaited<T>;
+    ) as unknown as ExperimentalOption<T>) as Awaited<T>
   }
 
   /**
@@ -1522,39 +1522,39 @@ export class ExperimentalOption<T> {
     this: void,
     genFn: () => Generator<ExperimentalOption<unknown>, T, unknown>,
   ): ExperimentalOption<T> {
-    const iterator = genFn();
+    const iterator = genFn()
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalOption<T>;
+    let nextArg: unknown
+    let currentResult: ExperimentalOption<T>
 
     while (true) {
-      const next = iterator.next(nextArg);
+      const next = iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Some
-        currentResult = ExperimentalOption.Some(next.value);
-        break;
+        currentResult = ExperimentalOption.Some(next.value)
+        break
       }
 
       // next.value is the ExperimentalOption that was yielded
-      let yielded = next.value as ExperimentalOption<unknown>;
+      let yielded = next.value as ExperimentalOption<unknown>
 
       if (isCapturedTrace(yielded)) {
-        yielded = yielded.value as ExperimentalOption<unknown>;
+        yielded = yielded.value as ExperimentalOption<unknown>
       }
 
       if (yielded.isNone()) {
         // Early termination on None - return singleton None
-        currentResult = ExperimentalOption.None;
-        break;
+        currentResult = ExperimentalOption.None
+        break
       }
 
       // Unwrap the Some value and pass it back to the generator
-      nextArg = yielded.unwrap();
+      nextArg = yielded.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 
   /**
@@ -1610,43 +1610,43 @@ export class ExperimentalOption<T> {
     ) => Generator<Eff, T, any>,
   ): ExperimentalOption<T> {
     const adapter = <A>(option: ExperimentalOption<A>): OptionYieldWrap<A> =>
-      new OptionYieldWrap(option);
+      new OptionYieldWrap(option)
 
-    const iterator = genFn(adapter);
+    const iterator = genFn(adapter)
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalOption<T>;
+    let nextArg: unknown
+    let currentResult: ExperimentalOption<T>
 
     while (true) {
-      const next = iterator.next(nextArg);
+      const next = iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Some
-        currentResult = ExperimentalOption.Some(next.value);
-        break;
+        currentResult = ExperimentalOption.Some(next.value)
+        break
       }
 
       // next.value is the OptionYieldWrap that was yielded
-      const wrapped = next.value as OptionYieldWrap<unknown>;
-      let option = wrapped.option;
+      const wrapped = next.value as OptionYieldWrap<unknown>
+      let option = wrapped.option
 
       if (isCapturedTrace(option)) {
         option = (option as CapturedTrace<ExperimentalOption<unknown>>)
-          .value as ExperimentalOption<unknown>;
+          .value as ExperimentalOption<unknown>
       }
 
       if (option.isNone()) {
         // Early termination on None - return singleton None
-        currentResult = ExperimentalOption.None;
-        break;
+        currentResult = ExperimentalOption.None
+        break
       }
 
       // Unwrap the Some value and pass it back to the generator
-      nextArg = option.unwrap();
+      nextArg = option.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 
   /**
@@ -1710,39 +1710,39 @@ export class ExperimentalOption<T> {
     this: void,
     genFn: () => AsyncGenerator<ExperimentalOption<unknown>, T, unknown>,
   ): Promise<ExperimentalOption<T>> {
-    const iterator = genFn();
+    const iterator = genFn()
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalOption<T>;
+    let nextArg: unknown
+    let currentResult: ExperimentalOption<T>
 
     while (true) {
-      const next = await iterator.next(nextArg);
+      const next = await iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Some
-        currentResult = ExperimentalOption.Some(next.value);
-        break;
+        currentResult = ExperimentalOption.Some(next.value)
+        break
       }
 
       // next.value is an ExperimentalOption (user awaits promises before yielding)
-      let option = next.value as ExperimentalOption<unknown>;
+      let option = next.value as ExperimentalOption<unknown>
 
       if (isCapturedTrace(option)) {
-        option = option.value as ExperimentalOption<unknown>;
+        option = option.value as ExperimentalOption<unknown>
       }
 
       if (option.isNone()) {
         // Early termination on None - return singleton None
-        currentResult = ExperimentalOption.None;
-        break;
+        currentResult = ExperimentalOption.None
+        break
       }
 
       // Unwrap the Some value
-      nextArg = await option.unwrap();
+      nextArg = await option.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 
   /**
@@ -1808,42 +1808,42 @@ export class ExperimentalOption<T> {
   ): Promise<ExperimentalOption<T>> {
     const adapter = <A>(
       option: ExperimentalOption<A> | Promise<ExperimentalOption<A>>,
-    ): AsyncOptionYieldWrap<A> => new AsyncOptionYieldWrap(option);
+    ): AsyncOptionYieldWrap<A> => new AsyncOptionYieldWrap(option)
 
-    const iterator = genFn(adapter);
+    const iterator = genFn(adapter)
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalOption<T>;
+    let nextArg: unknown
+    let currentResult: ExperimentalOption<T>
 
     while (true) {
-      const next = await iterator.next(nextArg);
+      const next = await iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Some
-        currentResult = ExperimentalOption.Some(next.value);
-        break;
+        currentResult = ExperimentalOption.Some(next.value)
+        break
       }
 
       // next.value is the AsyncOptionYieldWrap that was yielded
-      const wrapped = next.value as AsyncOptionYieldWrap<unknown>;
-      let option = await wrapped.option;
+      const wrapped = next.value as AsyncOptionYieldWrap<unknown>
+      let option = await wrapped.option
 
       if (isCapturedTrace(option)) {
         option = (option as CapturedTrace<ExperimentalOption<unknown>>)
-          .value as ExperimentalOption<unknown>;
+          .value as ExperimentalOption<unknown>
       }
 
       if (option.isNone()) {
         // Early termination on None - return singleton None
-        currentResult = ExperimentalOption.None;
-        break;
+        currentResult = ExperimentalOption.None
+        break
       }
 
       // Unwrap the Some value
-      nextArg = await option.unwrap();
+      nextArg = await option.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 }

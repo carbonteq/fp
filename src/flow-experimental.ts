@@ -1,16 +1,16 @@
 import {
   ExperimentalOption as Option,
   UnwrappedNone,
-} from "./option-experimental.js";
-import { ExperimentalResult as Result } from "./result-experimental.js";
-import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
+} from "./option-experimental.js"
+import { ExperimentalResult as Result } from "./result-experimental.js"
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
 
 function isOption<T>(value: unknown): value is Option<T> {
-  return value instanceof Option;
+  return value instanceof Option
 }
 
 function isResult<T, E>(value: unknown): value is Result<T, E> {
-  return value instanceof Result;
+  return value instanceof Result
 }
 
 /**
@@ -38,18 +38,18 @@ function isResult<T, E>(value: unknown): value is Result<T, E> {
  */
 export class ExperimentalFlowError extends Error {
   *[Symbol.iterator](): Generator<this, never, unknown> {
-    const trace = new Error().stack;
-    return (yield new CapturedTrace(this, trace) as unknown as this) as never;
+    const trace = new Error().stack
+    return (yield new CapturedTrace(this, trace) as unknown as this) as never
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<this, never, unknown> {
-    const trace = new Error().stack;
-    return (yield new CapturedTrace(this, trace) as unknown as this) as never;
+    const trace = new Error().stack
+    return (yield new CapturedTrace(this, trace) as unknown as this) as never
   }
 }
 
 function isFlowError(value: unknown): value is ExperimentalFlowError {
-  return value instanceof ExperimentalFlowError;
+  return value instanceof ExperimentalFlowError
 }
 
 type ExtractXFlowError<Y> =
@@ -61,29 +61,29 @@ type ExtractXFlowError<Y> =
       ? E
       : Y extends ExperimentalFlowError
         ? Y
-        : never;
+        : never
 
 class XFlowYieldWrap<T, E> {
   constructor(readonly value: Option<T> | Result<T, E>) {}
 
   *[Symbol.iterator](): Generator<XFlowYieldWrap<T, E>, T, unknown> {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(this, trace) as unknown as XFlowYieldWrap<
       T,
       E
-    >) as T;
+    >) as T
   }
 }
 
 class AsyncXFlowYieldWrap<T, E> {
-  readonly value: Promise<Option<T> | Result<T, E>>;
+  readonly value: Promise<Option<T> | Result<T, E>>
 
   constructor(
     value: Option<T> | Result<T, E> | Promise<Option<T> | Result<T, E>>,
   ) {
     this.value = (
       isPromiseLike(value) ? value : Promise.resolve(value)
-    ) as Promise<Option<T> | Result<T, E>>;
+    ) as Promise<Option<T> | Result<T, E>>
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
@@ -91,11 +91,11 @@ class AsyncXFlowYieldWrap<T, E> {
     T,
     unknown
   > {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as AsyncXFlowYieldWrap<T, E>) as T;
+    ) as unknown as AsyncXFlowYieldWrap<T, E>) as T
   }
 }
 
@@ -103,13 +103,13 @@ type ExtractWrapError<Y> =
   // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
   Y extends XFlowYieldWrap<any, infer E>
     ? E // UnwrappedNone is added via adapter overload for Option
-    : never;
+    : never
 
 type ExtractAsyncWrapError<Y> =
   // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
   Y extends AsyncXFlowYieldWrap<any, infer E>
     ? E // UnwrappedNone is added via adapter overload for Option
-    : never;
+    : never
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
 export class ExperimentalFlow {
@@ -121,68 +121,68 @@ export class ExperimentalFlow {
   >(
     genFn: () => Generator<Eff, T, unknown>,
   ): Result<T, ExtractXFlowError<Eff>> {
-    const iterator = genFn();
-    let nextArg: unknown;
+    const iterator = genFn()
+    let nextArg: unknown
 
     while (true) {
-      const next = iterator.next(nextArg);
-      if (next.done) return Result.Ok(next.value);
+      const next = iterator.next(nextArg)
+      if (next.done) return Result.Ok(next.value)
 
-      let value = next.value;
-      let stack: string | undefined;
+      let value = next.value
+      let stack: string | undefined
 
       if (isCapturedTrace(value)) {
-        stack = value.stack;
-        value = value.value as Eff;
+        stack = value.stack
+        value = value.value as Eff
       }
 
       if (isFlowError(value)) {
         // Handle FlowError - short-circuit with the error
         if (stack) {
-          const stackLines = stack.split("\n");
+          const stackLines = stack.split("\n")
           // stackLines[0] is "Error"
           // stackLines[1] is the internal FlowError.[Symbol.iterator] frame
           // We want to keep from stackLines[2] onwards
           if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n");
-            value.stack = `${value.name}: ${value.message}\n${userStack}`;
+            const userStack = stackLines.slice(2).join("\n")
+            value.stack = `${value.name}: ${value.message}\n${userStack}`
           }
         }
-        return Result.Err(value) as Result<T, ExtractXFlowError<Eff>>;
+        return Result.Err(value) as Result<T, ExtractXFlowError<Eff>>
       } else if (isOption(value)) {
         if (value.isNone()) {
-          const err = new UnwrappedNone();
+          const err = new UnwrappedNone()
           if (stack) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             // stackLines[0] is "Error"
             // stackLines[1] is the internal Option.[Symbol.iterator] frame
             // We want to keep from stackLines[2] onwards
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return Result.Err(err) as Result<T, ExtractXFlowError<Eff>>;
+          return Result.Err(err) as Result<T, ExtractXFlowError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       } else if (isResult(value)) {
         if (value.isErr()) {
-          const err = value.unwrapErr();
+          const err = value.unwrapErr()
           if (stack && err instanceof Error) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return value as unknown as Result<T, ExtractXFlowError<Eff>>;
+          return value as unknown as Result<T, ExtractXFlowError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       } else {
         // Should not happen if types are correct, but runtime safe
         // Could throw or just return generic error
         // For now, assuming strict usage or runtime error
-        throw new Error("Flow.gen yielded unknown type");
+        throw new Error("Flow.gen yielded unknown type")
       }
     }
   }
@@ -191,66 +191,66 @@ export class ExperimentalFlow {
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static genAdapter<Eff extends XFlowYieldWrap<any, any>, T>(
     genFn: (adapter: {
-      <A>(val: Option<A>): XFlowYieldWrap<A, UnwrappedNone>;
-      <A, E>(val: Result<A, E>): XFlowYieldWrap<A, E>;
-      fail: <E extends Error>(error: E) => XFlowYieldWrap<never, E>;
+      <A>(val: Option<A>): XFlowYieldWrap<A, UnwrappedNone>
+      <A, E>(val: Result<A, E>): XFlowYieldWrap<A, E>
+      fail: <E extends Error>(error: E) => XFlowYieldWrap<never, E>
     }) => Generator<Eff, T, unknown>,
   ): Result<T, ExtractWrapError<Eff>> {
     const baseAdapter = <A, E>(val: Option<A> | Result<A, E>) =>
-      new XFlowYieldWrap(val);
+      new XFlowYieldWrap(val)
     const adapter = Object.assign(baseAdapter, {
       fail: <E extends Error>(error: E) =>
         new XFlowYieldWrap<never, E>(Result.Err(error)),
-    });
-    const iterator = genFn(adapter);
-    let nextArg: unknown;
+    })
+    const iterator = genFn(adapter)
+    let nextArg: unknown
 
     while (true) {
-      const next = iterator.next(nextArg);
-      if (next.done) return Result.Ok(next.value);
+      const next = iterator.next(nextArg)
+      if (next.done) return Result.Ok(next.value)
 
       // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-      let wrapped = next.value as any;
-      let stack: string | undefined;
+      let wrapped = next.value as any
+      let stack: string | undefined
 
       if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack;
-        wrapped = wrapped.value as XFlowYieldWrap<unknown, unknown>;
+        stack = wrapped.stack
+        wrapped = wrapped.value as XFlowYieldWrap<unknown, unknown>
       } else {
-        wrapped = wrapped as XFlowYieldWrap<unknown, unknown>;
+        wrapped = wrapped as XFlowYieldWrap<unknown, unknown>
       }
 
-      const value = wrapped.value;
+      const value = wrapped.value
 
       if (isOption(value)) {
         if (value.isNone()) {
-          const err = new UnwrappedNone();
+          const err = new UnwrappedNone()
           if (stack) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             // stackLines[0] is "Error"
             // stackLines[1] is the internal FlowYieldWrap.[Symbol.iterator] frame
             // We want to keep from stackLines[2] onwards
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return Result.Err(err) as Result<T, ExtractWrapError<Eff>>;
+          return Result.Err(err) as Result<T, ExtractWrapError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       } else if (isResult(value)) {
         if (value.isErr()) {
-          const err = value.unwrapErr();
+          const err = value.unwrapErr()
           if (stack && err instanceof Error) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return value as unknown as Result<T, ExtractWrapError<Eff>>;
+          return value as unknown as Result<T, ExtractWrapError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       }
     }
   }
@@ -263,63 +263,63 @@ export class ExperimentalFlow {
   >(
     genFn: () => AsyncGenerator<Eff, T, unknown>,
   ): Promise<Result<T, ExtractXFlowError<Eff>>> {
-    const iterator = genFn();
-    let nextArg: unknown;
+    const iterator = genFn()
+    let nextArg: unknown
 
     while (true) {
-      const next = await iterator.next(nextArg);
-      if (next.done) return Result.Ok(next.value);
+      const next = await iterator.next(nextArg)
+      if (next.done) return Result.Ok(next.value)
 
-      let value = next.value;
-      let stack: string | undefined;
+      let value = next.value
+      let stack: string | undefined
 
       if (isCapturedTrace(value)) {
-        stack = value.stack;
-        value = value.value as Eff;
+        stack = value.stack
+        value = value.value as Eff
       }
 
       if (isFlowError(value)) {
         // Handle FlowError - short-circuit with the error
         if (stack) {
-          const stackLines = stack.split("\n");
+          const stackLines = stack.split("\n")
           // stackLines[0] is "Error"
           // stackLines[1] is the internal FlowError.[Symbol.asyncIterator] frame
           // We want to keep from stackLines[2] onwards
           if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n");
-            value.stack = `${value.name}: ${value.message}\n${userStack}`;
+            const userStack = stackLines.slice(2).join("\n")
+            value.stack = `${value.name}: ${value.message}\n${userStack}`
           }
         }
-        return Result.Err(value) as Result<T, ExtractXFlowError<Eff>>;
+        return Result.Err(value) as Result<T, ExtractXFlowError<Eff>>
       } else if (isOption(value)) {
         if (value.isNone()) {
-          const err = new UnwrappedNone();
+          const err = new UnwrappedNone()
           if (stack) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             // stackLines[0] is "Error"
             // stackLines[1] is the internal Option.[Symbol.iterator] frame
             // We want to keep from stackLines[2] onwards
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return Result.Err(err) as Result<T, ExtractXFlowError<Eff>>;
+          return Result.Err(err) as Result<T, ExtractXFlowError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       } else if (isResult(value)) {
         if (value.isErr()) {
-          const err = value.unwrapErr();
+          const err = value.unwrapErr()
           if (stack && err instanceof Error) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return value as unknown as Result<T, ExtractXFlowError<Eff>>;
+          return value as unknown as Result<T, ExtractXFlowError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       }
     }
   }
@@ -329,66 +329,66 @@ export class ExperimentalFlow {
     genFn: (adapter: {
       <A>(
         val: Option<A> | Promise<Option<A>>,
-      ): AsyncXFlowYieldWrap<A, UnwrappedNone>;
+      ): AsyncXFlowYieldWrap<A, UnwrappedNone>
       <A, E>(
         val: Result<A, E> | Promise<Result<A, E>>,
-      ): AsyncXFlowYieldWrap<A, E>;
-      fail: <E extends Error>(error: E) => AsyncXFlowYieldWrap<never, E>;
+      ): AsyncXFlowYieldWrap<A, E>
+      fail: <E extends Error>(error: E) => AsyncXFlowYieldWrap<never, E>
     }) => AsyncGenerator<Eff, T, unknown>,
   ): Promise<Result<T, ExtractAsyncWrapError<Eff>>> {
     const baseAdapter = <A, E>(
       val: Option<A> | Result<A, E> | Promise<Option<A> | Result<A, E>>,
-    ) => new AsyncXFlowYieldWrap(val);
+    ) => new AsyncXFlowYieldWrap(val)
     const adapter = Object.assign(baseAdapter, {
       fail: <E extends Error>(error: E) =>
         new AsyncXFlowYieldWrap<never, E>(Result.Err(error)),
-    });
-    const iterator = genFn(adapter);
-    let nextArg: unknown;
+    })
+    const iterator = genFn(adapter)
+    let nextArg: unknown
 
     while (true) {
-      const next = await iterator.next(nextArg);
-      if (next.done) return Result.Ok(next.value);
+      const next = await iterator.next(nextArg)
+      if (next.done) return Result.Ok(next.value)
 
       // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-      let wrapped = next.value as any;
-      let stack: string | undefined;
+      let wrapped = next.value as any
+      let stack: string | undefined
 
       if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack;
-        wrapped = wrapped.value as AsyncXFlowYieldWrap<unknown, unknown>;
+        stack = wrapped.stack
+        wrapped = wrapped.value as AsyncXFlowYieldWrap<unknown, unknown>
       } else {
-        wrapped = wrapped as AsyncXFlowYieldWrap<unknown, unknown>;
+        wrapped = wrapped as AsyncXFlowYieldWrap<unknown, unknown>
       }
 
-      const value = await wrapped.value;
+      const value = await wrapped.value
 
       if (isOption(value)) {
         if (value.isNone()) {
-          const err = new UnwrappedNone();
+          const err = new UnwrappedNone()
           if (stack) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return Result.Err(err) as Result<T, ExtractAsyncWrapError<Eff>>;
+          return Result.Err(err) as Result<T, ExtractAsyncWrapError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       } else if (isResult(value)) {
         if (value.isErr()) {
-          const err = value.unwrapErr();
+          const err = value.unwrapErr()
           if (stack && err instanceof Error) {
-            const stackLines = stack.split("\n");
+            const stackLines = stack.split("\n")
             if (stackLines.length > 2) {
-              const userStack = stackLines.slice(2).join("\n");
-              err.stack = `${err.name}: ${err.message}\n${userStack}`;
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
             }
           }
-          return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>;
+          return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>
         }
-        nextArg = value.unwrap();
+        nextArg = value.unwrap()
       }
     }
   }

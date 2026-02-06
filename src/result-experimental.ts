@@ -1,29 +1,29 @@
-import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
-import { ExperimentalOption as Option } from "./option-experimental.js";
-import { UNIT } from "./unit.js";
-import { CapturedTrace, isCapturedTrace } from "./utils.js";
+import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js"
+import { ExperimentalOption as Option } from "./option-experimental.js"
+import { UNIT } from "./unit.js"
+import { CapturedTrace, isCapturedTrace } from "./utils.js"
 
-export type UnitResult<E = never> = ExperimentalResult<UNIT, E>;
+export type UnitResult<E = never> = ExperimentalResult<UNIT, E>
 
 export type UnwrapResult<T extends ExperimentalResult<unknown, unknown>> =
-  T extends ExperimentalResult<infer U, infer E> ? { ok: U; err: E } : never;
+  T extends ExperimentalResult<infer U, infer E> ? { ok: U; err: E } : never
 
 type CombinedResultOk<T extends ExperimentalResult<unknown, unknown>[]> = {
-  [K in keyof T]: UnwrapResult<T[K]>["ok"];
-};
+  [K in keyof T]: UnwrapResult<T[K]>["ok"]
+}
 type CombinedResultErr<T extends ExperimentalResult<unknown, unknown>[]> = {
-  [K in keyof T]: UnwrapResult<T[K]>["err"];
-}[number];
+  [K in keyof T]: UnwrapResult<T[K]>["err"]
+}[number]
 
 export type CombineResults<T extends ExperimentalResult<unknown, unknown>[]> =
-  ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>>;
+  ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>>
 
 /** Sentinel value stored in #val when Result is Err */
-const ERR_VAL = Symbol("Result::Err");
+const ERR_VAL = Symbol("Result::Err")
 
 interface MatchCases<T, E, U> {
-  Ok: (val: T) => U;
-  Err: (err: E) => U;
+  Ok: (val: T) => U
+  Err: (err: E) => U
 }
 
 /**
@@ -36,11 +36,11 @@ class ResultYieldWrap<T, E> {
   constructor(readonly result: ExperimentalResult<T, E>) {}
 
   *[Symbol.iterator](): Generator<ResultYieldWrap<T, E>, T, unknown> {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(this, trace) as unknown as ResultYieldWrap<
       T,
       E
-    >) as T;
+    >) as T
   }
 }
 
@@ -58,56 +58,56 @@ class AsyncResultYieldWrap<T, E> {
     T,
     unknown
   > {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as AsyncResultYieldWrap<T, E>) as T;
+    ) as unknown as AsyncResultYieldWrap<T, E>) as T
   }
 }
 
 /** Extract error type from yielded values */
 type ExtractResultError<T> =
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  T extends ResultYieldWrap<any, infer E> ? E : never;
+  T extends ResultYieldWrap<any, infer E> ? E : never
 
 /** Extract error type from async yielded values */
 type ExtractAsyncResultError<T> =
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  T extends AsyncResultYieldWrap<any, infer E> ? E : never;
+  T extends AsyncResultYieldWrap<any, infer E> ? E : never
 
 /** Extract error type directly from ExperimentalResult */
 // biome-ignore lint/suspicious/noExplicitAny: inference
-type ExtractError<T> = T extends ExperimentalResult<any, infer E> ? E : never;
+type ExtractError<T> = T extends ExperimentalResult<any, infer E> ? E : never
 
 export class ExperimentalResult<T, E> {
   /** Discriminant tag for type-level identification */
-  readonly _tag: "Ok" | "Err";
+  readonly _tag: "Ok" | "Err"
 
   /** Value when Ok; ERR_VAL sentinel when Err */
-  readonly #val: T;
+  readonly #val: T
 
   /** Error when Err (sync); undefined when Ok */
-  readonly #err: E;
+  readonly #err: E
 
   private constructor(val: T, err: E, tag: "Ok" | "Err") {
-    this.#val = val;
-    this.#err = err;
-    this._tag = tag;
+    this.#val = val
+    this.#err = err
+    this._tag = tag
   }
 
   /** Singleton UNIT_RESULT for void-success operations */
   static readonly UNIT_RESULT: ExperimentalResult<UNIT, never> =
-    new ExperimentalResult(UNIT, undefined as never, "Ok");
+    new ExperimentalResult(UNIT, undefined as never, "Ok")
 
   /** Create an Ok containing the given value */
   static Ok<T, E = never>(this: void, val: T): ExperimentalResult<T, E> {
-    return new ExperimentalResult(val, undefined as E, "Ok");
+    return new ExperimentalResult(val, undefined as E, "Ok")
   }
 
   /** Create an Err containing the given error */
   static Err<E, T = never>(this: void, err: E): ExperimentalResult<T, E> {
-    return new ExperimentalResult(ERR_VAL as T, err, "Err");
+    return new ExperimentalResult(ERR_VAL as T, err, "Err")
   }
 
   /**
@@ -130,7 +130,7 @@ export class ExperimentalResult<T, E> {
    * @see isErr
    */
   isOk(): this is ExperimentalResult<T, never> {
-    return this._tag === "Ok" && this.#val !== ERR_VAL;
+    return this._tag === "Ok" && this.#val !== ERR_VAL
   }
 
   /**
@@ -153,7 +153,7 @@ export class ExperimentalResult<T, E> {
    * @see isOk
    */
   isErr(): this is ExperimentalResult<never, E> {
-    return this._tag === "Err" || this.#val === ERR_VAL;
+    return this._tag === "Err" || this.#val === ERR_VAL
   }
 
   /**
@@ -178,7 +178,7 @@ export class ExperimentalResult<T, E> {
    * ```
    */
   isUnit(): this is ExperimentalResult<UNIT, never> {
-    return this.#val === UNIT;
+    return this.#val === UNIT
   }
 
   /**
@@ -197,9 +197,9 @@ export class ExperimentalResult<T, E> {
    */
   toString(): string {
     if (this.isOk()) {
-      return `Result::Ok<${String(this.#val)}>`;
+      return `Result::Ok<${String(this.#val)}>`
     }
-    return `Result::Err<${String(this.#err)}>`;
+    return `Result::Err<${String(this.#err)}>`
   }
 
   /**
@@ -227,13 +227,13 @@ export class ExperimentalResult<T, E> {
    */
   unwrap(): T {
     if (this.isErr()) {
-      const err = this.#err;
-      if (err instanceof Error) throw err;
+      const err = this.#err
+      if (err instanceof Error) throw err
 
-      throw new UnwrappedOkWithErr(this.toString());
+      throw new UnwrappedOkWithErr(this.toString())
     }
 
-    return this.#val;
+    return this.#val
   }
 
   /**
@@ -252,10 +252,10 @@ export class ExperimentalResult<T, E> {
    */
   unwrapErr(): E {
     if (this._tag === "Err") {
-      return this.#err;
+      return this.#err
     }
 
-    throw new UnwrappedErrWithOk(this.toString());
+    throw new UnwrappedErrWithOk(this.toString())
   }
 
   /**
@@ -276,9 +276,9 @@ export class ExperimentalResult<T, E> {
    * @see safeUnwrap
    */
   unwrapOr(defaultValue: T): T {
-    if (this.isErr()) return defaultValue;
+    if (this.isErr()) return defaultValue
 
-    return this.#val;
+    return this.#val
   }
 
   /**
@@ -301,9 +301,9 @@ export class ExperimentalResult<T, E> {
    * @see unwrap
    */
   unwrapOrElse(fn: (err: E) => T): T {
-    if (this.isErr()) return fn(this.#err);
+    if (this.isErr()) return fn(this.#err)
 
-    return this.#val;
+    return this.#val
   }
 
   /**
@@ -325,9 +325,9 @@ export class ExperimentalResult<T, E> {
    * @see unwrapOr
    */
   safeUnwrap(): T | null {
-    if (this.isErr()) return null;
+    if (this.isErr()) return null
 
-    return this.#val === ERR_VAL ? null : this.#val;
+    return this.#val === ERR_VAL ? null : this.#val
   }
 
   /**
@@ -356,10 +356,10 @@ export class ExperimentalResult<T, E> {
    */
   match<U>(cases: MatchCases<T, E, U>): U {
     if (this.isErr()) {
-      return cases.Err(this.#err);
+      return cases.Err(this.#err)
     }
 
-    return cases.Ok(this.#val);
+    return cases.Ok(this.#val)
   }
 
   /**
@@ -397,9 +397,9 @@ export class ExperimentalResult<T, E> {
    */
   fold<U>(onOk: (val: T) => U, onErr: (err: E) => U): U {
     if (this.isErr()) {
-      return onErr(this.#err);
+      return onErr(this.#err)
     }
-    return onOk(this.#val);
+    return onOk(this.#val)
   }
 
   /**
@@ -437,9 +437,9 @@ export class ExperimentalResult<T, E> {
     onErr: (err: E) => Promise<U>,
   ): Promise<U> {
     if (this.isErr()) {
-      return onErr(this.#err);
+      return onErr(this.#err)
     }
-    return onOk(this.#val).catch((e) => onErr(e as E));
+    return onOk(this.#val).catch((e) => onErr(e as E))
   }
 
   /**
@@ -472,13 +472,13 @@ export class ExperimentalResult<T, E> {
    * @see {@link foldAsync} for positional-argument async matching
    */
   async matchAsync<U>(cases: {
-    Ok: (val: T) => Promise<U>;
-    Err: (err: E) => Promise<U>;
+    Ok: (val: T) => Promise<U>
+    Err: (err: E) => Promise<U>
   }): Promise<U> {
     if (this.isErr()) {
-      return cases.Err(this.#err);
+      return cases.Err(this.#err)
     }
-    return cases.Ok(this.#val).catch((_) => cases.Err(this.#err));
+    return cases.Ok(this.#val).catch((_) => cases.Err(this.#err))
   }
 
   /**
@@ -515,10 +515,10 @@ export class ExperimentalResult<T, E> {
    */
   matchPartial<U>(cases: Partial<MatchCases<T, E, U>>, getDefault: () => U): U {
     if (this.isErr()) {
-      return cases.Err ? cases.Err(this.#err) : getDefault();
+      return cases.Err ? cases.Err(this.#err) : getDefault()
     }
 
-    return cases.Ok ? cases.Ok(this.#val) : getDefault();
+    return cases.Ok ? cases.Ok(this.#val) : getDefault()
   }
 
   /**
@@ -541,14 +541,14 @@ export class ExperimentalResult<T, E> {
    * @see mapAsync
    * @see flatMap
    */
-  map<U>(fn: (val: T) => Promise<U>): never;
-  map<U>(fn: (val: T) => U): ExperimentalResult<U, E>;
+  map<U>(fn: (val: T) => Promise<U>): never
+  map<U>(fn: (val: T) => U): ExperimentalResult<U, E>
   map<U>(fn: (val: T) => U): ExperimentalResult<U, E> {
     if (this.isErr()) {
-      return ExperimentalResult.Err(this.#err) as ExperimentalResult<U, E>;
+      return ExperimentalResult.Err(this.#err) as ExperimentalResult<U, E>
     }
-    const curr = this.#val;
-    return ExperimentalResult.Ok(fn(curr as T));
+    const curr = this.#val
+    return ExperimentalResult.Ok(fn(curr as T))
   }
 
   /**
@@ -571,13 +571,13 @@ export class ExperimentalResult<T, E> {
     fn: (val: T) => Promise<U>,
   ): Promise<ExperimentalResult<U, E>> {
     if (this.isErr()) {
-      return Promise.resolve(ExperimentalResult.Err<E, U>(this.#err));
+      return Promise.resolve(ExperimentalResult.Err<E, U>(this.#err))
     }
 
-    const curr = this.#val;
+    const curr = this.#val
     return fn(curr)
       .then((u) => ExperimentalResult.Ok(u))
-      .catch((e) => ExperimentalResult.Err(e as E));
+      .catch((e) => ExperimentalResult.Err(e as E))
   }
 
   /**
@@ -612,10 +612,10 @@ export class ExperimentalResult<T, E> {
     fn: (val: T) => ExperimentalResult<U, E2>,
   ): ExperimentalResult<U, E | E2> {
     if (this.isErr()) {
-      return ExperimentalResult.Err<E | E2, U>(this.#err);
+      return ExperimentalResult.Err<E | E2, U>(this.#err)
     }
 
-    return fn(this.#val) as ExperimentalResult<U, E | E2>;
+    return fn(this.#val) as ExperimentalResult<U, E | E2>
   }
 
   /**
@@ -644,7 +644,7 @@ export class ExperimentalResult<T, E> {
     fn: (val: T) => Promise<ExperimentalResult<U, E2>>,
   ): Promise<ExperimentalResult<U, E | E2>> {
     if (this.isErr()) {
-      return ExperimentalResult.Err<E | E2, U>(this.#err);
+      return ExperimentalResult.Err<E | E2, U>(this.#err)
     }
 
     return fn(this.#val as T)
@@ -653,7 +653,7 @@ export class ExperimentalResult<T, E> {
           ? ExperimentalResult.Err<E | E2, U>(r.#err)
           : (r as ExperimentalResult<U, E | E2>),
       )
-      .catch((e) => ExperimentalResult.Err<E | E2, U>(e));
+      .catch((e) => ExperimentalResult.Err<E | E2, U>(e))
   }
 
   /**
@@ -680,15 +680,15 @@ export class ExperimentalResult<T, E> {
    * @see flatZip
    * @see map
    */
-  zip<U>(fn: (val: T) => Promise<U>): never;
-  zip<U>(fn: (val: T) => U): ExperimentalResult<[prev: T, current: U], E>;
+  zip<U>(fn: (val: T) => Promise<U>): never
+  zip<U>(fn: (val: T) => U): ExperimentalResult<[prev: T, current: U], E>
   zip<U>(fn: (val: T) => U): ExperimentalResult<[T, U], E> {
     if (this.isErr()) {
-      return ExperimentalResult.Err<E, [T, U]>(this.#err);
+      return ExperimentalResult.Err<E, [T, U]>(this.#err)
     }
 
-    const curr = this.#val;
-    return ExperimentalResult.Ok([curr, fn(curr)]);
+    const curr = this.#val
+    return ExperimentalResult.Ok([curr, fn(curr)])
   }
 
   /**
@@ -711,11 +711,11 @@ export class ExperimentalResult<T, E> {
     fn: (val: T) => Promise<U>,
   ): Promise<ExperimentalResult<[T, U], E>> {
     if (this.isErr()) {
-      return ExperimentalResult.Err<E, [T, U]>(this.#err);
+      return ExperimentalResult.Err<E, [T, U]>(this.#err)
     }
 
-    const curr = this.#val;
-    return fn(curr).then((u) => ExperimentalResult.Ok([curr, u]));
+    const curr = this.#val
+    return fn(curr).then((u) => ExperimentalResult.Ok([curr, u]))
   }
 
   /**
@@ -750,14 +750,14 @@ export class ExperimentalResult<T, E> {
       return ExperimentalResult.Err(this.#err) as ExperimentalResult<
         [T, U],
         E | E2
-      >;
+      >
     }
-    const curr = this.#val as T;
-    const r = fn(curr);
+    const curr = this.#val as T
+    const r = fn(curr)
     if (r.isErr()) {
-      return ExperimentalResult.Err(r.unwrapErr() as E | E2);
+      return ExperimentalResult.Err(r.unwrapErr() as E | E2)
     }
-    return ExperimentalResult.Ok([curr, r.unwrap() as U]);
+    return ExperimentalResult.Ok([curr, r.unwrap() as U])
   }
 
   /**
@@ -783,17 +783,17 @@ export class ExperimentalResult<T, E> {
     fn: (val: T) => Promise<ExperimentalResult<U, E2>>,
   ): Promise<ExperimentalResult<[T, U], E | E2>> {
     if (this.isErr()) {
-      return ExperimentalResult.Err<E | E2, [T, U]>(this.#err);
+      return ExperimentalResult.Err<E | E2, [T, U]>(this.#err)
     }
 
-    const curr = this.#val;
+    const curr = this.#val
     return fn(curr).then((r) => {
       if (r.isErr()) {
-        return ExperimentalResult.Err(r.unwrapErr() as E | E2);
+        return ExperimentalResult.Err(r.unwrapErr() as E | E2)
       }
 
-      return ExperimentalResult.Ok([curr, r.unwrap() as U]);
-    });
+      return ExperimentalResult.Ok([curr, r.unwrap() as U])
+    })
   }
 
   /**
@@ -820,14 +820,14 @@ export class ExperimentalResult<T, E> {
    * @see mapErrAsync
    * @see mapBoth
    */
-  mapErr<E2>(fn: (err: E) => Promise<E2>): never;
-  mapErr<E2>(fn: (err: E) => E2): ExperimentalResult<T, E2>;
+  mapErr<E2>(fn: (err: E) => Promise<E2>): never
+  mapErr<E2>(fn: (err: E) => E2): ExperimentalResult<T, E2>
   mapErr<E2>(fn: (err: E) => E2): ExperimentalResult<T, E2> {
     if (this.isErr()) {
-      return ExperimentalResult.Err(fn(this.#err));
+      return ExperimentalResult.Err(fn(this.#err))
     }
 
-    return ExperimentalResult.Ok(this.#val);
+    return ExperimentalResult.Ok(this.#val)
   }
 
   /**
@@ -851,10 +851,10 @@ export class ExperimentalResult<T, E> {
     fn: (err: E) => Promise<E2>,
   ): Promise<ExperimentalResult<T, E2>> {
     if (this.isErr()) {
-      return fn(this.#err).then((e) => ExperimentalResult.Err(e));
+      return fn(this.#err).then((e) => ExperimentalResult.Err(e))
     }
 
-    return ExperimentalResult.Ok(this.#val);
+    return ExperimentalResult.Ok(this.#val)
   }
 
   /**
@@ -886,20 +886,20 @@ export class ExperimentalResult<T, E> {
    * @see map
    * @see mapErr
    */
-  mapBoth<T2, E2>(fnOk: (val: T) => Promise<T2>, fnErr: (err: E) => E2): never;
-  mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (err: E) => Promise<E2>): never;
+  mapBoth<T2, E2>(fnOk: (val: T) => Promise<T2>, fnErr: (err: E) => E2): never
+  mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (err: E) => Promise<E2>): never
   mapBoth<T2, E2>(
     fnOk: (val: T) => T2,
     fnErr: (err: E) => E2,
-  ): ExperimentalResult<T2, E2>;
+  ): ExperimentalResult<T2, E2>
   mapBoth<T2, E2>(
     fnOk: (val: T) => T2,
     fnErr: (err: E) => E2,
   ): ExperimentalResult<T2, E2> {
     if (this.isErr()) {
-      return ExperimentalResult.Err(fnErr(this.#err));
+      return ExperimentalResult.Err(fnErr(this.#err))
     }
-    return ExperimentalResult.Ok(fnOk(this.#val));
+    return ExperimentalResult.Ok(fnOk(this.#val))
   }
 
   /**
@@ -928,10 +928,10 @@ export class ExperimentalResult<T, E> {
     fnErr: (err: E) => Promise<E2>,
   ): Promise<ExperimentalResult<T2, E2>> {
     if (this.isErr()) {
-      return fnErr(this.#err).then((e) => ExperimentalResult.Err(e));
+      return fnErr(this.#err).then((e) => ExperimentalResult.Err(e))
     }
 
-    return fnOk(this.#val).then((v) => ExperimentalResult.Ok(v));
+    return fnOk(this.#val).then((v) => ExperimentalResult.Ok(v))
   }
 
   /**
@@ -965,8 +965,8 @@ export class ExperimentalResult<T, E> {
   orElse<E2>(
     fn: (err: E) => ExperimentalResult<T, E2>,
   ): ExperimentalResult<T, E2> {
-    if (this.isOk()) return this as ExperimentalResult<T, E2>;
-    return fn(this.#err);
+    if (this.isOk()) return this as ExperimentalResult<T, E2>
+    return fn(this.#err)
   }
 
   /**
@@ -991,10 +991,10 @@ export class ExperimentalResult<T, E> {
     fn: (err: E) => Promise<ExperimentalResult<T, E2>>,
   ): Promise<ExperimentalResult<T, E2>> {
     if (this.isOk()) {
-      return this as ExperimentalResult<T, E2>;
+      return this as ExperimentalResult<T, E2>
     }
 
-    return fn(this.#err);
+    return fn(this.#err)
   }
 
   /**
@@ -1036,51 +1036,51 @@ export class ExperimentalResult<T, E> {
    * @see all
    */
   validate<VE extends unknown[]>(validators: {
-    [K in keyof VE]: (val: T) => ExperimentalResult<unknown, VE[K]>;
-  }): ExperimentalResult<T, E | VE[number][]>;
+    [K in keyof VE]: (val: T) => ExperimentalResult<unknown, VE[K]>
+  }): ExperimentalResult<T, E | VE[number][]>
   validate<VE extends unknown[]>(validators: {
-    [K in keyof VE]: (val: T) => Promise<ExperimentalResult<unknown, VE[K]>>;
-  }): Promise<ExperimentalResult<T, E | VE[number][]>>;
+    [K in keyof VE]: (val: T) => Promise<ExperimentalResult<unknown, VE[K]>>
+  }): Promise<ExperimentalResult<T, E | VE[number][]>>
   validate<VE extends unknown[]>(validators: {
     [K in keyof VE]:
       | ((val: T) => ExperimentalResult<unknown, VE[K]>)
-      | ((val: T) => Promise<ExperimentalResult<unknown, VE[K]>>);
+      | ((val: T) => Promise<ExperimentalResult<unknown, VE[K]>>)
   }):
     | ExperimentalResult<T, E | VE[number][]>
     | Promise<ExperimentalResult<T, E | VE[number][]>> {
-    if (this.isErr()) return this as ExperimentalResult<T, VE[number][]>;
+    if (this.isErr()) return this as ExperimentalResult<T, VE[number][]>
 
-    const baseVal = this.#val as T;
-    const results = validators.map((v) => v(baseVal));
+    const baseVal = this.#val as T
+    const results = validators.map((v) => v(baseVal))
 
     // Check if any result is a promise
     if (results.some((r) => r instanceof Promise)) {
       return Promise.all(results).then((resolved) => {
-        const errs: unknown[] = [];
+        const errs: unknown[] = []
         for (const r of resolved as ExperimentalResult<unknown, unknown>[]) {
-          if (r.isErr()) errs.push(r.unwrapErr());
+          if (r.isErr()) errs.push(r.unwrapErr())
         }
         if (errs.length > 0) {
           return ExperimentalResult.Err(
             errs as VE[number][],
-          ) as ExperimentalResult<T, VE[number][]>;
+          ) as ExperimentalResult<T, VE[number][]>
         }
-        return this as ExperimentalResult<T, VE[number][]>;
-      });
+        return this as ExperimentalResult<T, VE[number][]>
+      })
     }
 
-    const syncResults = results as ExperimentalResult<unknown, unknown>[];
-    const errs: unknown[] = [];
+    const syncResults = results as ExperimentalResult<unknown, unknown>[]
+    const errs: unknown[] = []
     for (const r of syncResults) {
-      if (r.isErr()) errs.push(r.#err);
+      if (r.isErr()) errs.push(r.#err)
     }
     if (errs.length > 0) {
       return ExperimentalResult.Err(errs as VE[number][]) as ExperimentalResult<
         T,
         VE[number][]
-      >;
+      >
     }
-    return this as ExperimentalResult<T, VE[number][]>;
+    return this as ExperimentalResult<T, VE[number][]>
   }
 
   /**
@@ -1110,26 +1110,26 @@ export class ExperimentalResult<T, E> {
    * @see validate
    */
   async validateAsync<VE extends unknown[]>(validators: {
-    [K in keyof VE]: (val: T) => Promise<ExperimentalResult<unknown, VE[K]>>;
+    [K in keyof VE]: (val: T) => Promise<ExperimentalResult<unknown, VE[K]>>
   }): Promise<ExperimentalResult<T, E | VE[number][]>> {
     if (this.isErr()) {
-      return this as ExperimentalResult<T, VE[number][]>;
+      return this as ExperimentalResult<T, VE[number][]>
     }
 
-    const baseVal = this.#val as T;
+    const baseVal = this.#val as T
     return Promise.all(validators.map((v) => v(baseVal))).then((resolved) => {
-      const errs: unknown[] = [];
+      const errs: unknown[] = []
 
       for (const r of resolved as ExperimentalResult<unknown, unknown>[]) {
-        if (r.isErr()) errs.push(r.#err);
+        if (r.isErr()) errs.push(r.#err)
       }
 
       if (errs.length > 0) {
-        return ExperimentalResult.Err<VE[number][], T>(errs as VE[number][]);
+        return ExperimentalResult.Err<VE[number][], T>(errs as VE[number][])
       }
 
-      return this as ExperimentalResult<T, VE[number][]>;
-    });
+      return this as ExperimentalResult<T, VE[number][]>
+    })
   }
 
   /**
@@ -1168,26 +1168,26 @@ export class ExperimentalResult<T, E> {
   static all<T extends ExperimentalResult<unknown, unknown>[]>(
     ...results: T
   ): ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>[]> {
-    const vals: unknown[] = [];
-    const errs: unknown[] = [];
+    const vals: unknown[] = []
+    const errs: unknown[] = []
 
     for (const r of results) {
       if (r.isErr()) {
-        errs.push(r.unwrapErr());
+        errs.push(r.unwrapErr())
       } else {
-        vals.push(r.unwrap());
+        vals.push(r.unwrap())
       }
     }
 
     if (errs.length > 0) {
       return ExperimentalResult.Err(
         errs as CombinedResultErr<T>[],
-      ) as ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>[]>;
+      ) as ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>[]>
     }
 
     return ExperimentalResult.Ok(
       vals as CombinedResultOk<T>,
-    ) as ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>[]>;
+    ) as ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>[]>
   }
 
   /**
@@ -1230,10 +1230,10 @@ export class ExperimentalResult<T, E> {
     ...results: ExperimentalResult<U, F>[]
   ): ExperimentalResult<U, F[]> {
     for (const r of results) {
-      if (r.isOk()) return r as ExperimentalResult<U, F[]>;
+      if (r.isOk()) return r as ExperimentalResult<U, F[]>
     }
 
-    return ExperimentalResult.Err(results.map((r) => r.unwrapErr()));
+    return ExperimentalResult.Err(results.map((r) => r.unwrapErr()))
   }
 
   /**
@@ -1262,14 +1262,14 @@ export class ExperimentalResult<T, E> {
    * @see tapAsync
    * @see tapErr
    */
-  tap(fn: (val: T) => Promise<void>): never;
-  tap(fn: (val: T) => void): ExperimentalResult<T, E>;
+  tap(fn: (val: T) => Promise<void>): never
+  tap(fn: (val: T) => void): ExperimentalResult<T, E>
   tap(fn: (val: T) => void): ExperimentalResult<T, E> {
     if (this.isOk()) {
-      fn(this.#val);
+      fn(this.#val)
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -1294,10 +1294,10 @@ export class ExperimentalResult<T, E> {
     fn: (val: T) => Promise<void>,
   ): Promise<ExperimentalResult<T, E>> {
     if (this.isOk()) {
-      await fn(this.#val);
+      await fn(this.#val)
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -1328,10 +1328,10 @@ export class ExperimentalResult<T, E> {
    */
   tapErr(fn: (err: E) => void): ExperimentalResult<T, E> {
     if (this.isErr()) {
-      fn(this.#err);
+      fn(this.#err)
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -1356,10 +1356,10 @@ export class ExperimentalResult<T, E> {
     fn: (err: E) => Promise<void>,
   ): Promise<ExperimentalResult<T, E>> {
     if (this.isErr()) {
-      await fn(this.#err);
+      await fn(this.#err)
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -1384,10 +1384,10 @@ export class ExperimentalResult<T, E> {
    */
   flip(): ExperimentalResult<E, T> {
     if (this.isErr()) {
-      return ExperimentalResult.Ok(this.#err);
+      return ExperimentalResult.Ok(this.#err)
     }
 
-    return ExperimentalResult.Err(this.#val);
+    return ExperimentalResult.Err(this.#val)
   }
 
   /**
@@ -1413,9 +1413,9 @@ export class ExperimentalResult<T, E> {
    * @see Option.toResult
    */
   toOption(): Option<T> {
-    if (this.isErr()) return Option.None;
+    if (this.isErr()) return Option.None
 
-    return Option.Some(this.#val);
+    return Option.Some(this.#val)
   }
 
   /**
@@ -1438,13 +1438,13 @@ export class ExperimentalResult<T, E> {
     this: ExperimentalResult<Array<In>, E>,
     mapper: (val: NoInfer<In>) => Out,
   ): ExperimentalResult<Array<Out>, E> {
-    if (this.isErr()) return this as ExperimentalResult<Array<Out>, E>;
+    if (this.isErr()) return this as ExperimentalResult<Array<Out>, E>
 
     if (Array.isArray(this.#val)) {
-      return new ExperimentalResult(this.#val.map(mapper), this.#err, "Ok");
+      return new ExperimentalResult(this.#val.map(mapper), this.#err, "Ok")
     }
 
-    throw new Error("Can only be called for Result<Array<T>, E>");
+    throw new Error("Can only be called for Result<Array<T>, E>")
   }
 
   /**
@@ -1460,11 +1460,11 @@ export class ExperimentalResult<T, E> {
    * ```
    */
   *[Symbol.iterator](): Generator<ExperimentalResult<T, E>, T, unknown> {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as ExperimentalResult<T, E>) as T;
+    ) as unknown as ExperimentalResult<T, E>) as T
   }
 
   /**
@@ -1484,11 +1484,11 @@ export class ExperimentalResult<T, E> {
     T,
     unknown
   > {
-    const trace = new Error().stack;
+    const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as ExperimentalResult<T, E>) as T;
+    ) as unknown as ExperimentalResult<T, E>) as T
   }
 
   // Static constructors
@@ -1499,7 +1499,7 @@ export class ExperimentalResult<T, E> {
   ): ExperimentalResult<NonNullable<T>, E> {
     return val === null || val === undefined
       ? ExperimentalResult.Err(error)
-      : ExperimentalResult.Ok(val as NonNullable<T>);
+      : ExperimentalResult.Ok(val as NonNullable<T>)
   }
 
   /** Create Result based on predicate result */
@@ -1510,7 +1510,7 @@ export class ExperimentalResult<T, E> {
   ): ExperimentalResult<T, E> {
     return pred(val)
       ? ExperimentalResult.Ok(val)
-      : ExperimentalResult.Err(error);
+      : ExperimentalResult.Err(error)
   }
 
   /** Catches sync exceptions */
@@ -1528,9 +1528,9 @@ export class ExperimentalResult<T, E> {
     errorMapper?: (e: unknown) => E,
   ): ExperimentalResult<T, E> {
     try {
-      return ExperimentalResult.Ok(fn());
+      return ExperimentalResult.Ok(fn())
     } catch (e) {
-      return ExperimentalResult.Err(errorMapper ? errorMapper(e) : (e as E));
+      return ExperimentalResult.Err(errorMapper ? errorMapper(e) : (e as E))
     }
   }
 
@@ -1541,9 +1541,9 @@ export class ExperimentalResult<T, E> {
     errorMapper?: (e: unknown) => E,
   ): Promise<ExperimentalResult<T, E>> {
     try {
-      return ExperimentalResult.Ok(await fn());
+      return ExperimentalResult.Ok(await fn())
     } catch (e) {
-      return ExperimentalResult.Err(errorMapper ? errorMapper(e) : (e as E));
+      return ExperimentalResult.Err(errorMapper ? errorMapper(e) : (e as E))
     }
   }
 
@@ -1570,49 +1570,49 @@ export class ExperimentalResult<T, E> {
     // biome-ignore lint/suspicious/noExplicitAny: inference
     genFn: () => Generator<Eff, T, any>,
   ): ExperimentalResult<T, ExtractError<Eff>> {
-    const iterator = genFn();
+    const iterator = genFn()
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalResult<T, ExtractError<Eff>>;
+    let nextArg: unknown
+    let currentResult: ExperimentalResult<T, ExtractError<Eff>>
 
     while (true) {
-      const next = iterator.next(nextArg);
+      const next = iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value);
-        break;
+        currentResult = ExperimentalResult.Ok(next.value)
+        break
       }
 
       // next.value is the Result that was yielded
-      let yielded = next.value as ExperimentalResult<unknown, unknown>;
-      let stack: string | undefined;
+      let yielded = next.value as ExperimentalResult<unknown, unknown>
+      let stack: string | undefined
 
       if (isCapturedTrace(yielded)) {
-        stack = yielded.stack;
-        yielded = yielded.value as ExperimentalResult<unknown, unknown>;
+        stack = yielded.stack
+        yielded = yielded.value as ExperimentalResult<unknown, unknown>
       }
 
       if (yielded.isErr()) {
-        const err = yielded.unwrapErr();
+        const err = yielded.unwrapErr()
         if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n");
+          const stackLines = stack.split("\n")
           if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n");
-            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            const userStack = stackLines.slice(2).join("\n")
+            err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
         // Early termination on error - return the Err result
-        currentResult = yielded as ExperimentalResult<T, ExtractError<Eff>>;
-        break;
+        currentResult = yielded as ExperimentalResult<T, ExtractError<Eff>>
+        break
       }
 
       // Unwrap the Ok value and pass it back to the generator
-      nextArg = yielded.unwrap();
+      nextArg = yielded.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 
   /**
@@ -1644,56 +1644,53 @@ export class ExperimentalResult<T, E> {
   ): ExperimentalResult<T, ExtractResultError<Eff>> {
     const adapter = <A, E>(
       result: ExperimentalResult<A, E>,
-    ): ResultYieldWrap<A, E> => new ResultYieldWrap(result);
+    ): ResultYieldWrap<A, E> => new ResultYieldWrap(result)
 
-    const iterator = genFn(adapter);
+    const iterator = genFn(adapter)
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalResult<T, ExtractResultError<Eff>>;
+    let nextArg: unknown
+    let currentResult: ExperimentalResult<T, ExtractResultError<Eff>>
 
     while (true) {
-      const next = iterator.next(nextArg);
+      const next = iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value);
-        break;
+        currentResult = ExperimentalResult.Ok(next.value)
+        break
       }
 
       // next.value is the ResultYieldWrap that was yielded
-      const wrapped = next.value as ResultYieldWrap<unknown, unknown>;
-      let result = wrapped.result;
-      let stack: string | undefined;
+      const wrapped = next.value as ResultYieldWrap<unknown, unknown>
+      let result = wrapped.result
+      let stack: string | undefined
 
       if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack;
+        stack = wrapped.stack
         // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-        result = (wrapped as any).value.result;
+        result = (wrapped as any).value.result
       }
 
       if (result.isErr()) {
-        const err = result.unwrapErr();
+        const err = result.unwrapErr()
         if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n");
+          const stackLines = stack.split("\n")
           if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n");
-            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            const userStack = stackLines.slice(2).join("\n")
+            err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
         // Early termination on error - return the Err result
-        currentResult = result as ExperimentalResult<
-          T,
-          ExtractResultError<Eff>
-        >;
-        break;
+        currentResult = result as ExperimentalResult<T, ExtractResultError<Eff>>
+        break
       }
 
       // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap();
+      nextArg = result.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 
   /**
@@ -1720,49 +1717,49 @@ export class ExperimentalResult<T, E> {
     // biome-ignore lint/suspicious/noExplicitAny: inference
     genFn: () => AsyncGenerator<Eff, T, any>,
   ): Promise<ExperimentalResult<T, ExtractError<Eff>>> {
-    const iterator = genFn();
+    const iterator = genFn()
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalResult<T, ExtractError<Eff>>;
+    let nextArg: unknown
+    let currentResult: ExperimentalResult<T, ExtractError<Eff>>
 
     while (true) {
-      const next = await iterator.next(nextArg);
+      const next = await iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value);
-        break;
+        currentResult = ExperimentalResult.Ok(next.value)
+        break
       }
 
       // next.value is a Result (user awaits promises before yielding)
-      let result = next.value as ExperimentalResult<unknown, unknown>;
-      let stack: string | undefined;
+      let result = next.value as ExperimentalResult<unknown, unknown>
+      let stack: string | undefined
 
       if (isCapturedTrace(result)) {
-        stack = result.stack;
-        result = result.value as ExperimentalResult<unknown, unknown>;
+        stack = result.stack
+        result = result.value as ExperimentalResult<unknown, unknown>
       }
 
       if (result.isErr()) {
-        const err = result.unwrapErr();
+        const err = result.unwrapErr()
         if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n");
+          const stackLines = stack.split("\n")
           if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n");
-            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            const userStack = stackLines.slice(2).join("\n")
+            err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
         // Early termination on error - return the Err result
-        currentResult = result as ExperimentalResult<T, ExtractError<Eff>>;
-        break;
+        currentResult = result as ExperimentalResult<T, ExtractError<Eff>>
+        break
       }
 
       // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap();
+      nextArg = result.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 
   /**
@@ -1800,57 +1797,57 @@ export class ExperimentalResult<T, E> {
     const adapter = <A, E2>(
       result: ExperimentalResult<A, E2> | Promise<ExperimentalResult<A, E2>>,
     ): AsyncResultYieldWrap<A, E2> =>
-      new AsyncResultYieldWrap(Promise.resolve(result));
+      new AsyncResultYieldWrap(Promise.resolve(result))
 
-    const iterator = genFn(adapter);
+    const iterator = genFn(adapter)
 
     // Use iteration instead of recursion to avoid stack overflow
-    let nextArg: unknown;
-    let currentResult: ExperimentalResult<T, ExtractAsyncResultError<Eff>>;
+    let nextArg: unknown
+    let currentResult: ExperimentalResult<T, ExtractAsyncResultError<Eff>>
 
     while (true) {
-      const next = await iterator.next(nextArg);
+      const next = await iterator.next(nextArg)
 
       if (next.done) {
         // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value);
-        break;
+        currentResult = ExperimentalResult.Ok(next.value)
+        break
       }
 
       // next.value is the AsyncResultYieldWrap that was yielded
-      const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>;
-      let result: ExperimentalResult<unknown, unknown>;
-      let stack: string | undefined;
+      const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>
+      let result: ExperimentalResult<unknown, unknown>
+      let stack: string | undefined
 
       if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack;
+        stack = wrapped.stack
         // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-        result = await (wrapped as any).value.result;
+        result = await (wrapped as any).value.result
       } else {
-        result = await wrapped.result;
+        result = await wrapped.result
       }
 
       if (result.isErr()) {
-        const err = result.unwrapErr();
+        const err = result.unwrapErr()
         if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n");
+          const stackLines = stack.split("\n")
           if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n");
-            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+            const userStack = stackLines.slice(2).join("\n")
+            err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
         // Early termination on error - return the Err result
         currentResult = result as ExperimentalResult<
           T,
           ExtractAsyncResultError<Eff>
-        >;
-        break;
+        >
+        break
       }
 
       // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap();
+      nextArg = result.unwrap()
     }
 
-    return currentResult;
+    return currentResult
   }
 }

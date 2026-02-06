@@ -1,128 +1,128 @@
-import { describe, expect, test } from "bun:test";
-import { ExperimentalFlow as XFlow } from "@/flow-experimental.js";
+import { describe, expect, test } from "bun:test"
+import { ExperimentalFlow as XFlow } from "@/flow-experimental.js"
 import {
   ExperimentalOption as Option,
   UnwrappedNone,
-} from "@/option-experimental.js";
-import { ExperimentalResult as Result } from "@/result-experimental.js";
+} from "@/option-experimental.js"
+import { ExperimentalResult as Result } from "@/result-experimental.js"
 
 class ValidationError extends Error {
-  readonly _tag = "ValidationError";
+  readonly _tag = "ValidationError"
   constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
+    super(message)
+    this.name = "ValidationError"
   }
 }
 
 class NotFoundError extends Error {
-  readonly _tag = "NotFoundError";
+  readonly _tag = "NotFoundError"
   constructor(message: string) {
-    super(message);
-    this.name = "NotFoundError";
+    super(message)
+    this.name = "NotFoundError"
   }
 }
 
 describe("XFlow.genAdapter", () => {
   test("handles all successes with adapter", () => {
     const result = XFlow.genAdapter(function* ($) {
-      const a = yield* $(Option.Some(10));
-      const b = yield* $(Result.Ok(20));
-      return a + b;
-    });
+      const a = yield* $(Option.Some(10))
+      const b = yield* $(Result.Ok(20))
+      return a + b
+    })
 
-    expect(result.isOk()).toBe(true);
-    expect(result.unwrap()).toBe(30);
-  });
+    expect(result.isOk()).toBe(true)
+    expect(result.unwrap()).toBe(30)
+  })
 
   test("handles Option.None short-circuit with adapter", () => {
     const result = XFlow.genAdapter(function* ($) {
-      yield* $(Option.Some(1));
-      yield* $(Option.None);
-      return 0;
-    });
+      yield* $(Option.Some(1))
+      yield* $(Option.None)
+      return 0
+    })
 
-    expect(result.isErr()).toBe(true);
-    expect(result.unwrapErr()).toBeInstanceOf(UnwrappedNone);
-  });
+    expect(result.isErr()).toBe(true)
+    expect(result.unwrapErr()).toBeInstanceOf(UnwrappedNone)
+  })
 
   test("handles Result.Err short-circuit with adapter", () => {
-    const err = new Error("oops");
+    const err = new Error("oops")
     const result = XFlow.genAdapter(function* ($) {
-      yield* $(Option.Some(1));
-      yield* $(Result.Err(err));
-      return 0;
-    });
+      yield* $(Option.Some(1))
+      yield* $(Result.Err(err))
+      return 0
+    })
 
-    expect(result.isErr()).toBe(true);
-    expect(result.unwrapErr()).toBe(err);
-  });
+    expect(result.isErr()).toBe(true)
+    expect(result.unwrapErr()).toBe(err)
+  })
 
   test("handles $.fail() for direct error yielding", () => {
     const result = XFlow.genAdapter(function* ($) {
-      const a = yield* $(Option.Some(1));
-      yield* $.fail(new ValidationError("Value must be positive"));
-      return a;
-    });
+      const a = yield* $(Option.Some(1))
+      yield* $.fail(new ValidationError("Value must be positive"))
+      return a
+    })
 
-    expect(result.isErr()).toBe(true);
-    expect(result.unwrapErr()).toBeInstanceOf(ValidationError);
+    expect(result.isErr()).toBe(true)
+    expect(result.unwrapErr()).toBeInstanceOf(ValidationError)
     expect((result.unwrapErr() as ValidationError).message).toBe(
       "Value must be positive",
-    );
-  });
+    )
+  })
 
   test("$.fail() short-circuits execution", () => {
-    let executedAfterError = false;
+    let executedAfterError = false
 
     const result = XFlow.genAdapter(function* ($) {
-      yield* $.fail(new NotFoundError("Resource not found"));
-      executedAfterError = true;
-      return 1;
-    });
+      yield* $.fail(new NotFoundError("Resource not found"))
+      executedAfterError = true
+      return 1
+    })
 
-    expect(result.isErr()).toBe(true);
-    expect(executedAfterError).toBe(false);
-    expect(result.unwrapErr()).toBeInstanceOf(NotFoundError);
-  });
+    expect(result.isErr()).toBe(true)
+    expect(executedAfterError).toBe(false)
+    expect(result.unwrapErr()).toBeInstanceOf(NotFoundError)
+  })
 
   test("$.fail() works with multiple error types", () => {
     const getValue = (input: number) =>
       XFlow.genAdapter(function* ($) {
         if (input < 0) {
-          yield* $.fail(new ValidationError("negative"));
+          yield* $.fail(new ValidationError("negative"))
         }
         if (input === 0) {
-          yield* $.fail(new NotFoundError("zero"));
+          yield* $.fail(new NotFoundError("zero"))
         }
-        return input * 2;
-      });
+        return input * 2
+      })
 
-    const res1 = getValue(-1);
-    expect(res1.isErr()).toBe(true);
-    expect(res1.unwrapErr()).toBeInstanceOf(ValidationError);
+    const res1 = getValue(-1)
+    expect(res1.isErr()).toBe(true)
+    expect(res1.unwrapErr()).toBeInstanceOf(ValidationError)
 
-    const res2 = getValue(0);
-    expect(res2.isErr()).toBe(true);
-    expect(res2.unwrapErr()).toBeInstanceOf(NotFoundError);
+    const res2 = getValue(0)
+    expect(res2.isErr()).toBe(true)
+    expect(res2.unwrapErr()).toBeInstanceOf(NotFoundError)
 
-    const res3 = getValue(5);
-    expect(res3.isOk()).toBe(true);
-    expect(res3.unwrap()).toBe(10);
-  });
+    const res3 = getValue(5)
+    expect(res3.isOk()).toBe(true)
+    expect(res3.unwrap()).toBe(10)
+  })
 
   test("$.fail() can be mixed with $(Result) and $(Option)", () => {
     const result = XFlow.genAdapter(function* ($) {
-      const a = yield* $(Option.Some(10));
-      const b = yield* $(Result.Ok(20));
+      const a = yield* $(Option.Some(10))
+      const b = yield* $(Result.Ok(20))
 
       if (a + b < 50) {
-        yield* $.fail(new ValidationError("Sum too small"));
+        yield* $.fail(new ValidationError("Sum too small"))
       }
 
-      return a + b;
-    });
+      return a + b
+    })
 
-    expect(result.isErr()).toBe(true);
-    expect(result.unwrapErr()).toBeInstanceOf(ValidationError);
-  });
-});
+    expect(result.isErr()).toBe(true)
+    expect(result.unwrapErr()).toBeInstanceOf(ValidationError)
+  })
+})

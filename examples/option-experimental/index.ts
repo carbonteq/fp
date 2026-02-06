@@ -338,4 +338,4 @@
  *   - Explicit adapter makes yields clear
  */
 
-export {};
+export {}

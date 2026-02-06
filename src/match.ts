@@ -1,13 +1,13 @@
-import type { Option as OldOption } from "./option.js";
-import type { ExperimentalOption } from "./option-experimental.js";
-import type { Result as OldResult } from "./result.js";
-import type { ExperimentalResult } from "./result-experimental.js";
+import type { Option as OldOption } from "./option.js"
+import type { ExperimentalOption } from "./option-experimental.js"
+import type { Result as OldResult } from "./result.js"
+import type { ExperimentalResult } from "./result-experimental.js"
 
-type Result<T, E> = ExperimentalResult<T, E>;
-type Option<T> = ExperimentalOption<T>;
+type Result<T, E> = ExperimentalResult<T, E>
+type Option<T> = ExperimentalOption<T>
 
-type LegacyResult<T, E> = OldResult<T, E> | ExperimentalResult<T, E>;
-type LegacyOption<T> = OldOption<T> | ExperimentalOption<T>;
+type LegacyResult<T, E> = OldResult<T, E> | ExperimentalResult<T, E>
+type LegacyOption<T> = OldOption<T> | ExperimentalOption<T>
 
 // =============================================================================
 // Type Utilities
@@ -18,12 +18,12 @@ type LegacyOption<T> = OldOption<T> | ExperimentalOption<T>;
  */
 type GetTags<T> = T extends { readonly _tag: infer Tag extends string }
   ? Tag
-  : never;
+  : never
 
 /**
  * Extract the variant of T that has the given tag.
  */
-type ExtractByTag<T, Tag> = T extends { readonly _tag: Tag } ? T : never;
+type ExtractByTag<T, Tag> = T extends { readonly _tag: Tag } ? T : never
 
 /**
  * Extract the inner type from a discriminated union based on tag.
@@ -47,17 +47,17 @@ type GetInnerType<T, Tag extends string> = Tag extends "Some"
         : unknown
       : ExtractByTag<T, Tag> extends { unwrap(): infer V }
         ? V
-        : unknown;
+        : unknown
 
 /**
  * Represents a compile-time exhaustiveness error.
  * When pattern matching is incomplete, this type surfaces the missing cases.
  */
 type ExhaustiveError<Missing extends string> = {
-  readonly _tag: "ExhaustiveError";
-  readonly error: "Pattern matching is not exhaustive";
-  readonly missingCases: Missing;
-};
+  readonly _tag: "ExhaustiveError"
+  readonly error: "Pattern matching is not exhaustive"
+  readonly missingCases: Missing
+}
 
 // =============================================================================
 // Pattern Types
@@ -65,30 +65,30 @@ type ExhaustiveError<Missing extends string> = {
 
 /** Base pattern interface */
 interface BasePattern<Tag extends string> {
-  readonly _patternTag: Tag;
+  readonly _patternTag: Tag
 }
 
 /** Pattern for matching Option.Some with optional predicate guard */
 interface SomePattern<T = unknown> extends BasePattern<"Some"> {
-  readonly predicate?: (val: T) => boolean;
-  readonly _hasPredicate: boolean;
+  readonly predicate?: (val: T) => boolean
+  readonly _hasPredicate: boolean
 }
 
 /** Pattern for matching Option.None */
 interface NonePattern extends BasePattern<"None"> {
-  readonly _hasPredicate: false;
+  readonly _hasPredicate: false
 }
 
 /** Pattern for matching Result.Ok with optional predicate guard */
 interface OkPattern<T = unknown> extends BasePattern<"Ok"> {
-  readonly predicate?: (val: T) => boolean;
-  readonly _hasPredicate: boolean;
+  readonly predicate?: (val: T) => boolean
+  readonly _hasPredicate: boolean
 }
 
 /** Pattern for matching Result.Err with optional predicate guard */
 interface ErrPattern<E = unknown> extends BasePattern<"Err"> {
-  readonly predicate?: (err: E) => boolean;
-  readonly _hasPredicate: boolean;
+  readonly predicate?: (err: E) => boolean
+  readonly _hasPredicate: boolean
 }
 
 /** Wildcard pattern that matches anything */
@@ -100,7 +100,7 @@ type Pattern<T = unknown, E = unknown> =
   | NonePattern
   | OkPattern<T>
   | ErrPattern<E>
-  | WildcardPattern;
+  | WildcardPattern
 
 // =============================================================================
 // Pattern Namespace (P)
@@ -108,38 +108,38 @@ type Pattern<T = unknown, E = unknown> =
 
 /** Pattern for Some without predicate - marks tag as fully consumed */
 interface SomePatternNoPredicate<_T = unknown> extends BasePattern<"Some"> {
-  readonly predicate: undefined;
-  readonly _hasPredicate: false;
+  readonly predicate: undefined
+  readonly _hasPredicate: false
 }
 
 /** Pattern for Some with predicate - does NOT consume tag */
 interface SomePatternWithPredicate<T = unknown> extends BasePattern<"Some"> {
-  readonly predicate: (val: T) => boolean;
-  readonly _hasPredicate: true;
+  readonly predicate: (val: T) => boolean
+  readonly _hasPredicate: true
 }
 
 /** Pattern for Ok without predicate - marks tag as fully consumed */
 interface OkPatternNoPredicate<_T = unknown> extends BasePattern<"Ok"> {
-  readonly predicate: undefined;
-  readonly _hasPredicate: false;
+  readonly predicate: undefined
+  readonly _hasPredicate: false
 }
 
 /** Pattern for Ok with predicate - does NOT consume tag */
 interface OkPatternWithPredicate<T = unknown> extends BasePattern<"Ok"> {
-  readonly predicate: (val: T) => boolean;
-  readonly _hasPredicate: true;
+  readonly predicate: (val: T) => boolean
+  readonly _hasPredicate: true
 }
 
 /** Pattern for Err without predicate - marks tag as fully consumed */
 interface ErrPatternNoPredicate<_E = unknown> extends BasePattern<"Err"> {
-  readonly predicate: undefined;
-  readonly _hasPredicate: false;
+  readonly predicate: undefined
+  readonly _hasPredicate: false
 }
 
 /** Pattern for Err with predicate - does NOT consume tag */
 interface ErrPatternWithPredicate<E = unknown> extends BasePattern<"Err"> {
-  readonly predicate: (err: E) => boolean;
-  readonly _hasPredicate: true;
+  readonly predicate: (err: E) => boolean
+  readonly _hasPredicate: true
 }
 
 /**
@@ -177,8 +177,8 @@ export const P = {
           predicate: undefined,
           _hasPredicate: false,
         } as const)) as {
-    <T = unknown>(): SomePatternNoPredicate<T>;
-    <T>(predicate: (val: T) => boolean): SomePatternWithPredicate<T>;
+    <T = unknown>(): SomePatternNoPredicate<T>
+    <T>(predicate: (val: T) => boolean): SomePatternWithPredicate<T>
   },
 
   /**
@@ -202,8 +202,8 @@ export const P = {
           predicate: undefined,
           _hasPredicate: false,
         } as const)) as {
-    <T = unknown>(): OkPatternNoPredicate<T>;
-    <T>(predicate: (val: T) => boolean): OkPatternWithPredicate<T>;
+    <T = unknown>(): OkPatternNoPredicate<T>
+    <T>(predicate: (val: T) => boolean): OkPatternWithPredicate<T>
   },
 
   /**
@@ -219,8 +219,8 @@ export const P = {
           predicate: undefined,
           _hasPredicate: false,
         } as const)) as {
-    <E = unknown>(): ErrPatternNoPredicate<E>;
-    <E>(predicate: (err: E) => boolean): ErrPatternWithPredicate<E>;
+    <E = unknown>(): ErrPatternNoPredicate<E>
+    <E>(predicate: (err: E) => boolean): ErrPatternWithPredicate<E>
   },
 
   /**
@@ -228,7 +228,7 @@ export const P = {
    * Use with `otherwise()` for catch-all handling.
    */
   _: { _patternTag: "_" } as WildcardPattern,
-} as const;
+} as const
 
 // =============================================================================
 // Match Builder Types
@@ -237,15 +237,15 @@ export const P = {
 /**
  * Handler function type for pattern matching.
  */
-type MatchHandler<T, R> = (value: T) => R;
+type MatchHandler<T, R> = (value: T) => R
 
 /**
  * Internal case representation stored by the builder.
  */
 interface MatchCase<T, R> {
-  readonly tag: string;
-  readonly predicate?: (val: unknown) => boolean;
-  readonly handler: MatchHandler<T, R>;
+  readonly tag: string
+  readonly predicate?: (val: unknown) => boolean
+  readonly handler: MatchHandler<T, R>
 }
 
 /**
@@ -270,7 +270,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
   with<Tag extends Exclude<GetTags<T>, Matched>, R>(
     tag: Tag,
     handler: MatchHandler<ExtractByTag<T, Tag>, R>,
-  ): MatchBuilder<T, Matched | Tag, Returns | R>;
+  ): MatchBuilder<T, Matched | Tag, Returns | R>
 
   /**
    * Add a pattern match case using a Pattern object without predicate.
@@ -287,7 +287,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
   with<Tag extends Exclude<GetTags<T>, Matched>, R>(
     pattern: BasePattern<Tag> & { readonly _hasPredicate: false },
     handler: MatchHandler<ExtractByTag<T, Tag>, R>,
-  ): MatchBuilder<T, Matched | Tag, Returns | R>;
+  ): MatchBuilder<T, Matched | Tag, Returns | R>
 
   /**
    * Add a pattern match case using a Pattern object with predicate guard.
@@ -305,7 +305,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
   with<Tag extends GetTags<T>, R>(
     pattern: BasePattern<Tag> & { readonly _hasPredicate: true },
     handler: MatchHandler<GetInnerType<T, Tag>, R>,
-  ): MatchBuilder<T, Matched, Returns | R>;
+  ): MatchBuilder<T, Matched, Returns | R>
 
   /**
    * Add a predicate-based match case.
@@ -321,7 +321,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
   when<R>(
     predicate: (value: T) => boolean,
     handler: MatchHandler<T, R>,
-  ): MatchBuilder<T, Matched, Returns | R>;
+  ): MatchBuilder<T, Matched, Returns | R>
 
   /**
    * Finalize the match, requiring all cases to be handled.
@@ -343,7 +343,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
    */
   exhaustive(): [Exclude<GetTags<T>, Matched>] extends [never]
     ? Returns
-    : ExhaustiveError<Exclude<GetTags<T>, Matched>>;
+    : ExhaustiveError<Exclude<GetTags<T>, Matched>>
 
   /**
    * Finalize the match with a fallback for unhandled cases.
@@ -355,7 +355,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
    *   .otherwise(() => 0);  // Handles None
    * ```
    */
-  otherwise<R>(fallback: MatchHandler<T, R>): Returns | R;
+  otherwise<R>(fallback: MatchHandler<T, R>): Returns | R
 }
 
 // =============================================================================
@@ -371,32 +371,30 @@ class MatchBuilderImpl<
   _Matched extends string,
   _Returns,
 > {
-  readonly #value: T;
-  readonly #cases: MatchCase<unknown, unknown>[];
+  readonly #value: T
+  readonly #cases: MatchCase<unknown, unknown>[]
 
   constructor(value: T, cases: MatchCase<unknown, unknown>[] = []) {
-    this.#value = value;
-    this.#cases = cases;
+    this.#value = value
+    this.#cases = cases
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: internal implementation flexibility
   with(tagOrPattern: any, handler: any): any {
     const tag =
-      typeof tagOrPattern === "string"
-        ? tagOrPattern
-        : tagOrPattern._patternTag;
+      typeof tagOrPattern === "string" ? tagOrPattern : tagOrPattern._patternTag
     const predicate =
       typeof tagOrPattern === "object" && "predicate" in tagOrPattern
         ? (tagOrPattern.predicate as ((val: unknown) => boolean) | undefined)
-        : undefined;
+        : undefined
 
     const newCase: MatchCase<unknown, unknown> = {
       tag,
       predicate,
       handler,
-    };
+    }
 
-    return new MatchBuilderImpl(this.#value, [...this.#cases, newCase]);
+    return new MatchBuilderImpl(this.#value, [...this.#cases, newCase])
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: internal implementation flexibility
@@ -405,29 +403,29 @@ class MatchBuilderImpl<
       tag: "_when",
       predicate: predicate as (val: unknown) => boolean,
       handler: handler as MatchHandler<unknown, unknown>,
-    };
+    }
 
-    return new MatchBuilderImpl(this.#value, [...this.#cases, newCase]);
+    return new MatchBuilderImpl(this.#value, [...this.#cases, newCase])
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: internal implementation flexibility
   exhaustive(): any {
-    return this.#execute();
+    return this.#execute()
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: internal implementation flexibility
   otherwise(fallback: any): any {
-    return this.#execute(fallback as MatchHandler<unknown, unknown>);
+    return this.#execute(fallback as MatchHandler<unknown, unknown>)
   }
 
   #execute(fallback?: MatchHandler<unknown, unknown>): unknown {
-    const value = this.#value;
-    const tag = value._tag;
+    const value = this.#value
+    const tag = value._tag
 
     // First, try predicate-based cases (when)
     for (const c of this.#cases) {
       if (c.tag === "_when" && c.predicate?.(value)) {
-        return c.handler(value);
+        return c.handler(value)
       }
     }
 
@@ -437,14 +435,14 @@ class MatchBuilderImpl<
         // Check predicate guard if present
         if (c.predicate) {
           // Extract the inner value for predicate check
-          const innerValue = this.#extractInnerValue(value);
+          const innerValue = this.#extractInnerValue(value)
           if (c.predicate(innerValue)) {
-            return c.handler(innerValue);
+            return c.handler(innerValue)
           }
         } else {
           // No predicate, just match by tag
-          const innerValue = this.#extractInnerValue(value);
-          return c.handler(innerValue);
+          const innerValue = this.#extractInnerValue(value)
+          return c.handler(innerValue)
         }
       }
     }
@@ -452,17 +450,17 @@ class MatchBuilderImpl<
     // Check for wildcard pattern
     for (const c of this.#cases) {
       if (c.tag === "_") {
-        return c.handler(value);
+        return c.handler(value)
       }
     }
 
     // Use fallback if provided
     if (fallback) {
-      return fallback(value);
+      return fallback(value)
     }
 
     // This should never happen if exhaustive() type checking works
-    throw new UnmatchedCaseError(tag);
+    throw new UnmatchedCaseError(tag)
   }
 
   #extractInnerValue(value: T): unknown {
@@ -471,21 +469,21 @@ class MatchBuilderImpl<
     if ("unwrap" in value && typeof value.unwrap === "function") {
       if (value._tag === "Some" || value._tag === "Ok") {
         try {
-          return (value as unknown as { unwrap: () => unknown }).unwrap();
+          return (value as unknown as { unwrap: () => unknown }).unwrap()
         } catch {
-          return undefined;
+          return undefined
         }
       }
       if (value._tag === "Err" && "unwrapErr" in value) {
         try {
-          return (value as unknown as { unwrapErr: () => unknown }).unwrapErr();
+          return (value as unknown as { unwrapErr: () => unknown }).unwrapErr()
         } catch {
-          return undefined;
+          return undefined
         }
       }
     }
     // For other discriminated unions, return the whole value
-    return value;
+    return value
   }
 }
 
@@ -498,10 +496,10 @@ class MatchBuilderImpl<
  * This should rarely occur if compile-time exhaustiveness is properly enforced.
  */
 export class UnmatchedCaseError extends Error {
-  readonly name = "UnmatchedCaseError";
+  readonly name = "UnmatchedCaseError"
 
   constructor(tag: string) {
-    super(`Unmatched case: ${tag}`);
+    super(`Unmatched case: ${tag}`)
   }
 }
 
@@ -565,7 +563,7 @@ export class UnmatchedCaseError extends Error {
 export function match<T extends { readonly _tag: string }>(
   value: T,
 ): MatchBuilder<T, never, never> {
-  return new MatchBuilderImpl(value, []) as MatchBuilder<T, never, never>;
+  return new MatchBuilderImpl(value, []) as MatchBuilder<T, never, never>
 }
 
 // =============================================================================
@@ -592,8 +590,8 @@ export const matchRes = <T, E, U>(
   r: LegacyResult<T, E>,
   branches: { Ok: (val: T) => U; Err: (err: E) => U },
 ): U => {
-  return r.match(branches);
-};
+  return r.match(branches)
+}
 
 /**
  * Pattern match on an Option using an object with Some and None handlers.
@@ -615,22 +613,22 @@ export const matchOpt = <T, U>(
   o: LegacyOption<T>,
   branches: { Some: (val: T) => U; None: () => U },
 ): U => {
-  return o.match(branches);
-};
+  return o.match(branches)
+}
 
 /**
  * Pattern match on a Result (alias for matchRes).
  *
  * @deprecated Use `result.match()` instance method or `match(result)` builder instead.
  */
-export const matchResult = matchRes;
+export const matchResult = matchRes
 
 /**
  * Pattern match on an Option (alias for matchOpt).
  *
  * @deprecated Use `option.match()` instance method or `match(option)` builder instead.
  */
-export const matchOption = matchOpt;
+export const matchOption = matchOpt
 
 // =============================================================================
 // Type Exports
@@ -651,4 +649,4 @@ export type {
   OkPatternWithPredicate,
   ErrPatternNoPredicate,
   ErrPatternWithPredicate,
-};
+}

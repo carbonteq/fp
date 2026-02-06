@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, mock } from "bun:test"
 import {
   match,
   matchOpt,
@@ -9,185 +9,182 @@ import {
   P,
   ExperimentalResult as Result,
   UnmatchedCaseError,
-} from "@/index.js";
+} from "@/index.js"
 
 describe("match Result (legacy)", () => {
   it("should run Ok handler on Ok values", () => {
-    const spyFn = mock((val: number) => val);
-    const r = Result.Ok(33);
+    const spyFn = mock((val: number) => val)
+    const r = Result.Ok(33)
 
     const matched = matchRes(r, {
       Ok: spyFn,
       Err: (_v) => 13,
-    });
+    })
 
-    expect(matched).toBe(33);
-    expect(spyFn).toHaveBeenCalledTimes(1);
-    expect(spyFn).toHaveBeenCalledWith(33);
-  });
+    expect(matched).toBe(33)
+    expect(spyFn).toHaveBeenCalledTimes(1)
+    expect(spyFn).toHaveBeenCalledWith(33)
+  })
 
   it("should run Err handler on Err values", () => {
-    const spyFn = mock((val: number) => val);
-    const r = Result.Err(42);
+    const spyFn = mock((val: number) => val)
+    const r = Result.Err(42)
 
     const matched = matchRes(r, {
       Err: spyFn,
       Ok: (_v) => 13,
-    });
+    })
 
-    expect(matched).toBe(42);
-    expect(spyFn).toHaveBeenCalledTimes(1);
-    expect(spyFn).toHaveBeenCalledWith(42);
-  });
+    expect(matched).toBe(42)
+    expect(spyFn).toHaveBeenCalledTimes(1)
+    expect(spyFn).toHaveBeenCalledWith(42)
+  })
 
   it("should have matchResult alias", () => {
-    const r = Result.Ok(42);
-    expect(matchResult(r, { Ok: (v) => v * 2, Err: () => 0 })).toBe(84);
-  });
-});
+    const r = Result.Ok(42)
+    expect(matchResult(r, { Ok: (v) => v * 2, Err: () => 0 })).toBe(84)
+  })
+})
 
 describe("match Option (legacy)", () => {
   it("should run Some handler on filled Option", () => {
-    const spyFn = mock((val: number) => val);
-    const opt = Option.Some(33);
+    const spyFn = mock((val: number) => val)
+    const opt = Option.Some(33)
 
     const matched = matchOpt(opt, {
       Some: spyFn,
       None: () => 13,
-    });
+    })
 
-    expect(matched).toBe(33);
-    expect(spyFn).toHaveBeenCalledTimes(1);
-    expect(spyFn).toHaveBeenCalledWith(33);
-  });
+    expect(matched).toBe(33)
+    expect(spyFn).toHaveBeenCalledTimes(1)
+    expect(spyFn).toHaveBeenCalledWith(33)
+  })
 
   it("should run None handler on empty Option", () => {
-    const spyFn = mock(() => 42);
-    const opt = Option.None;
+    const spyFn = mock(() => 42)
+    const opt = Option.None
 
     const matched = matchOpt(opt, {
       None: spyFn,
       Some: () => 13,
-    });
+    })
 
-    expect(matched).toBe(42);
-    expect(spyFn).toHaveBeenCalledTimes(1);
-  });
+    expect(matched).toBe(42)
+    expect(spyFn).toHaveBeenCalledTimes(1)
+  })
 
   it("should have matchOption alias", () => {
-    const opt = Option.Some(21);
-    expect(matchOption(opt, { Some: (v) => v * 2, None: () => 0 })).toBe(42);
-  });
-});
+    const opt = Option.Some(21)
+    expect(matchOption(opt, { Some: (v) => v * 2, None: () => 0 })).toBe(42)
+  })
+})
 
 describe("Option.fold()", () => {
   it("should call onSome for Some values", () => {
     const result = Option.Some(42).fold(
       (v) => v * 2,
       () => 0,
-    );
-    expect(result).toBe(84);
-  });
+    )
+    expect(result).toBe(84)
+  })
 
   it("should call onNone for None values", () => {
     const result = Option.None.fold(
       (v: number) => v * 2,
       () => 0,
-    );
-    expect(result).toBe(0);
-  });
+    )
+    expect(result).toBe(0)
+  })
 
   it("should be equivalent to match with positional args", () => {
-    const opt = Option.Some("hello");
+    const opt = Option.Some("hello")
     const matchResult = opt.match({
       Some: (v) => v.toUpperCase(),
       None: () => "EMPTY",
-    });
+    })
     const foldResult = opt.fold(
       (v) => v.toUpperCase(),
       () => "EMPTY",
-    );
-    expect(foldResult).toBe(matchResult);
-  });
-});
+    )
+    expect(foldResult).toBe(matchResult)
+  })
+})
 
 describe("Option.foldAsync()", () => {
   it("should call async onSome for Some values", async () => {
     const result = await Option.Some(42).foldAsync(
       async (v) => v * 2,
       async () => 0,
-    );
-    expect(result).toBe(84);
-  });
+    )
+    expect(result).toBe(84)
+  })
 
   it("should call async onNone for None values", async () => {
     const result = await Option.None.foldAsync(
       async (v: number) => v * 2,
       async () => 0,
-    );
-    expect(result).toBe(0);
-  });
-});
+    )
+    expect(result).toBe(0)
+  })
+})
 
 describe("Option.matchAsync()", () => {
   it("should call async Some handler", async () => {
     const result = await Option.Some(21).matchAsync({
       Some: async (v) => v * 2,
       None: async () => 0,
-    });
-    expect(result).toBe(42);
-  });
+    })
+    expect(result).toBe(42)
+  })
 
   it("should call async None handler", async () => {
     const result = await Option.None.matchAsync({
       Some: async (v: number) => v * 2,
       None: async () => 100,
-    });
-    expect(result).toBe(100);
-  });
-});
+    })
+    expect(result).toBe(100)
+  })
+})
 
 describe("Option.matchPartial()", () => {
   it("should handle Some when only Some is provided", () => {
-    const result = Option.Some(42).matchPartial(
-      { Some: (v) => v * 2 },
-      () => 0,
-    );
-    expect(result).toBe(84);
-  });
+    const result = Option.Some(42).matchPartial({ Some: (v) => v * 2 }, () => 0)
+    expect(result).toBe(84)
+  })
 
   it("should use default for None when only Some is provided", () => {
     const result = Option.None.matchPartial(
       { Some: (v: number) => v * 2 },
       () => 0,
-    );
-    expect(result).toBe(0);
-  });
+    )
+    expect(result).toBe(0)
+  })
 
   it("should handle None when only None is provided", () => {
-    const result = Option.None.matchPartial({ None: () => -1 }, () => 100);
-    expect(result).toBe(-1);
-  });
+    const result = Option.None.matchPartial({ None: () => -1 }, () => 100)
+    expect(result).toBe(-1)
+  })
 
   it("should use default for Some when only None is provided", () => {
-    const result = Option.Some(42).matchPartial({ None: () => -1 }, () => 100);
-    expect(result).toBe(100);
-  });
+    const result = Option.Some(42).matchPartial({ None: () => -1 }, () => 100)
+    expect(result).toBe(100)
+  })
 
   it("should support lazy default with function", () => {
-    const spy = mock(() => 999);
-    const result = Option.None.matchPartial({ Some: (v: number) => v }, spy);
-    expect(result).toBe(999);
-    expect(spy).toHaveBeenCalledTimes(1);
-  });
+    const spy = mock(() => 999)
+    const result = Option.None.matchPartial({ Some: (v: number) => v }, spy)
+    expect(result).toBe(999)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
 
   it("should not call lazy default when case matches", () => {
-    const spy = mock(() => 999);
-    const result = Option.Some(42).matchPartial({ Some: (v) => v * 2 }, spy);
-    expect(result).toBe(84);
-    expect(spy).not.toHaveBeenCalled();
-  });
-});
+    const spy = mock(() => 999)
+    const result = Option.Some(42).matchPartial({ Some: (v) => v * 2 }, spy)
+    expect(result).toBe(84)
+    expect(spy).not.toHaveBeenCalled()
+  })
+})
 
 // =============================================================================
 // Result.fold() tests
@@ -198,31 +195,31 @@ describe("Result.fold()", () => {
     const result = Result.Ok(42).fold(
       (v) => v * 2,
       () => 0,
-    );
-    expect(result).toBe(84);
-  });
+    )
+    expect(result).toBe(84)
+  })
 
   it("should call onErr for Err values", () => {
     const result = (Result.Err("error") as Result<number, string>).fold(
       () => 0,
       (e) => e.length,
-    );
-    expect(result).toBe(5); // "error".length
-  });
+    )
+    expect(result).toBe(5) // "error".length
+  })
 
   it("should be equivalent to match with positional args", () => {
-    const res = Result.Ok("hello");
+    const res = Result.Ok("hello")
     const matchResult = res.match({
       Ok: (v) => v.toUpperCase(),
       Err: () => "ERROR",
-    });
+    })
     const foldResult = res.fold(
       (v) => v.toUpperCase(),
       () => "ERROR",
-    );
-    expect(foldResult).toBe(matchResult);
-  });
-});
+    )
+    expect(foldResult).toBe(matchResult)
+  })
+})
 
 // =============================================================================
 // Result.foldAsync() tests
@@ -233,9 +230,9 @@ describe("Result.foldAsync()", () => {
     const result = await Result.Ok(42).foldAsync(
       async (v) => v * 2,
       async () => 0,
-    );
-    expect(result).toBe(84);
-  });
+    )
+    expect(result).toBe(84)
+  })
 
   it("should call async onErr for Err values", async () => {
     const result = await (
@@ -243,10 +240,10 @@ describe("Result.foldAsync()", () => {
     ).foldAsync(
       async () => 0,
       async (e) => e.length,
-    );
-    expect(result).toBe(5); // "error".length
-  });
-});
+    )
+    expect(result).toBe(5) // "error".length
+  })
+})
 
 // =============================================================================
 // Result.matchAsync() tests
@@ -257,9 +254,9 @@ describe("Result.matchAsync()", () => {
     const result = await Result.Ok(21).matchAsync({
       Ok: async (v) => v * 2,
       Err: async () => 0,
-    });
-    expect(result).toBe(42);
-  });
+    })
+    expect(result).toBe(42)
+  })
 
   it("should call async Err handler", async () => {
     const result = await (
@@ -267,10 +264,10 @@ describe("Result.matchAsync()", () => {
     ).matchAsync({
       Ok: async () => 0,
       Err: async (e) => e.length,
-    });
-    expect(result).toBe(4); // "fail".length
-  });
-});
+    })
+    expect(result).toBe(4) // "fail".length
+  })
+})
 
 // =============================================================================
 // Result.matchPartial() tests
@@ -278,44 +275,44 @@ describe("Result.matchAsync()", () => {
 
 describe("Result.matchPartial()", () => {
   it("should handle Ok when only Ok is provided", () => {
-    const result = Result.Ok(42).matchPartial({ Ok: (v) => v * 2 }, () => 0);
-    expect(result).toBe(84);
-  });
+    const result = Result.Ok(42).matchPartial({ Ok: (v) => v * 2 }, () => 0)
+    expect(result).toBe(84)
+  })
 
   it("should use default for Err when only Ok is provided", () => {
     const result = Result.Err("error").matchPartial(
       { Ok: (v: number) => v * 2 },
       () => 0,
-    );
-    expect(result).toBe(0);
-  });
+    )
+    expect(result).toBe(0)
+  })
 
   it("should handle Err when only Err is provided", () => {
     const result = Result.Err("error").matchPartial(
       { Err: (e) => `got: ${e}` },
       () => "default",
-    );
-    expect(result).toBe("got: error");
-  });
+    )
+    expect(result).toBe("got: error")
+  })
 
   it("should use default for Ok when only Err is provided", () => {
     const result = Result.Ok(42).matchPartial(
       { Err: (e: string) => `got: ${e}` },
       () => "default",
-    );
-    expect(result).toBe("default");
-  });
+    )
+    expect(result).toBe("default")
+  })
 
   it("should support lazy default with function", () => {
-    const spy = mock(() => "computed");
+    const spy = mock(() => "computed")
     const result = Result.Err("error").matchPartial(
       { Ok: (v: number) => `${v}` },
       spy,
-    );
-    expect(result).toBe("computed");
-    expect(spy).toHaveBeenCalledTimes(1);
-  });
-});
+    )
+    expect(result).toBe("computed")
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+})
 
 // =============================================================================
 // Fluent match() builder tests - Basic
@@ -326,34 +323,34 @@ describe("match() builder - basic", () => {
     const result = match(Option.Some(21))
       .with("Some", (v) => v * 2)
       .with("None", () => 0)
-      .exhaustive();
-    expect(result).toBe(42);
-  });
+      .exhaustive()
+    expect(result).toBe(42)
+  })
 
   it("should match Option.None with string tag", () => {
     const result = match(Option.None as Option<number>)
       .with("Some", (v) => v * 2)
       .with("None", () => 0)
-      .exhaustive();
-    expect(result).toBe(0);
-  });
+      .exhaustive()
+    expect(result).toBe(0)
+  })
 
   it("should match Result.Ok with string tag", () => {
     const result = match(Result.Ok(21))
       .with("Ok", (v) => v * 2)
       .with("Err", () => 0)
-      .exhaustive();
-    expect(result).toBe(42);
-  });
+      .exhaustive()
+    expect(result).toBe(42)
+  })
 
   it("should match Result.Err with string tag", () => {
     const result = match(Result.Err("error") as Result<number, string>)
       .with("Ok", (v) => v * 2)
       .with("Err", (e) => `got: ${e}`)
-      .exhaustive();
-    expect(result).toBe("got: error");
-  });
-});
+      .exhaustive()
+    expect(result).toBe("got: error")
+  })
+})
 
 // =============================================================================
 // Fluent match() builder tests - with P patterns
@@ -364,34 +361,34 @@ describe("match() builder - with P patterns", () => {
     const result = match(Option.Some(42))
       .with(P.Some(), (v) => v * 2)
       .with(P.None(), () => 0)
-      .exhaustive();
-    expect(result).toBe(84);
-  });
+      .exhaustive()
+    expect(result).toBe(84)
+  })
 
   it("should match with P.None()", () => {
     const result = match(Option.None as Option<number>)
       .with(P.Some(), (v) => v * 2)
       .with(P.None(), () => 99)
-      .exhaustive();
-    expect(result).toBe(99);
-  });
+      .exhaustive()
+    expect(result).toBe(99)
+  })
 
   it("should match with P.Ok()", () => {
     const result = match(Result.Ok("success"))
       .with(P.Ok(), (v) => `got: ${v}`)
       .with(P.Err(), () => "error")
-      .exhaustive();
-    expect(result).toBe("got: success");
-  });
+      .exhaustive()
+    expect(result).toBe("got: success")
+  })
 
   it("should match with P.Err()", () => {
     const result = match(Result.Err("fail") as Result<string, string>)
       .with(P.Ok(), (v) => `got: ${v}`)
       .with(P.Err(), (e) => `error: ${e}`)
-      .exhaustive();
-    expect(result).toBe("error: fail");
-  });
-});
+      .exhaustive()
+    expect(result).toBe("error: fail")
+  })
+})
 
 // =============================================================================
 // Fluent match() builder tests - predicate guards
@@ -406,9 +403,9 @@ describe("match() builder - predicate guards", () => {
       )
       .with(P.Some(), () => "small")
       .with(P.None(), () => "none")
-      .exhaustive();
-    expect(result).toBe("big");
-  });
+      .exhaustive()
+    expect(result).toBe("big")
+  })
 
   it("should fall through when predicate fails", () => {
     const result = match(Option.Some(30))
@@ -418,9 +415,9 @@ describe("match() builder - predicate guards", () => {
       )
       .with(P.Some(), () => "small")
       .with(P.None(), () => "none")
-      .exhaustive();
-    expect(result).toBe("small");
-  });
+      .exhaustive()
+    expect(result).toBe("small")
+  })
 
   it("should match with predicate guard on Ok", () => {
     const result = match(Result.Ok(200))
@@ -430,9 +427,9 @@ describe("match() builder - predicate guards", () => {
       )
       .with(P.Ok(), () => "partial")
       .with(P.Err(), () => "error")
-      .exhaustive();
-    expect(result).toBe("success");
-  });
+      .exhaustive()
+    expect(result).toBe("success")
+  })
 
   it("should match with predicate guard on Err", () => {
     const result = match(
@@ -444,10 +441,10 @@ describe("match() builder - predicate guards", () => {
         () => "not found",
       )
       .with(P.Err(), () => "other error")
-      .exhaustive();
-    expect(result).toBe("not found");
-  });
-});
+      .exhaustive()
+    expect(result).toBe("not found")
+  })
+})
 
 // =============================================================================
 // Fluent match() builder tests - otherwise()
@@ -457,26 +454,26 @@ describe("match() builder - otherwise()", () => {
   it("should use otherwise as fallback", () => {
     const result = match(Option.None as Option<number>)
       .with("Some", (v) => v * 2)
-      .otherwise(() => 0);
-    expect(result).toBe(0);
-  });
+      .otherwise(() => 0)
+    expect(result).toBe(0)
+  })
 
   it("should not call otherwise when case matches", () => {
-    const spy = mock(() => 0);
+    const spy = mock(() => 0)
     const result = match(Option.Some(42))
       .with("Some", (v) => v * 2)
-      .otherwise(spy);
-    expect(result).toBe(84);
-    expect(spy).not.toHaveBeenCalled();
-  });
+      .otherwise(spy)
+    expect(result).toBe(84)
+    expect(spy).not.toHaveBeenCalled()
+  })
 
   it("should work with Result", () => {
     const result = match(Result.Err("error") as Result<number, string>)
       .with("Ok", (v) => v)
-      .otherwise(() => -1);
-    expect(result).toBe(-1);
-  });
-});
+      .otherwise(() => -1)
+    expect(result).toBe(-1)
+  })
+})
 
 // =============================================================================
 // Fluent match() builder tests - when()
@@ -484,18 +481,18 @@ describe("match() builder - otherwise()", () => {
 
 describe("match() builder - when()", () => {
   it("should match with when predicate", () => {
-    const opt = Option.Some(100);
+    const opt = Option.Some(100)
     const result = match(opt)
       .when(
         (o) => o.isSome() && o.unwrap() > 50,
         () => "big",
       )
-      .otherwise(() => "small");
-    expect(result).toBe("big");
-  });
+      .otherwise(() => "small")
+    expect(result).toBe("big")
+  })
 
   it("should try when before with cases", () => {
-    const opt = Option.Some(100);
+    const opt = Option.Some(100)
     const result = match(opt)
       .when(
         (o) => o.isSome() && o.unwrap() > 50,
@@ -503,10 +500,10 @@ describe("match() builder - when()", () => {
       )
       .with("Some", () => "with matched")
       .with("None", () => "none")
-      .exhaustive();
-    expect(result).toBe("when matched");
-  });
-});
+      .exhaustive()
+    expect(result).toBe("when matched")
+  })
+})
 
 // =============================================================================
 // Fluent match() builder tests - discriminated unions
@@ -516,41 +513,41 @@ describe("match() builder - discriminated unions", () => {
   type Shape =
     | { readonly _tag: "circle"; radius: number }
     | { readonly _tag: "rect"; width: number; height: number }
-    | { readonly _tag: "point" };
+    | { readonly _tag: "point" }
 
   // Helper to ensure proper union type inference
-  const asShape = (s: Shape): Shape => s;
+  const asShape = (s: Shape): Shape => s
 
   it("should match discriminated union variants", () => {
-    const circle = asShape({ _tag: "circle", radius: 5 });
+    const circle = asShape({ _tag: "circle", radius: 5 })
     const result = match(circle)
       .with("circle", (s) => Math.PI * s.radius ** 2)
       .with("rect", (s) => s.width * s.height)
       .with("point", () => 0)
-      .exhaustive();
-    expect(result).toBeCloseTo(Math.PI * 25);
-  });
+      .exhaustive()
+    expect(result).toBeCloseTo(Math.PI * 25)
+  })
 
   it("should match rect variant", () => {
-    const rect = asShape({ _tag: "rect", width: 4, height: 5 });
+    const rect = asShape({ _tag: "rect", width: 4, height: 5 })
     const result = match(rect)
       .with("circle", (s) => Math.PI * s.radius ** 2)
       .with("rect", (s) => s.width * s.height)
       .with("point", () => 0)
-      .exhaustive();
-    expect(result).toBe(20);
-  });
+      .exhaustive()
+    expect(result).toBe(20)
+  })
 
   it("should match point variant", () => {
-    const point = asShape({ _tag: "point" });
+    const point = asShape({ _tag: "point" })
     const result = match(point)
       .with("circle", (s) => Math.PI * s.radius ** 2)
       .with("rect", (s) => s.width * s.height)
       .with("point", () => 0)
-      .exhaustive();
-    expect(result).toBe(0);
-  });
-});
+      .exhaustive()
+    expect(result).toBe(0)
+  })
+})
 
 // =============================================================================
 // UnmatchedCaseError tests
@@ -558,15 +555,15 @@ describe("match() builder - discriminated unions", () => {
 
 describe("UnmatchedCaseError", () => {
   it("should have correct name", () => {
-    const err = new UnmatchedCaseError("Test");
-    expect(err.name).toBe("UnmatchedCaseError");
-  });
+    const err = new UnmatchedCaseError("Test")
+    expect(err.name).toBe("UnmatchedCaseError")
+  })
 
   it("should have correct message", () => {
-    const err = new UnmatchedCaseError("MyTag");
-    expect(err.message).toBe("Unmatched case: MyTag");
-  });
-});
+    const err = new UnmatchedCaseError("MyTag")
+    expect(err.message).toBe("Unmatched case: MyTag")
+  })
+})
 
 // =============================================================================
 // P namespace tests
@@ -574,50 +571,50 @@ describe("UnmatchedCaseError", () => {
 
 describe("P namespace", () => {
   it("should create Some pattern without predicate", () => {
-    const pattern = P.Some();
-    expect(pattern._patternTag).toBe("Some");
-    expect(pattern.predicate).toBeUndefined();
-  });
+    const pattern = P.Some()
+    expect(pattern._patternTag).toBe("Some")
+    expect(pattern.predicate).toBeUndefined()
+  })
 
   it("should create Some pattern with predicate", () => {
-    const pred = (x: number) => x > 10;
-    const pattern = P.Some(pred);
-    expect(pattern._patternTag).toBe("Some");
-    expect(pattern.predicate).toBe(pred);
-  });
+    const pred = (x: number) => x > 10
+    const pattern = P.Some(pred)
+    expect(pattern._patternTag).toBe("Some")
+    expect(pattern.predicate).toBe(pred)
+  })
 
   it("should create None pattern", () => {
-    const pattern = P.None();
-    expect(pattern._patternTag).toBe("None");
-  });
+    const pattern = P.None()
+    expect(pattern._patternTag).toBe("None")
+  })
 
   it("should create Ok pattern without predicate", () => {
-    const pattern = P.Ok();
-    expect(pattern._patternTag).toBe("Ok");
-    expect(pattern.predicate).toBeUndefined();
-  });
+    const pattern = P.Ok()
+    expect(pattern._patternTag).toBe("Ok")
+    expect(pattern.predicate).toBeUndefined()
+  })
 
   it("should create Ok pattern with predicate", () => {
-    const pred = (x: number) => x > 10;
-    const pattern = P.Ok(pred);
-    expect(pattern._patternTag).toBe("Ok");
-    expect(pattern.predicate).toBe(pred);
-  });
+    const pred = (x: number) => x > 10
+    const pattern = P.Ok(pred)
+    expect(pattern._patternTag).toBe("Ok")
+    expect(pattern.predicate).toBe(pred)
+  })
 
   it("should create Err pattern without predicate", () => {
-    const pattern = P.Err();
-    expect(pattern._patternTag).toBe("Err");
-    expect(pattern.predicate).toBeUndefined();
-  });
+    const pattern = P.Err()
+    expect(pattern._patternTag).toBe("Err")
+    expect(pattern.predicate).toBeUndefined()
+  })
 
   it("should create Err pattern with predicate", () => {
-    const pred = (e: string) => e.includes("error");
-    const pattern = P.Err(pred);
-    expect(pattern._patternTag).toBe("Err");
-    expect(pattern.predicate).toBe(pred);
-  });
+    const pred = (e: string) => e.includes("error")
+    const pattern = P.Err(pred)
+    expect(pattern._patternTag).toBe("Err")
+    expect(pattern.predicate).toBe(pred)
+  })
 
   it("should have wildcard pattern", () => {
-    expect(P._._patternTag).toBe("_");
-  });
-});
+    expect(P._._patternTag).toBe("_")
+  })
+})

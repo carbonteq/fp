@@ -1,2 +1,2 @@
-export const UNIT = Symbol.for("UNIT");
-export type UNIT = typeof UNIT;
+export const UNIT = Symbol.for("UNIT")
+export type UNIT = typeof UNIT

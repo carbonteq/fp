@@ -1,4 +1,4 @@
-import { defineConfig } from "tsdown";
+import { defineConfig } from "tsdown"
 
 export default defineConfig((_options) => ({
   tsconfig: "./tsconfig.build.json",
@@ -14,4 +14,4 @@ export default defineConfig((_options) => ({
   unbundle: true,
   dts: { tsgo: true },
   platform: "node",
-}));
+}))

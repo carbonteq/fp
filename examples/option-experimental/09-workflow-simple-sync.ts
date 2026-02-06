@@ -17,7 +17,7 @@
  * - Calculate checkout summary
  */
 
-import { ExperimentalOption as Option } from "../../dist/option-experimental.mjs";
+import { ExperimentalOption as Option } from "../../dist/option-experimental.mjs"
 import {
   type CheckoutSummary,
   calculateCheckoutSummary,
@@ -27,9 +27,9 @@ import {
   getProductsForCart,
   validateCartNotEmpty,
   validateStockAvailability,
-} from "./shared-domain";
+} from "./shared-domain"
 
-console.log("=== Simple Sync Workflow: Checkout Summary ===\n");
+console.log("=== Simple Sync Workflow: Checkout Summary ===\n")
 
 // ============================================================================
 // STYLE 1: flatMap chain style
@@ -58,19 +58,19 @@ function processCheckoutUsingFlatMap(
           calculateCheckoutSummary(user, cart, products),
         ),
       ),
-    );
+    )
 }
 
 // Test flatMap style
-console.log("1. flatMap chain style:");
-const flatMapResult = processCheckoutUsingFlatMap("user-123", "cart-456");
+console.log("1. flatMap chain style:")
+const flatMapResult = processCheckoutUsingFlatMap("user-123", "cart-456")
 if (flatMapResult.isSome()) {
-  const summary = flatMapResult.unwrap();
-  console.log("   User:", summary.user.name);
-  console.log("   Items:", summary.itemCount);
-  console.log("   Total:", summary.total);
+  const summary = flatMapResult.unwrap()
+  console.log("   User:", summary.user.name)
+  console.log("   Items:", summary.itemCount)
+  console.log("   Total:", summary.total)
 } else {
-  console.log("   No checkout summary available");
+  console.log("   No checkout summary available")
 }
 
 // ============================================================================
@@ -83,37 +83,37 @@ function processCheckoutUsingGen(
 ): Option<CheckoutSummary> {
   return Option.gen(function* () {
     // Step 1: Fetch and validate user
-    const user = yield* findUserById(userId);
-    yield* user.ensureActive();
+    const user = yield* findUserById(userId)
+    yield* user.ensureActive()
 
     // Step 2: Fetch and validate cart
-    const cart = yield* findCartById(cartId);
-    yield* cart.ensureOwner(user);
+    const cart = yield* findCartById(cartId)
+    yield* cart.ensureOwner(user)
 
     // Step 3: Validate cart has items
-    yield* validateCartNotEmpty(cart);
+    yield* validateCartNotEmpty(cart)
 
     // Step 4: Fetch products for cart items
-    const products = yield* getProductsForCart(cart);
+    const products = yield* getProductsForCart(cart)
 
     // Step 5: Validate stock availability
-    yield* validateStockAvailability(products, cart.items);
+    yield* validateStockAvailability(products, cart.items)
 
     // Step 6: Calculate and return summary
-    return calculateCheckoutSummary(user, cart, products);
-  });
+    return calculateCheckoutSummary(user, cart, products)
+  })
 }
 
 // Test gen style
-console.log("\n2. Option.gen style:");
-const genResult = processCheckoutUsingGen("user-123", "cart-456");
+console.log("\n2. Option.gen style:")
+const genResult = processCheckoutUsingGen("user-123", "cart-456")
 if (genResult.isSome()) {
-  const summary = genResult.unwrap();
-  console.log("   User:", summary.user.name);
-  console.log("   Items:", summary.itemCount);
-  console.log("   Total:", summary.total);
+  const summary = genResult.unwrap()
+  console.log("   User:", summary.user.name)
+  console.log("   Items:", summary.itemCount)
+  console.log("   Total:", summary.total)
 } else {
-  console.log("   No checkout summary available");
+  console.log("   No checkout summary available")
 }
 
 // ============================================================================
@@ -126,44 +126,44 @@ function processCheckoutUsingGenAdapter(
 ): Option<CheckoutSummary> {
   return Option.genAdapter(function* ($) {
     // Step 1: Fetch and validate user
-    const user = yield* $(findUserById(userId));
-    yield* $(user.ensureActive());
+    const user = yield* $(findUserById(userId))
+    yield* $(user.ensureActive())
 
     // Step 2: Fetch and validate cart
-    const cart = yield* $(findCartById(cartId));
-    yield* $(cart.ensureOwner(user));
+    const cart = yield* $(findCartById(cartId))
+    yield* $(cart.ensureOwner(user))
 
     // Step 3: Validate cart has items
-    yield* $(validateCartNotEmpty(cart));
+    yield* $(validateCartNotEmpty(cart))
 
     // Step 4: Fetch products for cart items
-    const products = yield* $(getProductsForCart(cart));
+    const products = yield* $(getProductsForCart(cart))
 
     // Step 5: Validate stock availability
-    yield* $(validateStockAvailability(products, cart.items));
+    yield* $(validateStockAvailability(products, cart.items))
 
     // Step 6: Calculate and return summary
-    return calculateCheckoutSummary(user, cart, products);
-  });
+    return calculateCheckoutSummary(user, cart, products)
+  })
 }
 
 // Test genAdapter style
-console.log("\n3. Option.genAdapter style:");
-const genAdapterResult = processCheckoutUsingGenAdapter("user-123", "cart-456");
+console.log("\n3. Option.genAdapter style:")
+const genAdapterResult = processCheckoutUsingGenAdapter("user-123", "cart-456")
 if (genAdapterResult.isSome()) {
-  const summary = genAdapterResult.unwrap();
-  console.log("   User:", summary.user.name);
-  console.log("   Items:", summary.itemCount);
-  console.log("   Total:", summary.total);
+  const summary = genAdapterResult.unwrap()
+  console.log("   User:", summary.user.name)
+  console.log("   Items:", summary.itemCount)
+  console.log("   Total:", summary.total)
 } else {
-  console.log("   No checkout summary available");
+  console.log("   No checkout summary available")
 }
 
 // ============================================================================
 // COMPARISON: Multi-step validation
 // ============================================================================
 
-console.log("\n=== Multi-step Validation Comparison ===\n");
+console.log("\n=== Multi-step Validation Comparison ===\n")
 
 // flatMap version
 function validateWithFlatMap(userId: string, cartId: string) {
@@ -171,154 +171,151 @@ function validateWithFlatMap(userId: string, cartId: string) {
     .flatMap((user) => user.ensureActive())
     .flatZip((_user) => findCartById(cartId))
     .flatMap(([user, cart]) => cart.ensureOwner(user))
-    .flatMap((cart) => validateCartNotEmpty(cart));
+    .flatMap((cart) => validateCartNotEmpty(cart))
 }
 
 // gen version
 function validateWithGen(userId: string, cartId: string) {
   return Option.gen(function* () {
-    const user = yield* findUserById(userId);
-    yield* user.ensureActive();
+    const user = yield* findUserById(userId)
+    yield* user.ensureActive()
 
-    const cart = yield* findCartById(cartId);
-    yield* cart.ensureOwner(user);
+    const cart = yield* findCartById(cartId)
+    yield* cart.ensureOwner(user)
 
-    yield* validateCartNotEmpty(cart);
+    yield* validateCartNotEmpty(cart)
 
-    return { user, cart };
-  });
+    return { user, cart }
+  })
 }
 
 // genAdapter version
 function validateWithGenAdapter(userId: string, cartId: string) {
   return Option.genAdapter(function* ($) {
-    const user = yield* $(findUserById(userId));
-    yield* $(user.ensureActive());
+    const user = yield* $(findUserById(userId))
+    yield* $(user.ensureActive())
 
-    const cart = yield* $(findCartById(cartId));
-    yield* $(cart.ensureOwner(user));
+    const cart = yield* $(findCartById(cartId))
+    yield* $(cart.ensureOwner(user))
 
-    yield* $(validateCartNotEmpty(cart));
+    yield* $(validateCartNotEmpty(cart))
 
-    return { user, cart };
-  });
+    return { user, cart }
+  })
 }
 
 console.log(
   "1. flatMap validation:",
   validateWithFlatMap("user-123", "cart-456")._tag,
-);
-console.log("2. gen validation:", validateWithGen("user-123", "cart-456")._tag);
+)
+console.log("2. gen validation:", validateWithGen("user-123", "cart-456")._tag)
 console.log(
   "3. genAdapter validation:",
   validateWithGenAdapter("user-123", "cart-456")._tag,
-);
+)
 
 // ============================================================================
 // COMPARISON: Failure scenarios
 // ============================================================================
 
-console.log("\n=== Failure Scenarios ===\n");
+console.log("\n=== Failure Scenarios ===\n")
 
 // Inactive user
-console.log("1. Inactive user:");
+console.log("1. Inactive user:")
 console.log(
   "   flatMap:",
   processCheckoutUsingFlatMap("user-999", "cart-456")._tag,
-); // "None"
-console.log("   gen:", processCheckoutUsingGen("user-999", "cart-456")._tag); // "None"
+) // "None"
+console.log("   gen:", processCheckoutUsingGen("user-999", "cart-456")._tag) // "None"
 console.log(
   "   genAdapter:",
   processCheckoutUsingGenAdapter("user-999", "cart-456")._tag,
-); // "None"
+) // "None"
 
 // Empty cart
-console.log("\n2. Empty cart:");
+console.log("\n2. Empty cart:")
 console.log(
   "   flatMap:",
   processCheckoutUsingFlatMap("user-123", "cart-789")._tag,
-); // "None"
-console.log("   gen:", processCheckoutUsingGen("user-123", "cart-789")._tag); // "None"
+) // "None"
+console.log("   gen:", processCheckoutUsingGen("user-123", "cart-789")._tag) // "None"
 console.log(
   "   genAdapter:",
   processCheckoutUsingGenAdapter("user-123", "cart-789")._tag,
-); // "None"
+) // "None"
 
 // Non-existent cart
-console.log("\n3. Non-existent cart:");
+console.log("\n3. Non-existent cart:")
 console.log(
   "   flatMap:",
   processCheckoutUsingFlatMap("user-123", "cart-invalid")._tag,
-); // "None"
-console.log(
-  "   gen:",
-  processCheckoutUsingGen("user-123", "cart-invalid")._tag,
-); // "None"
+) // "None"
+console.log("   gen:", processCheckoutUsingGen("user-123", "cart-invalid")._tag) // "None"
 console.log(
   "   genAdapter:",
   processCheckoutUsingGenAdapter("user-123", "cart-invalid")._tag,
-); // "None"
+) // "None"
 
 // ============================================================================
 // COMPARISON: Individual product lookup with validation
 // ============================================================================
 
-console.log("\n=== Product Lookup with Validation ===\n");
+console.log("\n=== Product Lookup with Validation ===\n")
 
 const findAndValidateProduct = (productId: string, quantity: number) => {
   return findProductById(productId)
     .flatMap((product) => product.ensureInStock())
-    .flatMap((product) => product.ensureQuantityAvailable(quantity));
-};
+    .flatMap((product) => product.ensureQuantityAvailable(quantity))
+}
 
 console.log(
   "1. Valid product (prod-1, qty 1):",
   findAndValidateProduct("prod-1", 1)._tag,
-); // "Some"
+) // "Some"
 console.log(
   "2. Out of stock (prod-3, qty 1):",
   findAndValidateProduct("prod-3", 1)._tag,
-); // "None"
+) // "None"
 console.log(
   "3. Insufficient stock (prod-1, qty 100):",
   findAndValidateProduct("prod-1", 100)._tag,
-); // "None"
+) // "None"
 
 // Using gen for the same
 const findAndValidateProductGen = (productId: string, quantity: number) => {
   return Option.gen(function* () {
-    const product = yield* findProductById(productId);
-    yield* product.ensureInStock();
-    yield* product.ensureQuantityAvailable(quantity);
-    return product;
-  });
-};
+    const product = yield* findProductById(productId)
+    yield* product.ensureInStock()
+    yield* product.ensureQuantityAvailable(quantity)
+    return product
+  })
+}
 
 console.log(
   "\n4. Using gen (prod-1, qty 1):",
   findAndValidateProductGen("prod-1", 1)._tag,
-); // "Some"
+) // "Some"
 
 // ============================================================================
 // READABILITY COMPARISON
 // ============================================================================
 
-console.log("\n=== Readability Comparison ===\n");
+console.log("\n=== Readability Comparison ===\n")
 
-console.log("flatMap chain:");
-console.log("  - Nested structure with callbacks");
-console.log("  - Harder to read with many steps");
-console.log("  - Need to pass values through explicitly");
+console.log("flatMap chain:")
+console.log("  - Nested structure with callbacks")
+console.log("  - Harder to read with many steps")
+console.log("  - Need to pass values through explicitly")
 
-console.log("\ngen:");
-console.log("  - Linear, imperative style");
-console.log("  - Easy to read and follow");
-console.log("  - Automatic value threading");
-console.log("  - Clear step-by-step flow");
+console.log("\ngen:")
+console.log("  - Linear, imperative style")
+console.log("  - Easy to read and follow")
+console.log("  - Automatic value threading")
+console.log("  - Clear step-by-step flow")
 
-console.log("\ngenAdapter:");
-console.log("  - Same readability as gen");
-console.log("  - Adapter ($) makes Option operations explicit");
-console.log("  - Better type inference for complex cases");
+console.log("\ngenAdapter:")
+console.log("  - Same readability as gen")
+console.log("  - Adapter ($) makes Option operations explicit")
+console.log("  - Better type inference for complex cases")
 
-console.log("\n=== All sync workflow examples completed ===");
+console.log("\n=== All sync workflow examples completed ===")

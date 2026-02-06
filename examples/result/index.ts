@@ -50,4 +50,4 @@
  * Run: bun run examples/result/06-utilities.ts
  */
 
-export {};
+export {}
