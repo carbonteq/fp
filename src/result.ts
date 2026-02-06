@@ -564,28 +564,24 @@ export class Result<T, E> {
    * @returns Result with both branches transformed
    */
   mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (val: E) => E2): Result<T2, E2>
-  mapBoth<T2, E2, In = Awaited<T2>>(
+  mapBoth<T2, E2, In = Awaited<T>>(
+    this: Result<Promise<In>, E>,
     fnOk: (val: In) => T2,
     fnErr: (val: E) => E2,
-  ): Result<Promise<In>, E2>
-  mapBoth<T2, E2, In = Awaited<T2>>(
-    this: Result<Promise<In>, E>,
-    fnOk: (val: In) => Promise<T2>,
+  ): Result<Promise<T2>, E2>
+  mapBoth<T2, E2>(
+    this: Result<T, E>,
+    fnOk: (val: T) => Promise<T2>,
     fnErr: (val: E) => E2,
-  ): Result<Promise<In>, E2>
-  mapBoth<E2, In = Awaited<T>>(
-    fnOk: (val: T) => In | Promise<In>,
+  ): Result<Promise<T2>, E2>
+  mapBoth<T2, E2, In = Awaited<T>>(
+    fnOk: (val: In) => T2 | Promise<T2>,
     fnErr: (val: E) => E2,
-  ): Result<Promise<In>, E> | Result<In, E> | Result<T, E2> {
-    if (this.isErr()) {
-      return this.mapErr(fnErr)
-    }
-
-    if (isPromiseLike(this.#val)) {
-      return this.map(fnOk as AsyncMapper<T, In>)
-    }
-
-    return this.map(fnOk as Mapper<T, In>)
+  ): Result<T2, E2> | Result<Promise<T2>, E2> {
+    const mappedOk = (this as { map: (fn: unknown) => unknown }).map(
+      fnOk,
+    ) as Result<T2, E> | Result<Promise<T2>, E>
+    return mappedOk.mapErr(fnErr)
   }
 
   // -------------------------------------------------------------------------
