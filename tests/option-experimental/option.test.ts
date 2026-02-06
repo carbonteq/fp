@@ -13,7 +13,7 @@ const asyncDoubleIt = async (n: number) => n * 2;
 const asyncDoubleOptIt = async (n: number) => Option.Some(n * 2);
 const asyncOptNone = async (_n: number): Promise<Option<number>> => Option.None;
 
-describe("option construction", () => {
+describe("Experimental option construction", () => {
   it("should construct Some opt", () => {
     const opt = Option.Some(123456);
 
@@ -690,7 +690,7 @@ describe("Option type inference", () => {
 
     it("should correctly type Option.None singleton", () => {
       // Option.None is Option<never>
-      expectTypeOf(Option.None).toMatchTypeOf<Option<never>>();
+      expectTypeOf(Option.None).toEqualTypeOf<Option<never>>();
 
       // Can be assigned to any Option<T>
       const numOpt: Option<number> = Option.None;

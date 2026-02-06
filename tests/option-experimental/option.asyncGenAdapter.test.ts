@@ -5,7 +5,7 @@ import { ExperimentalOption as Option } from "@/option-experimental.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe("Option.asyncGenAdapter", () => {
+describe("ExperimentalOption.asyncGenAdapter", () => {
   describe("basic functionality", () => {
     it("should unwrap Some values", async () => {
       const result = await Option.asyncGenAdapter(async function* ($) {
@@ -430,8 +430,8 @@ describe("Option.asyncGenAdapter", () => {
         throw new Error("Network error");
       };
 
-      await expect(
-        Option.asyncGenAdapter(async function* ($) {
+      expect(
+        await Option.asyncGenAdapter(async function* ($) {
           const value = yield* $(failingFetch());
           return value;
         }),

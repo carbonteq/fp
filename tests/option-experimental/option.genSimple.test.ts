@@ -3,7 +3,7 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test";
 import { ExperimentalOption as Option } from "@/option-experimental.js";
 
-describe("Option.gen", () => {
+describe("ExperimentalOption.gen", () => {
   describe("basic functionality", () => {
     it("should unwrap a single Some value", () => {
       const result = Option.gen(function* () {
