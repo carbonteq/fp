@@ -3,7 +3,7 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test";
 import { ExperimentalResult as Result } from "@/result-experimental.js";
 
-describe("Result.gen", () => {
+describe("ExperimentalResult.gen", () => {
   describe("basic functionality", () => {
     it("should unwrap a single Ok value", () => {
       const result = Result.gen(function* () {

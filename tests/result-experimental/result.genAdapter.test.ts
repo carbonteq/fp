@@ -3,7 +3,7 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import { ExperimentalResult as Result } from "@/result-experimental.js";
 
-describe("Result.genAdapter", () => {
+describe("ExperimentalResult.genAdapter", () => {
   describe("basic functionality", () => {
     it("should unwrap Ok values", () => {
       const result = Result.genAdapter(function* ($) {

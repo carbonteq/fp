@@ -16,7 +16,7 @@ const validatePromiseErr = (_n: number): Promise<Result<string, string>> =>
 const asyncErrResIt = async (_n: number): Promise<Result<number, string>> =>
   Result.Err("Failure");
 
-describe("Result.validate behavior", () => {
+describe("ExperimentalResult.validate behavior", () => {
   it("should return original value if success validating Result<T, E>", () => {
     const mockerA = mock(validateOk);
     const mockerB = mock(validateOk);

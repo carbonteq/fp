@@ -3,7 +3,7 @@ import { ExperimentalResult as Result } from "@/result-experimental.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe("Result async chain short-circuiting", () => {
+describe("ExperimentalResult async chain short-circuiting", () => {
   it("should not call map after async flatMap resolves to Err", async () => {
     const sideEffect = mock((n: number) => n + 1);
     const result = await Result.Ok(1)

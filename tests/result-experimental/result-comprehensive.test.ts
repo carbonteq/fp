@@ -3,7 +3,7 @@ import { ExperimentalResult as Result } from "@/result-experimental.js";
 import { UNIT } from "@/unit.js";
 
 describe("Constructors", () => {
-  describe("Result.Ok()", () => {
+  describe("ExperimentalResult.Ok()", () => {
     it("should create Ok containing the value", () => {
       const result = Result.Ok(42);
       expect(result.isOk()).toBe(true);
@@ -25,7 +25,7 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.Err()", () => {
+  describe("ExperimentalResult.Err()", () => {
     it("should create Err containing the error", () => {
       const result = Result.Err("error message");
       expect(result.isErr()).toBe(true);
@@ -46,7 +46,7 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.fromNullable()", () => {
+  describe("ExperimentalResult.fromNullable()", () => {
     it("should return Ok for non-nullish values", () => {
       expect(Result.fromNullable("value", "error").isOk()).toBe(true);
       expect(Result.fromNullable(0, "error").isOk()).toBe(true);
@@ -67,7 +67,7 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.fromPredicate()", () => {
+  describe("ExperimentalResult.fromPredicate()", () => {
     it("should return Ok if predicate passes", () => {
       const result = Result.fromPredicate(21, (x) => x >= 18, "must be adult");
       expect(result.isOk()).toBe(true);
@@ -81,7 +81,7 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.tryCatch()", () => {
+  describe("ExperimentalResult.tryCatch()", () => {
     it("should return Ok when function succeeds", () => {
       const result = Result.tryCatch(() => JSON.parse('{"a": 1}'));
       expect(result.isOk()).toBe(true);
@@ -106,7 +106,7 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.tryAsyncCatch()", () => {
+  describe("ExperimentalResult.tryAsyncCatch()", () => {
     it("should return Ok when async function succeeds", async () => {
       const result = await Result.tryAsyncCatch(async () => 42);
       expect(result.isOk()).toBe(true);
@@ -125,7 +125,7 @@ describe("Constructors", () => {
     });
   });
 
-  describe("Result.UNIT_RESULT", () => {
+  describe("ExperimentalResult.UNIT_RESULT", () => {
     it("should be a singleton", () => {
       expect(Result.UNIT_RESULT).toBe(Result.UNIT_RESULT);
     });
@@ -428,7 +428,7 @@ describe("Validation", () => {
 });
 
 describe("Aggregation", () => {
-  describe("Result.all()", () => {
+  describe("ExperimentalResult.all()", () => {
     it("should combine all Ok into Ok array", () => {
       const result = Result.all(Result.Ok(1), Result.Ok(2), Result.Ok(3));
       expect(result.isOk()).toBe(true);
@@ -448,7 +448,7 @@ describe("Aggregation", () => {
     });
   });
 
-  describe("Result.any()", () => {
+  describe("ExperimentalResult.any()", () => {
     it("should return first Ok", () => {
       const result = Result.any(Result.Err("a"), Result.Ok(2), Result.Ok(3));
       expect(result.isOk()).toBe(true);

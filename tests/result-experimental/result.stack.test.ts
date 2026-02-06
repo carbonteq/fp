@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { ExperimentalFlow as XFlow } from "@/flow-experimental.js";
 import { ExperimentalResult as Result } from "@/result-experimental.js";
 
-describe("Result Stack Traces", () => {
+describe("ExperimentalResult Stack Traces", () => {
   it("Result.gen should append yield location to stack trace", () => {
     const err = Result.Err(new Error("Original Error"));
 

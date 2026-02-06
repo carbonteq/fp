@@ -5,7 +5,7 @@ import { ExperimentalResult as Result } from "@/result-experimental.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe("Result.asyncGen", () => {
+describe("ExperimentalResult.asyncGen", () => {
   describe("basic functionality", () => {
     it("should unwrap a single Ok value", async () => {
       const result = await Result.asyncGen(async function* () {

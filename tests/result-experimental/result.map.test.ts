@@ -13,7 +13,7 @@ const asyncDoubleIt = async (n: number) => n * 2;
 const errResIt = (_n: number) => Result.Err(new DummyError());
 const asyncErrResIt = async (_n: number) => Result.Err(new DummyError());
 
-describe("Result.map behavior", () => {
+describe("ExperimentalResult.map behavior", () => {
   it("should transform an Ok value asynchronously with mapAsync", async () => {
     const r = Result.Ok(2);
     const mockerA = mock(asyncDoubleIt);

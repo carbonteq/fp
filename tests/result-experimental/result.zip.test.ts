@@ -16,7 +16,7 @@ const tupleAsyncDoubleIt = async (n: [number, number]) => n.map(doubleIt);
 const errResIt = (_n: number) => Result.Err(new DummyError());
 const asyncErrResIt = async (_n: number) => Result.Err(new DummyError());
 
-describe("Result.zip behavior", () => {
+describe("ExperimentalResult.zip behavior", () => {
   it("should not transform an Err value that is a Promise synchronously", () => {
     const r = Result.Err(Promise.resolve(new DummyError()));
     const mockerA = mock(doubleIt);

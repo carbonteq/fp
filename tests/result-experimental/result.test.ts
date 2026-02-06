@@ -10,7 +10,7 @@ class DummyError extends Error {
   }
 }
 
-describe("Result construction", () => {
+describe("ExperimentalResult construction", () => {
   it("ok result", () => {
     const r = Result.Ok("dummy");
 

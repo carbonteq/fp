@@ -46,7 +46,7 @@ const tupleAsyncDoubleResIt = async (
   return Result.Ok(recursivelyTransform(value, doubleIt));
 };
 
-describe("Result.flatZip behavior", () => {
+describe("ExperimentalResult.flatZip behavior", () => {
   describe("async operations with flatZipAsync", () => {
     it("should apply Promise<Result<T, E>> on Result<T, E> correctly", async () => {
       const r = Result.Ok(2);

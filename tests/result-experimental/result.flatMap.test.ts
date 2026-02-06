@@ -18,7 +18,7 @@ const asyncDoubleResIt = async (n: number) => Result.Ok(doubleIt(n));
 const asyncErrResIt = async (_n: number): Promise<Result<number, DummyError>> =>
   Result.Err(new DummyError());
 
-describe("Result.flatMap behavior", () => {
+describe("ExperimentalResult.flatMap behavior", () => {
   describe("sync flatMap", () => {
     it("should apply Result<T, E> on Result<T, E> correctly", () => {
       const r = Result.Ok(2);

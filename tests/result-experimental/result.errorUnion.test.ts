@@ -21,7 +21,7 @@ const parse = (s: string): Result<number, Err2> => {
 const process = (n: number): Result<boolean, Err3> =>
   n > 0 ? Result.Ok(true) : Result.Err(makeErr3(["must be positive"]));
 
-describe("Result error type union inference", () => {
+describe("ExperimentalResult error type union inference", () => {
   describe("gen (no adapter)", () => {
     it("should union error types from multiple yields", () => {
       const result = Result.gen(function* () {

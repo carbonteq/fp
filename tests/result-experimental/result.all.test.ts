@@ -7,7 +7,7 @@ const asyncErrResIt = async (n: number): Promise<Result<number, number>> =>
 const asyncOkResIt = async (n: number): Promise<Result<number, never>> =>
   Result.Ok(n);
 
-describe("Result.all behavior", () => {
+describe("ExperimentalResult.all behavior", () => {
   it("should combine all Ok values", () => {
     const r1 = Result.Ok(1);
     const r2 = Result.Ok(2);
