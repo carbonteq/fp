@@ -49,6 +49,10 @@ type GetInnerType<T, Tag extends string> = Tag extends "Some"
         ? V
         : unknown
 
+type MatchInput<T, Tag extends string> = Tag extends "Some" | "Ok" | "Err"
+  ? GetInnerType<T, Tag>
+  : ExtractByTag<T, Tag>
+
 /**
  * Represents a compile-time exhaustiveness error.
  * When pattern matching is incomplete, this type surfaces the missing cases.
@@ -269,7 +273,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
    */
   with<Tag extends Exclude<GetTags<T>, Matched>, R>(
     tag: Tag,
-    handler: MatchHandler<ExtractByTag<T, Tag>, R>,
+    handler: MatchHandler<MatchInput<T, Tag>, R>,
   ): MatchBuilder<T, Matched | Tag, Returns | R>
 
   /**
@@ -286,7 +290,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
    */
   with<Tag extends Exclude<GetTags<T>, Matched>, R>(
     pattern: BasePattern<Tag> & { readonly _hasPredicate: false },
-    handler: MatchHandler<ExtractByTag<T, Tag>, R>,
+    handler: MatchHandler<MatchInput<T, Tag>, R>,
   ): MatchBuilder<T, Matched | Tag, Returns | R>
 
   /**
