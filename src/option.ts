@@ -1,6 +1,6 @@
 import { Result } from "./result.js";
 import { UNIT } from "./unit.js";
-import { CapturedTrace, isPromiseLike } from "./utils.js";
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -35,6 +35,42 @@ type OptionCtx = { promiseNoneSlot: boolean };
 interface MatchCases<T, U> {
   Some: (val: T) => U;
   None: () => U;
+}
+
+/**
+ * Wrapper that makes Option yieldable with proper type tracking.
+ *
+ * @internal
+ */
+class OptionYieldWrap<T> {
+  constructor(readonly option: Option<T>) {}
+
+  *[Symbol.iterator](): Generator<OptionYieldWrap<T>, T, unknown> {
+    return (yield this) as T;
+  }
+}
+
+/**
+ * Wrapper that makes Option yieldable in async generators with proper type tracking.
+ *
+ * @internal
+ */
+class AsyncOptionYieldWrap<T> {
+  readonly option: Promise<Option<T>>;
+
+  constructor(option: Option<T> | Promise<Option<T>>) {
+    this.option = (
+      isPromiseLike(option) ? option : Promise.resolve(option)
+    ) as Promise<Option<T>>;
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    AsyncOptionYieldWrap<T>,
+    Awaited<T>,
+    unknown
+  > {
+    return (yield this) as Awaited<T>;
+  }
 }
 
 export class Option<T> {
@@ -737,15 +773,15 @@ export class Option<T> {
   }
 
   /**
-   * Makes ExperimentalOption iterable for use with generator-based syntax.
+   * Makes Option iterable for use with generator-based syntax.
    *
    * Yields self and returns the unwrapped value when resumed.
-   * Used internally by {@link ExperimentalOption.gen} for `yield*` syntax.
+   * Used internally by {@link Option.gen} for `yield*` syntax.
    *
    * @example
    * ```ts
-   * const result = ExperimentalOption.gen(function* () {
-   *   const value = yield* ExperimentalOption.Some(42);
+   * const result = Option.gen(function* () {
+   *   const value = yield* Option.Some(42);
    *   return value * 2;
    * });
    * // Some(84)
@@ -759,15 +795,15 @@ export class Option<T> {
   }
 
   /**
-   * Makes ExperimentalOption iterable for use with async generator-based syntax.
+   * Makes Option iterable for use with async generator-based syntax.
    *
    * Yields self and returns the unwrapped value when resumed.
-   * Used internally by {@link ExperimentalOption.asyncGen} for `yield*` syntax.
+   * Used internally by {@link Option.asyncGen} for `yield*` syntax.
    *
    * @example
    * ```ts
-   * const result = await ExperimentalOption.asyncGen(async function* () {
-   *   const value = yield* await Promise.resolve(ExperimentalOption.Some(42));
+   * const result = await Option.asyncGen(async function* () {
+   *   const value = yield* await Promise.resolve(Option.Some(42));
    *   return value * 2;
    * });
    * // Some(84)
@@ -785,5 +821,386 @@ export class Option<T> {
       this,
       trace,
     ) as unknown as Option<T>) as Awaited<T>;
+  }
+
+  /**
+   * Generator-based syntax for chaining Option operations (simplified, no adapter).
+   *
+   * Provides imperative-style code while maintaining functional Option handling.
+   * Use `yield*` to unwrap Options or short-circuit on `None`.
+   *
+   * Short-circuits on first `None`, returning singleton `None`. Uses iteration
+   * instead of recursion to avoid stack overflow on deep chains.
+   *
+   * @template T - The return type of the generator
+   * @param genFn - A generator function that yields Options
+   * @returns `Some<T>` with the generator's return value, or `None`
+   *
+   * @example
+   * ```ts
+   * // Simple sync chain
+   * const result = Option.gen(function* () {
+   *   const a = yield* Option.Some(1);
+   *   const b = yield* Option.Some(2);
+   *   return a + b;
+   * });
+   * // Some(3)
+   *
+   * // None short-circuit
+   * const shortCircuit = Option.gen(function* () {
+   *   const a = yield* Option.Some(1);
+   *   const b = yield* Option.None;    // Short-circuits here
+   *   const c = yield* Option.Some(3); // Never executes
+   *   return a + b + c;
+   * });
+   * // None
+   *
+   * // Chaining optional operations
+   * const email = Option.gen(function* () {
+   *   const user = yield* findUser(userId);
+   *   const profile = yield* Option.fromNullable(user.profile);
+   *   const settings = yield* Option.fromNullable(profile.settings);
+   *   return settings.email;
+   * });
+   *
+   * // Nested optional access
+   * const city = Option.gen(function* () {
+   *   const user = yield* Option.fromNullable(getUser());
+   *   const address = yield* Option.fromNullable(user?.address);
+   *   const city = yield* Option.fromNullable(address?.city);
+   *   return city;
+   * });
+   * ```
+   *
+   * @see {@link genAdapter} for better type inference in complex chains
+   * @see {@link asyncGen} for async operations
+   */
+  static gen<T>(
+    this: void,
+    genFn: () => Generator<Option<unknown>, T, unknown>,
+  ): Option<T> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Option<T>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Some
+        currentResult = Option.Some(next.value);
+        break;
+      }
+
+      // next.value is the Option that was yielded
+      let yielded = next.value as Option<unknown>;
+
+      if (isCapturedTrace(yielded)) {
+        yielded = yielded.value as Option<unknown>;
+      }
+
+      if (yielded.isNone()) {
+        // Early termination on None - return singleton None
+        currentResult = Option.None;
+        break;
+      }
+
+      // Unwrap the Some value and pass it back to the generator
+      nextArg = yielded.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Generator-based syntax for chaining Option operations with an adapter function.
+   *
+   * Provides better type inference and IDE support compared to {@link gen}.
+   * The `$` adapter wraps Options and enables clearer type tracking.
+   *
+   * Short-circuits on first `None`, returning singleton `None`. Uses iteration
+   * instead of recursion to avoid stack overflow on deep chains.
+   *
+   * @template Eff - The effect type (inferred from usage)
+   * @template T - The return type of the generator
+   * @param genFn - A generator function receiving an adapter `$`
+   * @returns `Some<T>` with the generator's return value, or `None`
+   *
+   * @example
+   * ```ts
+   * // Better type inference
+   * const result = Option.genAdapter(function* ($) {
+   *   const a = yield* $(Option.Some(1));
+   *   const b = yield* $(Option.Some(2));
+   *   return a + b;
+   * });
+   * // Some(3)
+   *
+   * // Deep nested access with better type safety
+   * const email = Option.genAdapter(function* ($) {
+   *   const user = yield* $(Option.fromNullable(apiResponse?.user));
+   *   const profile = yield* $(Option.fromNullable(user?.profile));
+   *   const contact = yield* $(Option.fromNullable(profile?.contact));
+   *   return contact?.email;
+   * });
+   *
+   * // Complex validation chain
+   * const validConfig = Option.genAdapter(function* ($) {
+   *   const raw = yield* $(loadConfig());
+   *   const parsed = yield* $(parseConfig(raw));
+   *   const validated = yield* $(validateConfig(parsed));
+   *   return validated;
+   * });
+   * ```
+   *
+   * @see {@link gen} for simpler chains without adapter
+   * @see {@link asyncGenAdapter} for async operations
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  static genAdapter<Eff extends OptionYieldWrap<any>, T>(
+    this: void,
+    genFn: (
+      adapter: <A>(option: Option<A>) => OptionYieldWrap<A>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
+    ) => Generator<Eff, T, any>,
+  ): Option<T> {
+    const adapter = <A>(option: Option<A>): OptionYieldWrap<A> =>
+      new OptionYieldWrap(option);
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Option<T>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Some
+        currentResult = Option.Some(next.value);
+        break;
+      }
+
+      // next.value is the OptionYieldWrap that was yielded
+      const wrapped = next.value as OptionYieldWrap<unknown>;
+      let option = wrapped.option;
+
+      if (isCapturedTrace(option)) {
+        option = (option as CapturedTrace<Option<unknown>>)
+          .value as Option<unknown>;
+      }
+
+      if (option.isNone()) {
+        // Early termination on None - return singleton None
+        currentResult = Option.None;
+        break;
+      }
+
+      // Unwrap the Some value and pass it back to the generator
+      nextArg = option.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Async generator-based syntax for chaining Option operations (simplified, no adapter).
+   *
+   * Use `yield*` with `Option<T>` values directly. For `Promise<Option<T>>`,
+   * await first then `yield*`.
+   *
+   * Short-circuits on first `None`, returning singleton `None`. Uses async iteration
+   * instead of recursion to avoid stack overflow on deep chains.
+   *
+   * @template T - The return type of the generator
+   * @param genFn - An async generator function that yields Options
+   * @returns `Promise<Some<T>>` with the generator's return value, or `Promise<None>`
+   *
+   * @example
+   * ```ts
+   * // Simple async chain
+   * const result = await Option.asyncGen(async function* () {
+   *   const a = yield* Option.Some(1);
+   *   const b = yield* await asyncOperation(a);  // await Promise<Option> first
+   *   const c = yield* Option.Some(3);
+   *   return a + b + c;
+   * });
+   * // Some(result)
+   *
+   * // None short-circuit in async
+   * const shortCircuit = await Option.asyncGen(async function* () {
+   *   const data = yield* await fetchOptionalData();
+   *   const parsed = yield* parse(data);         // Short-circuits on None
+   *   const validated = yield* validate(parsed); // Never executes
+   *   return validated;
+   * });
+   * // None
+   *
+   * // Mixed sync/async workflow
+   * const result = await Option.asyncGen(async function* () {
+   *   const id = yield* Option.Some(parseInt(input)); // sync
+   *   const user = yield* await fetchUser(id);        // async
+   *   const profile = yield* Option.fromNullable(user?.profile); // sync
+   *   const enriched = yield* await enrichProfile(profile); // async
+   *   return enriched;
+   * });
+   *
+   * // Complex pipeline with multiple optional steps
+   * async function processLead(email: string): Promise<Option<Lead>> {
+   *   return await Option.asyncGen(async function* () {
+   *     const normalized = yield* Some(normalizeEmail(email));
+   *     const existing = yield* await findExistingLead(normalized);
+   *     const enriched = yield* await enrichLeadData(existing);
+   *     const validated = yield* validateLead(enriched);
+   *     return validated;
+   *   });
+   * }
+   * ```
+   *
+   * @see {@link asyncGenAdapter} for better type inference and cleaner syntax
+   * @see {@link gen} for synchronous operations
+   */
+  static async asyncGen<T>(
+    this: void,
+    genFn: () => AsyncGenerator<Option<unknown>, T, unknown>,
+  ): Promise<Option<T>> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Option<T>;
+
+    while (true) {
+      const next = await iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Some
+        currentResult = Option.Some(next.value);
+        break;
+      }
+
+      // next.value is an Option (user awaits promises before yielding)
+      let option = next.value as Option<unknown>;
+
+      if (isCapturedTrace(option)) {
+        option = option.value as Option<unknown>;
+      }
+
+      if (option.isNone()) {
+        // Early termination on None - return singleton None
+        currentResult = Option.None;
+        break;
+      }
+
+      // Unwrap the Some value
+      nextArg = await option.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Async generator-based syntax for chaining Option operations with an adapter function.
+   *
+   * The `$` adapter handles both sync `Option<T>` and async `Promise<Option<T>>`,
+   * automatically awaiting promises. This provides cleaner syntax for mixed sync/async workflows.
+   *
+   * Short-circuits on first `None`, returning singleton `None`. Uses async iteration
+   * instead of recursion to avoid stack overflow on deep chains.
+   *
+   * @template Eff - The effect type (inferred from usage)
+   * @template T - The return type of the generator
+   * @param genFn - An async generator function receiving an adapter `$`
+   * @returns `Promise<Some<T>>` with the generator's return value, or `Promise<None>`
+   *
+   * @example
+   * ```ts
+   * // No need to manually await - adapter handles it
+   * const result = await Option.asyncGenAdapter(async function* ($) {
+   *   const a = yield* $(Option.Some(1));       // sync Option
+   *   const b = yield* $(asyncOperation(a));    // Promise<Option> - auto-awaited
+   *   const c = yield* $(Option.Some(3));
+   *   return a + b + c;
+   * });
+   *
+   * // Complex workflow with database and API calls
+   * const userData = await Option.asyncGenAdapter(async function* ($) {
+   *   const session = yield* $(getSession());       // Promise<Option<Session>>
+   *   const userId = yield* $(Option.fromNullable(session?.userId));
+   *   const profile = yield* $(await fetchProfile(userId)); // Promise<Option<Profile>>
+   *   const preferences = yield* $(Option.fromNullable(profile?.preferences));
+   *   const enriched = yield* $(await enrichPreferences(preferences));
+   *   return enriched;
+   * });
+   *
+   * // Real-world: Optional data enrichment
+   * async function getProductDetails(productId: string): Promise<Option<ProductDetails>> {
+   *   return await Option.asyncGenAdapter(async function* ($) {
+   *     const product = yield* $(await fetchProduct(productId));
+   *     const pricing = yield* $(await fetchPricing(product.sku));
+   *     const inventory = yield* $(await checkInventory(product.id));
+   *     const reviews = yield* $(await fetchReviews(product.id));
+   *     const related = yield* $(await fetchRelatedProducts(product.category));
+   *
+   *     return { product, pricing, inventory, reviews, related };
+   *   });
+   * }
+   * ```
+   *
+   * @see {@link asyncGen} when you want explicit `await` for async operations
+   * @see {@link genAdapter} for synchronous operations
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  static async asyncGenAdapter<Eff extends AsyncOptionYieldWrap<any>, T>(
+    this: void,
+    genFn: (
+      adapter: <A>(
+        option: Option<A> | Promise<Option<A>>,
+      ) => AsyncOptionYieldWrap<A>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
+    ) => AsyncGenerator<Eff, T, any>,
+  ): Promise<Option<T>> {
+    const adapter = <A>(
+      option: Option<A> | Promise<Option<A>>,
+    ): AsyncOptionYieldWrap<A> => new AsyncOptionYieldWrap(option);
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Option<T>;
+
+    while (true) {
+      const next = await iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Some
+        currentResult = Option.Some(next.value);
+        break;
+      }
+
+      // next.value is the AsyncOptionYieldWrap that was yielded
+      const wrapped = next.value as AsyncOptionYieldWrap<unknown>;
+      let option = await wrapped.option;
+
+      if (isCapturedTrace(option)) {
+        option = (option as CapturedTrace<Option<unknown>>)
+          .value as Option<unknown>;
+      }
+
+      if (option.isNone()) {
+        // Early termination on None - return singleton None
+        currentResult = Option.None;
+        break;
+      }
+
+      // Unwrap the Some value
+      nextArg = await option.unwrap();
+    }
+
+    return currentResult;
   }
 }
