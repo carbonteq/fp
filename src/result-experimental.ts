@@ -1535,7 +1535,7 @@ export class ExperimentalResult<T, E> {
   }
 
   /** Catches async exceptions - returns Promise<Result<T, E>> */
-  async tryAsyncCatch<T, E = unknown>(
+  static async tryAsyncCatch<T, E = unknown>(
     this: void,
     fn: () => Promise<T>,
     errorMapper?: (e: unknown) => E,
@@ -1565,7 +1565,8 @@ export class ExperimentalResult<T, E> {
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  gen<Eff extends ExperimentalResult<any, any>, T>(
+  static gen<Eff extends ExperimentalResult<any, any>, T>(
+    this: void,
     // biome-ignore lint/suspicious/noExplicitAny: inference
     genFn: () => Generator<Eff, T, any>,
   ): ExperimentalResult<T, ExtractError<Eff>> {
@@ -1632,7 +1633,8 @@ export class ExperimentalResult<T, E> {
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
+  static genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
+    this: void,
     genFn: (
       adapter: <A, E>(
         result: ExperimentalResult<A, E>,
@@ -1713,7 +1715,8 @@ export class ExperimentalResult<T, E> {
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  async asyncGen<Eff extends ExperimentalResult<any, any>, T>(
+  static async asyncGen<Eff extends ExperimentalResult<any, any>, T>(
+    this: void,
     // biome-ignore lint/suspicious/noExplicitAny: inference
     genFn: () => AsyncGenerator<Eff, T, any>,
   ): Promise<ExperimentalResult<T, ExtractError<Eff>>> {
@@ -1781,11 +1784,12 @@ export class ExperimentalResult<T, E> {
    * // Result<number, never>
    * ```
    */
-  async asyncGenAdapter<
+  static async asyncGenAdapter<
     // biome-ignore lint/suspicious/noExplicitAny: inference
     Eff extends AsyncResultYieldWrap<any, any>,
     T,
   >(
+    this: void,
     genFn: (
       adapter: <A, E2>(
         result: ExperimentalResult<A, E2> | Promise<ExperimentalResult<A, E2>>,
