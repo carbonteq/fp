@@ -630,11 +630,11 @@ export class Option<T> {
   flatZip<U, Curr>(
     this: Option<Curr>,
     fn: (val: Curr) => Promise<Option<U>>,
-  ): Option<Promise<[T, U]>>
+  ): Option<Promise<[Curr, U]>>
   flatZip<U, Curr>(
     this: Option<Curr>,
     fn: (val: Curr) => Option<U>,
-  ): Option<[T, U]>
+  ): Option<[Curr, U]>
   flatZip<U, Curr = Awaited<T>>(
     fn: Mapper<Curr, Option<U>> | AsyncMapper<Curr, Option<U>>,
   ) {
