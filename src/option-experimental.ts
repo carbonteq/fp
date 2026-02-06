@@ -536,9 +536,8 @@ export class ExperimentalOption<T> {
       let option = wrapped.option;
 
       if (isCapturedTrace(option)) {
-        option = (
-          option as unknown as CapturedTrace<ExperimentalOption<unknown>>
-        ).value as ExperimentalOption<unknown>;
+        option = (option as CapturedTrace<ExperimentalOption<unknown>>)
+          .value as ExperimentalOption<unknown>;
       }
 
       if (option.isNone()) {
@@ -733,9 +732,8 @@ export class ExperimentalOption<T> {
       let option = await wrapped.option;
 
       if (isCapturedTrace(option)) {
-        option = (
-          option as unknown as CapturedTrace<ExperimentalOption<unknown>>
-        ).value as ExperimentalOption<unknown>;
+        option = (option as CapturedTrace<ExperimentalOption<unknown>>)
+          .value as ExperimentalOption<unknown>;
       }
 
       if (option.isNone()) {

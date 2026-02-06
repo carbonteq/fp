@@ -1512,11 +1512,6 @@ export class ExperimentalResult<T, E> {
       ? ExperimentalResult.Ok(val)
       : ExperimentalResult.Err(error);
   }
-}
-
-export namespace ExperimentalResult {
-  // Type alias for backward compatibility
-  export type Result<T, E> = ExperimentalResult<T, E>;
 
   /** Catches sync exceptions */
   // export function tryCatch<_T, E = unknown>(
@@ -1527,10 +1522,11 @@ export namespace ExperimentalResult {
   //   fn: () => T,
   //   errorMapper?: (e: unknown) => E,
   // ): Result<T, E>;
-  export function tryCatch<T, E = unknown>(
+  static tryCatch<T, E = unknown>(
+    this: void,
     fn: () => T,
     errorMapper?: (e: unknown) => E,
-  ): Result<T, E> {
+  ): ExperimentalResult<T, E> {
     try {
       return ExperimentalResult.Ok(fn());
     } catch (e) {
@@ -1539,10 +1535,11 @@ export namespace ExperimentalResult {
   }
 
   /** Catches async exceptions - returns Promise<Result<T, E>> */
-  export async function tryAsyncCatch<T, E = unknown>(
+  async tryAsyncCatch<T, E = unknown>(
+    this: void,
     fn: () => Promise<T>,
     errorMapper?: (e: unknown) => E,
-  ): Promise<Result<T, E>> {
+  ): Promise<ExperimentalResult<T, E>> {
     try {
       return ExperimentalResult.Ok(await fn());
     } catch (e) {
@@ -1568,15 +1565,15 @@ export namespace ExperimentalResult {
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  export function gen<Eff extends ExperimentalResult<any, any>, T>(
+  gen<Eff extends ExperimentalResult<any, any>, T>(
     // biome-ignore lint/suspicious/noExplicitAny: inference
     genFn: () => Generator<Eff, T, any>,
-  ): Result<T, ExtractError<Eff>> {
+  ): ExperimentalResult<T, ExtractError<Eff>> {
     const iterator = genFn();
 
     // Use iteration instead of recursion to avoid stack overflow
     let nextArg: unknown;
-    let currentResult: Result<T, ExtractError<Eff>>;
+    let currentResult: ExperimentalResult<T, ExtractError<Eff>>;
 
     while (true) {
       const next = iterator.next(nextArg);
@@ -1588,12 +1585,12 @@ export namespace ExperimentalResult {
       }
 
       // next.value is the Result that was yielded
-      let yielded = next.value as Result<unknown, unknown>;
+      let yielded = next.value as ExperimentalResult<unknown, unknown>;
       let stack: string | undefined;
 
       if (isCapturedTrace(yielded)) {
         stack = yielded.stack;
-        yielded = yielded.value as Result<unknown, unknown>;
+        yielded = yielded.value as ExperimentalResult<unknown, unknown>;
       }
 
       if (yielded.isErr()) {
@@ -1606,7 +1603,7 @@ export namespace ExperimentalResult {
           }
         }
         // Early termination on error - return the Err result
-        currentResult = yielded as unknown as Result<T, ExtractError<Eff>>;
+        currentResult = yielded as ExperimentalResult<T, ExtractError<Eff>>;
         break;
       }
 
@@ -1635,20 +1632,23 @@ export namespace ExperimentalResult {
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  export function genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
+  genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
     genFn: (
-      adapter: <A, E>(result: Result<A, E>) => ResultYieldWrap<A, E>,
+      adapter: <A, E>(
+        result: ExperimentalResult<A, E>,
+      ) => ResultYieldWrap<A, E>,
       // biome-ignore lint/suspicious/noExplicitAny: inference
     ) => Generator<Eff, T, any>,
-  ): Result<T, ExtractResultError<Eff>> {
-    const adapter = <A, E>(result: Result<A, E>): ResultYieldWrap<A, E> =>
-      new ResultYieldWrap(result);
+  ): ExperimentalResult<T, ExtractResultError<Eff>> {
+    const adapter = <A, E>(
+      result: ExperimentalResult<A, E>,
+    ): ResultYieldWrap<A, E> => new ResultYieldWrap(result);
 
     const iterator = genFn(adapter);
 
     // Use iteration instead of recursion to avoid stack overflow
     let nextArg: unknown;
-    let currentResult: Result<T, ExtractResultError<Eff>>;
+    let currentResult: ExperimentalResult<T, ExtractResultError<Eff>>;
 
     while (true) {
       const next = iterator.next(nextArg);
@@ -1680,7 +1680,10 @@ export namespace ExperimentalResult {
           }
         }
         // Early termination on error - return the Err result
-        currentResult = result as unknown as Result<T, ExtractResultError<Eff>>;
+        currentResult = result as ExperimentalResult<
+          T,
+          ExtractResultError<Eff>
+        >;
         break;
       }
 
@@ -1710,15 +1713,15 @@ export namespace ExperimentalResult {
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
-  export async function asyncGen<Eff extends ExperimentalResult<any, any>, T>(
+  async asyncGen<Eff extends ExperimentalResult<any, any>, T>(
     // biome-ignore lint/suspicious/noExplicitAny: inference
     genFn: () => AsyncGenerator<Eff, T, any>,
-  ): Promise<Result<T, ExtractError<Eff>>> {
+  ): Promise<ExperimentalResult<T, ExtractError<Eff>>> {
     const iterator = genFn();
 
     // Use iteration instead of recursion to avoid stack overflow
     let nextArg: unknown;
-    let currentResult: Result<T, ExtractError<Eff>>;
+    let currentResult: ExperimentalResult<T, ExtractError<Eff>>;
 
     while (true) {
       const next = await iterator.next(nextArg);
@@ -1730,12 +1733,12 @@ export namespace ExperimentalResult {
       }
 
       // next.value is a Result (user awaits promises before yielding)
-      let result = next.value as Result<unknown, unknown>;
+      let result = next.value as ExperimentalResult<unknown, unknown>;
       let stack: string | undefined;
 
       if (isCapturedTrace(result)) {
         stack = result.stack;
-        result = result.value as Result<unknown, unknown>;
+        result = result.value as ExperimentalResult<unknown, unknown>;
       }
 
       if (result.isErr()) {
@@ -1748,7 +1751,7 @@ export namespace ExperimentalResult {
           }
         }
         // Early termination on error - return the Err result
-        currentResult = result as unknown as Result<T, ExtractError<Eff>>;
+        currentResult = result as ExperimentalResult<T, ExtractError<Eff>>;
         break;
       }
 
@@ -1778,20 +1781,20 @@ export namespace ExperimentalResult {
    * // Result<number, never>
    * ```
    */
-  export async function asyncGenAdapter<
+  async asyncGenAdapter<
     // biome-ignore lint/suspicious/noExplicitAny: inference
     Eff extends AsyncResultYieldWrap<any, any>,
     T,
   >(
     genFn: (
       adapter: <A, E2>(
-        result: Result<A, E2> | Promise<Result<A, E2>>,
+        result: ExperimentalResult<A, E2> | Promise<ExperimentalResult<A, E2>>,
       ) => AsyncResultYieldWrap<A, E2>,
       // biome-ignore lint/suspicious/noExplicitAny: inference
     ) => AsyncGenerator<Eff, T, any>,
-  ): Promise<Result<T, ExtractAsyncResultError<Eff>>> {
+  ): Promise<ExperimentalResult<T, ExtractAsyncResultError<Eff>>> {
     const adapter = <A, E2>(
-      result: Result<A, E2> | Promise<Result<A, E2>>,
+      result: ExperimentalResult<A, E2> | Promise<ExperimentalResult<A, E2>>,
     ): AsyncResultYieldWrap<A, E2> =>
       new AsyncResultYieldWrap(Promise.resolve(result));
 
@@ -1799,7 +1802,7 @@ export namespace ExperimentalResult {
 
     // Use iteration instead of recursion to avoid stack overflow
     let nextArg: unknown;
-    let currentResult: Result<T, ExtractAsyncResultError<Eff>>;
+    let currentResult: ExperimentalResult<T, ExtractAsyncResultError<Eff>>;
 
     while (true) {
       const next = await iterator.next(nextArg);
@@ -1833,7 +1836,7 @@ export namespace ExperimentalResult {
           }
         }
         // Early termination on error - return the Err result
-        currentResult = result as unknown as Result<
+        currentResult = result as ExperimentalResult<
           T,
           ExtractAsyncResultError<Eff>
         >;

@@ -44,6 +44,15 @@ export class Option<T> {
   readonly #ctx: OptionCtx;
   readonly #val: T;
 
+  /**
+   * Creates a new Option instance with internal context.
+   *
+   * @param val - Stored value or sentinel
+   * @param ctx - Internal async tracking context
+   * @param tag - Discriminant tag for Some/None
+   *
+   * @internal
+   */
   private constructor(val: T, ctx: OptionCtx, tag: "Some" | "None") {
     this.#val = val;
     this.#ctx = ctx;
@@ -57,29 +66,64 @@ export class Option<T> {
     "None",
   );
 
-  /** Create a Some containing the given value */
+  /**
+   * Creates a Some variant containing the provided value.
+   *
+   * @template Inner - Type of the wrapped value
+   * @param val - Value to wrap in Some
+   * @returns Option in the Some state
+   */
   static Some<Inner>(this: void, val: Inner): Option<Inner> {
     return new Option(val, { promiseNoneSlot: false }, "Some");
   }
 
-  /** Create Option from nullable value - returns None for null/undefined */
+  /**
+   * Creates an Option from a nullable value, returning None for null/undefined.
+   *
+   * @template T - Input type that may include null/undefined
+   * @param val - Value to convert
+   * @returns Some for non-nullish values, otherwise None
+   */
   static fromNullable<T>(val: T): Option<NonNullable<T>> {
     return val === null || val === undefined
       ? Option.None
       : Option.Some(val as NonNullable<T>);
   }
 
-  /** Create Option from potentially falsy value - returns None for falsy */
+  /**
+   * Creates an Option from a potentially falsy value, returning None for falsy.
+   *
+   * Treats false, 0, "", null, and undefined as absence.
+   *
+   * @template T - Input type
+   * @param val - Value to convert
+   * @returns Some for truthy values, otherwise None
+   */
   static fromFalsy<T>(val: T | Falsy): Option<T> {
     return val ? Option.Some(val as T) : Option.None;
   }
 
-  /** Create Option based on predicate result */
+  /**
+   * Creates an Option based on a predicate.
+   *
+   * @template T - Input type
+   * @param val - Value to test
+   * @param pred - Predicate to decide Some vs None
+   * @returns Some when predicate passes, otherwise None
+   */
   static fromPredicate<T>(val: T, pred: Predicate<T>): Option<T> {
     return pred(val) ? Option.Some(val) : Option.None;
   }
 
-  /** Wrap Promise<Option<T>> as Option<Promise<T>> */
+  /**
+   * Wraps a Promise<Option<T>> as Option<Promise<T>>.
+   *
+   * Preserves None by tracking a sentinel in the async context.
+   *
+   * @template U - Inner value type
+   * @param o - Promise resolving to an Option
+   * @returns Option containing a Promise of the inner value
+   */
   static fromPromise<U>(o: Promise<Option<U>>): Option<Promise<U>> {
     const ctx: OptionCtx = { promiseNoneSlot: false };
     const p = new Promise<U>((resolve, reject) =>
@@ -94,7 +138,15 @@ export class Option<T> {
     return new Option(p, ctx, "Some");
   }
 
-  /** Combine multiple Options - returns Some array if all are Some, else None */
+  /**
+   * Combines multiple Options into a single Option of an array.
+   *
+   * Returns Some of all values if all inputs are Some; otherwise None.
+   *
+   * @template T - Variadic tuple of Option types
+   * @param options - Options to combine
+   * @returns Some of tuple values, or None if any input is None
+   */
   static all<T extends Option<unknown>[]>(
     ...options: T
   ): Option<CombinedOptions<T>> {
@@ -108,7 +160,13 @@ export class Option<T> {
     return Option.Some(vals);
   }
 
-  /** Returns first Some, or None if all are None */
+  /**
+   * Returns the first Some in the list, or None if all are None.
+   *
+   * @template T - Value type
+   * @param options - Options to search
+   * @returns The first Some found, otherwise None
+   */
   static any<T>(...options: Option<T>[]): Option<T> {
     for (const opt of options) {
       if (opt.isSome()) return opt;
@@ -116,12 +174,22 @@ export class Option<T> {
     return Option.None;
   }
 
-  /** Type guard for Some state */
+  /**
+   * Type guard that narrows to Some.
+   *
+   * @returns true if this Option is Some
+   */
   isSome(): this is Option<T> & { readonly _tag: "Some" } {
     return this._tag === "Some" && !this.isNone();
   }
 
-  /** Type guard for None state */
+  /**
+   * Type guard that narrows to None.
+   *
+   * Includes async None tracking for Option<Promise<T>>.
+   *
+   * @returns true if this Option is None
+   */
   isNone(): this is Option<never> & { readonly _tag: "None" } {
     return (
       this._tag === "None" ||
@@ -130,12 +198,21 @@ export class Option<T> {
     );
   }
 
-  /** Type guard for Unit value */
+  /**
+   * Type guard for the UNIT sentinel value.
+   *
+   * @returns true if the contained value is UNIT
+   */
   isUnit(): this is Option<UNIT> {
     return this.#val === UNIT;
   }
 
-  /** Returns value or throws UnwrapError */
+  /**
+   * Returns the contained value or throws if None.
+   *
+   * @throws UnwrappedNone when called on None
+   * @returns The contained value
+   */
   unwrap(): T {
     if (this.isNone()) {
       throw UNWRAPPED_NONE_ERR;
@@ -143,25 +220,45 @@ export class Option<T> {
     return this.#val;
   }
 
-  /** Returns value or the provided default */
+  /**
+   * Returns the contained value or the provided default.
+   *
+   * @param defaultValue - Value to use when None
+   * @returns The contained value or default
+   */
   unwrapOr(defaultValue: T): T {
     if (this.isNone()) return defaultValue;
     return this.#val;
   }
 
-  /** Returns value or calls factory to get default */
+  /**
+   * Returns the contained value or computes a default lazily.
+   *
+   * @param fn - Default factory invoked only when None
+   * @returns The contained value or computed default
+   */
   unwrapOrElse(fn: () => T): T {
     if (this.isNone()) return fn();
     return this.#val;
   }
 
-  /** Returns value or null for None */
+  /**
+   * Returns the contained value or null for None.
+   *
+   * @returns The contained value, or null when None
+   */
   safeUnwrap(): T | null {
     if (this.isNone()) return null;
     return this.#val;
   }
 
-  /** Pattern match on Option state */
+  /**
+   * Exhaustive pattern match on Option state.
+   *
+   * @template U - Result type
+   * @param cases - Handlers for Some and None
+   * @returns Result of the matching handler
+   */
   match<U>(cases: MatchCases<T, U>): U {
     if (this.isNone()) {
       return cases.None();
@@ -173,6 +270,18 @@ export class Option<T> {
   // map() - with async overloads per spec
   // -------------------------------------------------------------------------
 
+  /**
+   * Transforms the contained value and wraps it in a new Option.
+   *
+   * If None, returns None without calling the mapper. Supports async values
+   * and async mappers; returns Option<Promise<U>> when async is involved.
+   *
+   * @template U - Result value type
+   * @param mapper - Function to transform the contained value
+   * @returns Option of the mapped value (sync or async)
+   *
+   * @see flatMap
+   */
   map<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     mapper: AsyncMapper<Curr, U>,
@@ -206,6 +315,16 @@ export class Option<T> {
     return new Option(transformed, { promiseNoneSlot: false }, "Some");
   }
 
+  /**
+   * Safely maps a promised value while tracking None in async context.
+   *
+   * @template Curr - Input value type
+   * @template U - Output value type
+   * @param p - Promise to map over
+   * @param mapper - Transform function
+   * @param ctx - Async context for None tracking
+   * @returns Promise of the transformed value or sentinel
+   */
   private static safeMap<Curr, U>(
     p: Promise<Curr>,
     mapper: (val: Curr) => U | Promise<U>,
@@ -224,6 +343,17 @@ export class Option<T> {
   // mapOr() - maps value or returns default (returns U, not Option<U>)
   // -------------------------------------------------------------------------
 
+  /**
+   * Maps the value or returns a default (unwrapped).
+   *
+   * If None, returns the default without calling fn. Supports async values
+   * and async mappers; returns Promise<U> when async is involved.
+   *
+   * @template U - Result type
+   * @param defaultVal - Value to return if None
+   * @param fn - Mapper applied when Some
+   * @returns Mapped value or default (sync or async)
+   */
   mapOr<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     defaultVal: U,
@@ -261,6 +391,18 @@ export class Option<T> {
   // flatMap() - with async overloads per spec
   // -------------------------------------------------------------------------
 
+  /**
+   * Chains operations that return Option, flattening nested Options.
+   *
+   * If None, returns None without calling the mapper. Supports async values
+   * and async mappers; returns Option<Promise<U>> when async is involved.
+   *
+   * @template U - Result value type
+   * @param mapper - Function returning an Option
+   * @returns Flattened Option result (sync or async)
+   *
+   * @see map
+   */
   flatMap<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     mapper: AsyncFlatMapper<Curr, U>,
@@ -303,7 +445,7 @@ export class Option<T> {
             } else {
               if (r.isNone()) {
                 newCtx.promiseNoneSlot = true;
-                resolve(NONE_VAL as unknown as U);
+                resolve(NONE_VAL as U);
               } else {
                 resolve(r.#val);
               }
@@ -325,6 +467,15 @@ export class Option<T> {
   // filter() - with async predicate support
   // -------------------------------------------------------------------------
 
+  /**
+   * Filters the contained value by a predicate.
+   *
+   * If Some, returns Some when predicate passes, otherwise None. Supports
+   * async values and async predicates; returns Option<Promise<T>> when async.
+   *
+   * @param pred - Predicate function
+   * @returns Option filtered by the predicate (sync or async)
+   */
   filter(pred: FilterPredicate<T>): Option<T>;
   filter(pred: AsyncPredicate<T>): Option<Promise<T>>;
   filter(
@@ -371,6 +522,16 @@ export class Option<T> {
   // zip() - with async overloads per spec
   // -------------------------------------------------------------------------
 
+  /**
+   * Pairs the original value with a derived value in a tuple.
+   *
+   * If None, returns None. Supports async values and async derivation; returns
+   * Option<Promise<[Curr, Awaited<U>]>> when async is involved.
+   *
+   * @template U - Derived value type
+   * @param fn - Function to derive a value from the contained value
+   * @returns Option of tuple with original and derived values
+   */
   zip<U, Curr>(
     this: Option<Promise<Curr>>,
     fn: (val: Curr) => U,
@@ -417,6 +578,16 @@ export class Option<T> {
   // flatZip() - with async overloads per spec
   // -------------------------------------------------------------------------
 
+  /**
+   * Pairs the original value with a derived Option value, flattening the result.
+   *
+   * If None, returns None. Supports async values and async Option derivation;
+   * returns Option<Promise<[Curr, U]>> when async is involved.
+   *
+   * @template U - Derived Option value type
+   * @param fn - Function returning an Option
+   * @returns Option of tuple with original and derived values
+   */
   flatZip<U, Curr>(
     this: Option<Promise<Curr>>,
     fn: (val: Curr) => Promise<Option<U>>,
@@ -479,7 +650,12 @@ export class Option<T> {
     return u.map((inner) => [c, inner]);
   }
 
-  /** Execute side effect for Some, return self */
+  /**
+   * Executes a side effect for Some values and returns self.
+   *
+   * @param fn - Side effect function
+   * @returns The same Option (chainable)
+   */
   tap(fn: (val: T) => void): Option<T> {
     if (this.isSome()) {
       fn(this.#val);
@@ -487,7 +663,13 @@ export class Option<T> {
     return this;
   }
 
-  /** Convert Option to Result */
+  /**
+   * Converts this Option to a Result, using the provided error for None.
+   *
+   * @template E - Error type
+   * @param error - Error value for None
+   * @returns Ok with value when Some, otherwise Err with error
+   */
   toResult<E>(error: E): Result<T, E> {
     if (this.isNone()) {
       return Result.Err(error);
@@ -495,7 +677,12 @@ export class Option<T> {
     return Result.Ok(this.#val);
   }
 
-  /** Resolve inner Promise and maintain Option structure */
+  /**
+   * Resolves the inner promise (if any) while preserving Option structure.
+   *
+   * @template Curr - Awaited value type
+   * @returns Promise of Option with awaited value, or None
+   */
   async toPromise<Curr = Awaited<T>>(): Promise<Option<Curr>> {
     if (this.isNone()) {
       return Option.None;
@@ -517,7 +704,15 @@ export class Option<T> {
     return new Option(inner, this.#ctx, "Some");
   }
 
-  /** Map over array elements inside Option */
+  /**
+   * Maps over array elements inside an Option<Array<T>>.
+   *
+   * @template Inner - Array element type
+   * @template Out - Mapped element type
+   * @param mapper - Function to map each element
+   * @returns Option containing the mapped array
+   * @throws TypeError if called on a non-array value
+   */
   innerMap<Inner, Out>(
     this: Option<Array<Inner>>,
     mapper: (val: Inner) => Out,
@@ -531,7 +726,11 @@ export class Option<T> {
     return new Option((this.#val as Inner[]).map(mapper), this.#ctx, "Some");
   }
 
-  /** String representation */
+  /**
+   * Returns a string representation of the Option.
+   *
+   * @returns "Option::None" or "Option::Some(value)"
+   */
   toString(): string {
     if (this.isNone()) return "Option::None";
     return `Option::Some(${String(this.#val)})`;

@@ -1,7 +1,7 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js";
 import { Option } from "./option.js";
 import { UNIT } from "./unit.js";
-import { CapturedTrace, isPromiseLike } from "./utils.js";
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js";
 
 type Mapper<T, U> = (val: T) => U;
 type AsyncMapper<T, U> = (val: T) => Promise<U>;
@@ -62,6 +62,60 @@ interface MatchCases<T, E, U> {
   Err: (err: E) => U;
 }
 
+/**
+ * Wrapper that makes Result yieldable with proper type tracking.
+ * The Generator signature ensures TypeScript tracks the inner type T.
+ *
+ * @internal
+ */
+class ResultYieldWrap<T, E> {
+  constructor(readonly result: Result<T, E>) {}
+
+  *[Symbol.iterator](): Generator<ResultYieldWrap<T, E>, T, unknown> {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(this, trace) as unknown as ResultYieldWrap<
+      T,
+      E
+    >) as T;
+  }
+}
+
+/**
+ * Wrapper that makes Result yieldable in async generators with proper type tracking.
+ * Supports Promise<Result<T, E>> for async result chaining.
+ *
+ * @internal
+ */
+class AsyncResultYieldWrap<T, E> {
+  constructor(readonly result: Promise<Result<T, E>>) {}
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<
+    AsyncResultYieldWrap<T, E>,
+    T,
+    unknown
+  > {
+    const trace = new Error().stack;
+    return (yield new CapturedTrace(
+      this,
+      trace,
+    ) as unknown as AsyncResultYieldWrap<T, E>) as T;
+  }
+}
+
+/** Extract error type from yielded values */
+type ExtractResultError<T> =
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  T extends ResultYieldWrap<any, infer E> ? E : never;
+
+/** Extract error type from async yielded values */
+type ExtractAsyncResultError<T> =
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  T extends AsyncResultYieldWrap<any, infer E> ? E : never;
+
+/** Extract error type directly from Result */
+// biome-ignore lint/suspicious/noExplicitAny: inference
+type ExtractError<T> = T extends Result<any, infer E> ? E : never;
+
 export class Result<T, E> {
   /** Discriminant tag for type-level identification */
   readonly _tag: "Ok" | "Err";
@@ -107,22 +161,44 @@ export class Result<T, E> {
     "Ok",
   );
 
-  /** Create an Ok containing the given value */
+  /**
+   * Creates an Ok containing the given value.
+   *
+   * @template T - Success value type
+   * @template E - Error type (defaults to never)
+   * @param val - Success value
+   * @returns Result in the Ok state
+   */
   static Ok<T, E = never>(this: void, val: T): Result<T, E> {
     return new Result(val, undefined as E, { asyncErr: NO_ERR }, "Ok");
   }
 
-  /** Create an Err containing the given error */
+  /**
+   * Creates an Err containing the given error.
+   *
+   * @template E - Error type
+   * @template T - Success value type (defaults to never)
+   * @param err - Error value
+   * @returns Result in the Err state
+   */
   static Err<E, T = never>(this: void, err: E): Result<T, E> {
     return new Result(ERR_VAL as T, err, { asyncErr: NO_ERR }, "Err");
   }
 
-  /** Type guard for Ok state */
+  /**
+   * Type guard for Ok state.
+   *
+   * @returns true if this Result is Ok
+   */
   isOk(): this is Result<T, never> {
     return this._tag === "Ok" && this.#ctx.asyncErr === NO_ERR;
   }
 
-  /** Type guard for Err state */
+  /**
+   * Type guard for Err state.
+   *
+   * @returns true if this Result is Err
+   */
   isErr(): this is Result<never, E> {
     return (
       this._tag === "Err" ||
@@ -131,11 +207,20 @@ export class Result<T, E> {
     );
   }
 
-  /** Type guard for Unit value */
+  /**
+   * Type guard for Ok containing UNIT.
+   *
+   * @returns true if the Ok value is UNIT
+   */
   isUnit(): this is Result<UNIT, never> {
     return this.#val === UNIT;
   }
 
+  /**
+   * Returns a string representation of the Result.
+   *
+   * @returns "Result::Ok<value>" or "Result::Err<error>"
+   */
   toString(): string {
     if (this.isOk()) {
       return `Result::Ok<${String(this.#val)}>`;
@@ -143,7 +228,16 @@ export class Result<T, E> {
     return `Result::Err<${String(this.getErr())}>`;
   }
 
-  /** Returns value or throws (re-throws if E extends Error) */
+  /**
+   * Returns the contained value or throws.
+   *
+   * If Err and the error is an Error, re-throws it; otherwise throws
+   * UnwrappedOkWithErr. For async values, returns a Promise that rejects
+   * on error.
+   *
+   * @returns The contained value (sync or async)
+   * @throws Error or UnwrappedOkWithErr when Err
+   */
   unwrap(this: Result<Promise<T>, E>): Promise<T>;
   unwrap(this: Result<T, E>): T;
   unwrap() {
@@ -174,7 +268,15 @@ export class Result<T, E> {
     return curr;
   }
 
-  /** Returns error or throws UnwrapError */
+  /**
+   * Returns the contained error or throws.
+   *
+   * For async values, returns a Promise resolving to the error or rejecting
+   * with UnwrappedErrWithOk when Ok.
+   *
+   * @returns The contained error (sync or async)
+   * @throws UnwrappedErrWithOk when called on Ok
+   */
   unwrapErr<T, E>(this: Result<T, E>): E;
   unwrapErr<T, E>(this: Result<Promise<T>, E>): Promise<E>;
   unwrapErr() {
@@ -201,7 +303,14 @@ export class Result<T, E> {
     throw new UnwrappedErrWithOk(this.toString());
   }
 
-  /** Returns value or the provided default */
+  /**
+   * Returns the contained value or the provided default.
+   *
+   * For async values, returns a Promise resolving to the value or default.
+   *
+   * @param defaultValue - Fallback value when Err
+   * @returns The contained value or default (sync or async)
+   */
   unwrapOr<Curr = Awaited<T>>(
     this: Result<Promise<Curr>, E>,
     defaultValue: Curr,
@@ -223,7 +332,15 @@ export class Result<T, E> {
     return curr as T;
   }
 
-  /** Returns value or calls factory with error to get default */
+  /**
+   * Returns the contained value or computes a default from the error.
+   *
+   * For async values, returns a Promise resolving to the value or computed
+   * default.
+   *
+   * @param fn - Function that maps the error to a fallback value
+   * @returns The contained value or computed default (sync or async)
+   */
   unwrapOrElse<Curr = Awaited<T>>(
     this: Result<Promise<Curr>, E>,
     fn: (err: E) => Curr,
@@ -248,7 +365,13 @@ export class Result<T, E> {
     return curr as T;
   }
 
-  /** Safe unwrap - returns null for Err */
+  /**
+   * Safely unwraps the value, returning null for Err.
+   *
+   * For async values, returns a Promise resolving to the value or null.
+   *
+   * @returns The contained value or null (sync or async)
+   */
   safeUnwrap(this: Result<never, E>): null;
   safeUnwrap<Curr = Awaited<T>>(
     this: Result<Promise<Curr>, E>,
@@ -270,7 +393,13 @@ export class Result<T, E> {
     return curr === ERR_VAL ? null : (curr as T);
   }
 
-  /** Pattern match on Result state */
+  /**
+   * Exhaustive pattern match on Result state.
+   *
+   * @template U - Result type of the handlers
+   * @param cases - Handlers for Ok and Err
+   * @returns Result of the matching handler
+   */
   match<U>(cases: MatchCases<T, E, U>): U {
     if (this.isErr()) {
       return cases.Err(this.getErr());
@@ -282,6 +411,23 @@ export class Result<T, E> {
   // map() - with async overloads per spec
   // -------------------------------------------------------------------------
 
+  /**
+   * Transforms the success value using the provided function.
+   *
+   * If the Result is Ok, applies the function to the value and wraps the result
+   * in a new Ok. If Err, propagates the error unchanged without calling the function.
+   *
+   * @param fn - Function to transform the success value
+   * @returns Result<U, E> with transformed value or propagated error
+   *
+   * @example
+   * ```ts
+   * Result.Ok(42).map((x) => x * 2);           // Ok(84)
+   * Result.Err("fail").map((x) => x * 2);       // Err("fail")
+   * ```
+   *
+   * @see flatMap
+   */
   map<T, U, E>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<U>,
@@ -325,6 +471,18 @@ export class Result<T, E> {
     return new Result(next, parentErr, { asyncErr: NO_ERR }, "Ok");
   }
 
+  /**
+   * Safely maps a promised Ok value while propagating async errors.
+   *
+   * @template In - Input value type
+   * @template U - Output value type
+   * @template E - Error type
+   * @param p - Promise of Ok value or ERR sentinel
+   * @param mapper - Transform function
+   * @param ctx - New async context to populate on error
+   * @param parentCtx - Parent async context to read error from
+   * @returns Promise of transformed value or ERR sentinel
+   */
   private static safeMap<In, U, E>(
     p: Promise<In | typeof ERR_VAL>,
     mapper: (val: In) => U | Promise<U>,
@@ -334,7 +492,7 @@ export class Result<T, E> {
     return p.then((v) => {
       if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
         ctx.asyncErr = parentCtx.asyncErr as E;
-        return ERR_VAL as unknown as U;
+        return ERR_VAL as U;
       }
       return mapper(v as In);
     }) as Promise<U>;
@@ -344,6 +502,27 @@ export class Result<T, E> {
   // mapErr() - transforms error while preserving success value
   // -------------------------------------------------------------------------
 
+  /**
+   * Transforms the error value while preserving the success value.
+   *
+   * If the Result is Err, applies the function to the error. If Ok, returns
+   * the Ok unchanged without calling the function.
+   *
+   * @param fn - Function to transform the error
+   * @returns Result<T, E2> with transformed error or original Ok
+   *
+   * @example
+   * ```ts
+   * Result.Err("network error").mapErr((e) => `Network: ${e}`); // Err("Network: network error")
+   * Result.Ok(42).mapErr((e) => `Error: ${e}`);                  // Ok(42)
+   *
+   * // Add context to errors
+   * fetchData()
+   *   .mapErr((e) => new ContextualError("Failed to fetch data", e));
+   * ```
+   *
+   * @see mapBoth
+   */
   mapErr<U>(fn: Mapper<E, U>): Result<T, U> {
     if (this._tag === "Err") {
       const mappedErr = fn(this.getErr());
@@ -364,7 +543,7 @@ export class Result<T, E> {
         }
         return v;
       });
-      return new Result(p as unknown as T, undefined as U, newCtx, "Ok");
+      return new Result(p as T, undefined as U, newCtx, "Ok");
     }
 
     return new Result(this.#val, undefined as U, { asyncErr: NO_ERR }, "Ok");
@@ -374,6 +553,16 @@ export class Result<T, E> {
   // mapBoth() - transforms both tracks simultaneously
   // -------------------------------------------------------------------------
 
+  /**
+   * Transforms both the Ok and Err values.
+   *
+   * Applies fnOk when Ok and fnErr when Err. Supports async Ok values via
+   * overloads; returns Result with mapped types.
+   *
+   * @param fnOk - Mapper for Ok values
+   * @param fnErr - Mapper for Err values
+   * @returns Result with both branches transformed
+   */
   mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (val: E) => E2): Result<T2, E2>;
   mapBoth<T2, E2, In = Awaited<T2>>(
     fnOk: (val: In) => T2,
@@ -403,6 +592,31 @@ export class Result<T, E> {
   // flatMap() - chains Result-returning functions
   // -------------------------------------------------------------------------
 
+  /**
+   * Chains operations that return Results, flattening nested Results.
+   *
+   * If the Result is Ok, applies the function (which returns a new Result) and
+   * returns that Result directly. If Err, propagates the error unchanged.
+   *
+   * Error types are unified: `Result<U, E | E2>`.
+   *
+   * @param fn - Function that returns a Result
+   * @returns Result<U, E | E2> from the function or propagated error
+   *
+   * @example
+   * ```ts
+   * // Success chain
+   * Result.Ok(42)
+   *   .flatMap((x) => Result.Ok(x + 1))        // Ok(43)
+   *   .flatMap((x) => Result.Err("too big"));  // Err("too big")
+   *
+   * // Error propagation
+   * Result.Err("initial").flatMap((x) => Result.Ok(x + 1)); // Err("initial")
+   * ```
+   *
+   * @see map
+   * @see flatZip
+   */
   flatMap<T, U, E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Result<Promise<U>, E2>,
@@ -455,7 +669,7 @@ export class Result<T, E> {
       );
     }
 
-    const curr = this.#val as unknown as Promise<In> | In;
+    const curr = this.#val as Promise<In> | In;
     const parentErr = this.#err;
     const parentCtx = this.#ctx;
     const newCtx: ResultCtx<E | E2> = { asyncErr: NO_ERR };
@@ -503,6 +717,17 @@ export class Result<T, E> {
     );
   }
 
+  /**
+   * Normalizes sync/async flatMap outputs to a value or Promise.
+   *
+   * @template U - Success value type
+   * @template E - Original error type
+   * @template E2 - Mapped error type
+   * @template T - Input value type
+   * @param mutableCtx - Mutable context for async error propagation
+   * @param mapped - FlatMap output (sync or async Result)
+   * @returns Value, Promise, or ERR sentinel
+   */
   private static flatMapHelper<U, E, E2, T>(
     mutableCtx: ResultCtx<E | E2>,
     mapped: FlatZipInput<T, U, E | E2>,
@@ -513,6 +738,16 @@ export class Result<T, E> {
     return Result.flatMapInnerHelper(mutableCtx, mapped);
   }
 
+  /**
+   * Extracts the inner value from a Result, updating error context on failure.
+   *
+   * @template U - Success value type
+   * @template E - Original error type
+   * @template E2 - Mapped error type
+   * @param mutableCtx - Mutable context for async error propagation
+   * @param r - Inner Result to unwrap
+   * @returns Value, Promise, or ERR sentinel
+   */
   private static flatMapInnerHelper<U, E, E2>(
     mutableCtx: ResultCtx<E | E2>,
     r: Result<Promise<U>, E | E2> | Result<U, E | E2>,
@@ -541,6 +776,27 @@ export class Result<T, E> {
     return innerVal;
   }
 
+  /**
+   * Pairs the original value with a derived value in a tuple.
+   *
+   * Unlike `map` which replaces the value, `zip` keeps the original and adds
+   * the derived value, creating `[original, derived]`.
+   *
+   * @param fn - Function to derive a value from the original
+   * @returns Result<[T, U], E> containing tuple of original and derived values
+   *
+   * @example
+   * ```ts
+   * Result.Ok(42).zip((x) => x * 10);        // Ok([42, 420])
+   * Result.Err("fail").zip((x) => x * 10);   // Err("fail")
+   *
+   * // Keep original while computing related value
+   * Result.Ok(user).zip((u) => u.permissions.length); // Ok([user, 5])
+   * ```
+   *
+   * @see flatZip
+   * @see map
+   */
   zip<T, U, In = Awaited<T>>(
     this: Result<Promise<In>, E>,
     fn: (val: In) => Promise<U>,
@@ -607,6 +863,30 @@ export class Result<T, E> {
   // flatZip() - pairs original value with value from another Result
   // -------------------------------------------------------------------------
 
+  /**
+   * Combines the current Result with another independent Result in a tuple.
+   *
+   * Unlike `zip` which derives a value from the original, `flatZip` works with
+   * two independent Results. If either is Err, propagates the first error.
+   *
+   * For async Results, use `flatZipAsync` instead.
+   *
+   * @param fn - Function that receives the value and returns another Result
+   * @returns Result<[T, U], E | E2> containing tuple of both values, or error
+   *
+   * @example
+   * ```ts
+   * Result.Ok(42)
+   *   .flatZip((x) => Result.Ok(x + 5))       // Ok([42, 47])
+   *   .flatZip(([a, b]) => Result.Err("x"));  // Err("x")
+   *
+   * Result.Ok(42).flatZip((x) => Result.Err("fail")); // Err("fail")
+   * Result.Err("init").flatZip((x) => Result.Ok(5)); // Err("init")
+   * ```
+   *
+   * @see zip
+   * @see flatMap
+   */
   flatZip<U, E2, In = Awaited<T>>(
     this: Result<Promise<In>, E>,
     fn: (val: In) => FlatZipInput<In, U, E | E2>,
@@ -682,6 +962,18 @@ export class Result<T, E> {
     return new Result(p as [In, Awaited<U>], parentErr as E | E2, newCtx, "Ok");
   }
 
+  /**
+   * Normalizes sync/async flatZip outputs to a tuple or ERR sentinel.
+   *
+   * @template U - Derived value type
+   * @template E - Original error type
+   * @template E2 - Mapped error type
+   * @template In - Original value type
+   * @param mutableCtx - Mutable context for async error propagation
+   * @param originalVal - Original value to preserve
+   * @param mapped - FlatZip output (sync or async Result)
+   * @returns Tuple, Promise of tuple, or ERR sentinel
+   */
   private static flatZipHelper<U, E, E2, In>(
     mutableCtx: ResultCtx<E | E2>,
     originalVal: In,
@@ -699,6 +991,18 @@ export class Result<T, E> {
     return Result.flatZipInnerHelper(mutableCtx, originalVal, mapped);
   }
 
+  /**
+   * Extracts the inner value for flatZip, updating error context on failure.
+   *
+   * @template U - Derived value type
+   * @template E - Original error type
+   * @template E2 - Mapped error type
+   * @template In - Original value type
+   * @param mutableCtx - Mutable context for async error propagation
+   * @param originalVal - Original value to preserve
+   * @param r - Inner Result to unwrap
+   * @returns Tuple, Promise of tuple, or ERR sentinel
+   */
   private static flatZipInnerHelper<U, E, E2, In>(
     mutableCtx: ResultCtx<E | E2>,
     originalVal: In,
@@ -733,6 +1037,17 @@ export class Result<T, E> {
   // zipErr() - combines errors while retaining original value
   // -------------------------------------------------------------------------
 
+  /**
+   * Runs a Result-producing function and turns Ok into Err on failure.
+   *
+   * If this Result is Ok, calls fn with the value. If fn returns Err, the
+   * resulting Result becomes Err while the original Ok value is preserved
+   * when fn succeeds.
+   *
+   * @template E2 - Additional error type
+   * @param fn - Function producing a Result
+   * @returns Result with original value or combined error
+   */
   zipErr<E2>(
     this: Result<Promise<T>, E>,
     fn: (val: T) => Promise<Result<unknown, E2>>,
@@ -783,12 +1098,7 @@ export class Result<T, E> {
     const newP = Result.zipErrHelper(curr as In, r, newCtx);
 
     if (isPromiseLike(newP)) {
-      return new Result(
-        newP as unknown as T,
-        parentErr as E | E2,
-        newCtx,
-        "Ok",
-      );
+      return new Result(newP as T, parentErr as E | E2, newCtx, "Ok");
     }
 
     if (newCtx.asyncErr !== NO_ERR) {
@@ -798,6 +1108,16 @@ export class Result<T, E> {
     return new Result(newP as unknown as T, parentErr as E | E2, newCtx, "Ok");
   }
 
+  /**
+   * Tracks errors from a Result while preserving the original value.
+   *
+   * @template In - Original value type
+   * @template E - Error type
+   * @param v - Original value to preserve
+   * @param r - Result to inspect for errors
+   * @param newCtx - Context to populate on error
+   * @returns Original value or Promise of value
+   */
   private static zipErrHelper<In, E>(
     v: In,
     r: Result<unknown, E> | Promise<Result<unknown, E>>,
@@ -822,6 +1142,44 @@ export class Result<T, E> {
   // Validation
   // ==========================================================================
 
+  /**
+   * Runs multiple validators on the Ok value, collecting ALL errors.
+   *
+   * Unlike most Result methods which short-circuit on the first error,
+   * `validate` runs ALL validators and collects all errors together.
+   * This is useful for form validation where you want to show all errors at once.
+   *
+   * If the Result is Err, returns it unchanged without running validators.
+   *
+   * Supports both sync and async validators. If any validator is async,
+   * returns `Promise<Result<T, E | VE[]>>`.
+   *
+   * @param validators - Array of validator functions that return Result
+   * @returns Result<T, E | VE[]> with original value or array of all errors
+   *
+   * @example
+   * ```ts
+   * const validators = [
+   *   (x: number) => x > 0 ? Result.Ok(true) : Result.Err("must be positive"),
+   *   (x: number) => x < 100 ? Result.Ok(true) : Result.Err("must be < 100"),
+   *   (x: number) => x % 2 === 0 ? Result.Ok(true) : Result.Err("must be even"),
+   * ];
+   *
+   * Result.Ok(42).validate(validators);                // Ok(42)
+   * Result.Ok(101).validate(validators);               // Err(["must be < 100"])
+   * Result.Ok(-5).validate(validators);                // Err(["must be positive", "must be even"])
+   * Result.Err("init").validate(validators);           // Err("init") - validators not run
+   *
+   * // With async validators (returns Promise<Result<...>>)
+   * await Result.Ok(data).validate([
+   *   async (d) => await validateEmail(d),
+   *   async (d) => await validatePhone(d),
+   * ]);
+   * ```
+   *
+   * @see validateAsync
+   * @see all
+   */
   validate<VE extends unknown[]>(
     this: Result<T, E>,
     validators: { [K in keyof VE]: (val: T) => Result<unknown, VE[K]> },
@@ -924,6 +1282,16 @@ export class Result<T, E> {
     return combinedRes.isErr() ? combinedRes : this;
   }
 
+  /**
+   * Collapses validator Results into a single value or ERR sentinel.
+   *
+   * @template Val - Success value type
+   * @template Err - Error type
+   * @param results - Validator Results to combine
+   * @param currCtx - Context to populate on error
+   * @param currVal - Original value to return on success
+   * @returns Original value, Promise of value, or ERR sentinel
+   */
   private static validateHelper<Val, Err>(
     results: Result<unknown, unknown>[],
     currCtx: ResultCtx<Err>,
@@ -935,7 +1303,7 @@ export class Result<T, E> {
       return combinedRes.#val.then((v) => {
         if (v === ERR_VAL || combinedRes.#ctx.asyncErr !== NO_ERR) {
           currCtx.asyncErr = combinedRes.getErr() as Err;
-          return ERR_VAL as unknown as Val;
+          return ERR_VAL as Val;
         }
         return currVal as Val;
       }) as Promise<Val>;
@@ -943,7 +1311,7 @@ export class Result<T, E> {
 
     if (combinedRes.isErr()) {
       currCtx.asyncErr = combinedRes.getErr() as Err;
-      return ERR_VAL as unknown as Val;
+      return ERR_VAL as Val;
     }
     return currVal as Val;
   }
@@ -952,6 +1320,39 @@ export class Result<T, E> {
   // Aggregation
   // ==========================================================================
 
+  /**
+   * Combines multiple Results, collecting all values or all errors.
+   *
+   * Unlike typical Result behavior which short-circuits on first error,
+   * `all` collects ALL errors from all Results. This is useful when you
+   * want to show complete validation feedback.
+   *
+   * - All Ok → `Ok([...values])` with preserved tuple types
+   * - Any Err → `Err([...errors])` collecting ALL errors
+   *
+   * @param results - Variable number of Results to combine
+   * @returns Result with tuple of all values, or array of all errors
+   *
+   * @example
+   * ```ts
+   * Result.all(Result.Ok(1), Result.Ok(2), ExperimentalResult.Ok(3));     // Ok([1, 2, 3])
+   * Result.all(Result.Ok(1), Result.Err("a"), Result.Err("b")); // Err(["a", "b"])
+   * Result.all();                                            // Ok([])
+   *
+   * // Real-world: Parallel validation
+   * const [user, posts, likes] = await Promise.all([
+   *   fetchUser(id),
+   *   fetchPosts(id),
+   *   fetchLikes(id),
+   * ]);
+   *
+   * const combined = Result.all(user, posts, likes);
+   * // Ok([User, Post[], Like[]]) or Err([...errors])
+   * ```
+   *
+   * @see any
+   * @see validate
+   */
   static all<T extends Result<unknown, unknown>[]>(
     ...results: T
   ): HasPromise<T> extends true
@@ -1012,7 +1413,42 @@ export class Result<T, E> {
     >;
   }
 
-  /** Returns first Ok, or collects all errors */
+  /**
+   * Returns the first Ok, or collects all errors if all are Err.
+   *
+   * Useful for fallback chains where you want the first success, but want
+   * to collect all errors if everything fails.
+   *
+   * - First Ok → Returns that Ok immediately
+   * - All Err → `Err([...all errors])`
+   *
+   * @param results - Variable number of Results to check
+   * @returns First Ok found, or Err with array of all errors
+   *
+   * @example
+   * ```ts
+   * Result.any(
+   *   Result.Err("Error 1"),
+   *   Result.Ok("First success"),
+   *   Result.Ok("Second success"),
+   * ); // Ok("First success")
+   *
+   * Result.any(
+   *   Result.Err("Error 1"),
+   *   Result.Err("Error 2"),
+   *   Result.Err("Error 3"),
+   * ); // Err(["Error 1", "Error 2", "Error 3"])
+   *
+   * // Fallback chain
+   * Result.any(
+   *   fetchFromCache(key),
+   *   fetchFromDb(key),
+   *   fetchFromRemote(key),
+   * );
+   * ```
+   *
+   * @see all
+   */
   static any<U, F>(...results: Result<U, F>[]): Result<U, F[]> {
     for (const r of results) {
       if (r.isOk()) return r as Result<U, F[]>;
@@ -1024,7 +1460,30 @@ export class Result<T, E> {
   // Utility Methods
   // ==========================================================================
 
-  /** Execute side effect for Ok, return self */
+  /**
+   * Executes a side effect function for Ok values, then returns self.
+   *
+   * Useful for logging, debugging, or executing effects without breaking the
+   * method chain. The function is only called if the Result is Ok.
+   *
+   * @param fn - Function to execute with the Ok value
+   * @returns The same Result (chainable)
+   *
+   * @example
+   * ```ts
+   * Result.Ok(42)
+   *   .tap((x) => console.log(`Processing: ${x}`))
+   *   .map((x) => x * 2);
+   * // Logs: "Processing: 42"
+   * // Returns: Ok(84)
+   *
+   * // Err - tap does nothing
+   * Result.Err("fail").tap((x) => console.log(x)); // Err("fail")
+   * ```
+   *
+   * @see tapErr
+   */
+
   tap<Curr = Awaited<T>>(
     this: Result<Promise<Curr>, E>,
     fn: (val: Curr) => void,
@@ -1055,7 +1514,29 @@ export class Result<T, E> {
     return this;
   }
 
-  /** Execute side effect for Err, return self */
+  /**
+   * Executes a side effect function for Err values, then returns self.
+   *
+   * Useful for logging errors or executing cleanup without breaking the chain.
+   * The function is only called if the Result is Err.
+   *
+   * @param fn - Function to execute with the error (sync or async)
+   * @returns The same Result (chainable)
+   *
+   * @example
+   * ```ts
+   * Result.Err("Connection failed")
+   *   .tapErr((err) => console.error(`[Error Log] ${new Date().toISOString()}: ${err}`))
+   *   .orElse((e) => Result.Ok(defaultValue));
+   * // Logs error timestamp
+   * // Returns: Ok(defaultValue)
+   *
+   * // Ok - tapErr does nothing
+   * Result.Ok(42).tapErr((e) => console.log(e)); // Ok(42)
+   * ```
+   *
+   * @see tap
+   */
   tapErr(fn: (err: E) => void): Result<T, E> {
     if (this.isErr()) {
       fn(this.getErr());
@@ -1063,7 +1544,26 @@ export class Result<T, E> {
     return this;
   }
 
-  /** Swap Ok and Err */
+  /**
+   * Swaps the Ok and Err states, turning success into failure and vice versa.
+   *
+   * Useful for inverting the meaning of a Result, such as converting
+   * validation errors to successes and valid values to errors.
+   *
+   * @returns Result<E, T> with swapped states
+   *
+   * @example
+   * ```ts
+   * Result.Ok("Success value").flip(); // Err("Success value")
+   * Result.Err("Error value").flip();  // Ok("Error value")
+   *
+   * // Invert validation (fail if value is in blacklist)
+   * const blacklist = ["admin", "root"];
+   * const isBlacklisted = (name: string) =>
+   *   Result.fromPredicate(name, (n) => !blacklist.includes(n), "blacklisted")
+   *     .flip(); // Ok if blacklisted, Err if not
+   * ```
+   */
   flip(): Result<E, T> {
     if (this.isErr()) {
       return new Result(
@@ -1081,13 +1581,38 @@ export class Result<T, E> {
     );
   }
 
-  /** Convert Result to Option (discards error info) */
+  /**
+   * Converts Result to Option, discarding error information.
+   *
+   * - Ok(value) → Some(value)
+   * - Err(error) → None
+   *
+   * Use when you only care about presence/absence of a value, not the error.
+   *
+   * @returns Option<T> - Some if Ok, None if Err
+   *
+   * @example
+   * ```ts
+   * Result.Ok(42).toOption();   // Some(42)
+   * Result.Err("fail").toOption(); // None
+   *
+   * // Safe user lookup
+   * const userOpt = fetchUser(id).toOption();
+   * // User or None, regardless of why fetch failed
+   * ```
+   *
+   * @see Option.toResult
+   */
   toOption(): Option<T> {
     if (this.isErr()) return Option.None;
     return Option.Some(this.#val);
   }
 
-  /** Resolve inner Promise and maintain Result structure */
+  /**
+   * Resolves the inner promise while preserving Result structure.
+   *
+   * @returns Promise of Result with awaited value or Err
+   */
   async toPromise(): Promise<Result<Awaited<T>, E>> {
     const v = await this.#val;
 
@@ -1105,12 +1630,27 @@ export class Result<T, E> {
     return new Result(v as Awaited<T>, this.#err, { asyncErr: NO_ERR }, "Ok");
   }
 
-  /** Map over array elements inside Result */
+  /**
+   * Maps over array elements inside a Result<Array<T>, E>.
+   *
+   * Applies the mapper function to each element if the Result is Ok and
+   * contains an array. Propagates Err unchanged.
+   *
+   * @param mapper - Function to map over each array element
+   * @returns Result<Array<Out>, E> with mapped array or propagated error
+   * @throws Error if the Result is Ok but value is not an array
+   *
+   * @example
+   * ```ts
+   * Result.Ok([1, 2, 3]).innerMap((x) => x * 2); // Ok([2, 4, 6])
+   * Result.Err("fail").innerMap((x) => x * 2);    // Err("fail")
+   * ```
+   */
   innerMap<In, E, Out>(
     this: Result<Array<In>, E>,
     mapper: (val: NoInfer<In>) => Out,
   ): Result<Array<Out>, E> {
-    if (this.isErr()) return this as unknown as Result<Array<Out>, E>;
+    if (this.isErr()) return this as Result<Array<Out>, E>;
 
     if (Array.isArray(this.#val)) {
       return new Result(this.#val.map(mapper), this.#err, this.#ctx, "Ok");
@@ -1119,15 +1659,34 @@ export class Result<T, E> {
     throw new Error("Can only be called for Result<Array<T>, E>");
   }
 
-  /** Recover from error by providing fallback Result */
+  /**
+   * Recovers from Err by providing a fallback Result.
+   *
+   * If Ok, returns self unchanged.
+   *
+   * @template T2 - Fallback success type
+   * @template E2 - Fallback error type
+   * @param fn - Function to produce a fallback Result from the error
+   * @returns Original Ok or fallback Result
+   */
   orElse<T2, E2>(fn: (err: E) => Result<T2, E2>): Result<T | T2, E2> {
-    if (this.isOk()) return this as unknown as Result<T | T2, E2>;
+    if (this.isOk()) return this as Result<T | T2, E2>;
     return fn(this.getErr());
   }
 
   // Static Constructors
 
-  /** Create Result from nullable value - returns Err for null/undefined */
+  /**
+   * Creates a Result from a nullable value.
+   *
+   * Returns Err when the value is null or undefined, otherwise Ok.
+   *
+   * @template T - Input value type
+   * @template E - Error type
+   * @param val - Value to wrap
+   * @param error - Error value for null/undefined
+   * @returns Ok with value or Err with error
+   */
   static fromNullable<T, E>(
     this: void,
     val: T | null | undefined,
@@ -1138,7 +1697,18 @@ export class Result<T, E> {
       : Result.Ok(val as NonNullable<T>);
   }
 
-  /** Create Result based on predicate result */
+  /**
+   * Creates a Result based on a predicate.
+   *
+   * Returns Ok when predicate passes, otherwise Err.
+   *
+   * @template T - Input value type
+   * @template E - Error type
+   * @param val - Value to test
+   * @param pred - Predicate to decide Ok vs Err
+   * @param error - Error value for predicate failure
+   * @returns Ok with value or Err with error
+   */
   static fromPredicate<T, E>(
     this: void,
     val: T,
@@ -1148,7 +1718,16 @@ export class Result<T, E> {
     return pred(val) ? Result.Ok(val) : Result.Err(error);
   }
 
-  /** Wrap Promise<Result<T, E>> as Result<Promise<T>, E> */
+  /**
+   * Wraps a Promise<Result<T, E>> as Result<Promise<T>, E>.
+   *
+   * Preserves Err by tracking async error context.
+   *
+   * @template U - Success value type
+   * @template F - Error type
+   * @param promise - Promise resolving to a Result
+   * @returns Result containing a Promise of the success value
+   */
   static fromPromise<U, F>(
     this: void,
     promise: Promise<Result<U, F>>,
@@ -1162,7 +1741,7 @@ export class Result<T, E> {
         } catch {
           // Should not happen for Err result
         }
-        return ERR_VAL as unknown as U;
+        return ERR_VAL as U;
       }
       return innerResult.unwrap();
     });
@@ -1175,7 +1754,15 @@ export class Result<T, E> {
     );
   }
 
-  /** Catches sync exceptions */
+  /**
+   * Catches synchronous exceptions and converts them to Err.
+   *
+   * @template T - Success value type
+   * @template E - Error type
+   * @param fn - Function that may throw
+   * @param errorMapper - Optional mapper for thrown errors
+   * @returns Ok with return value or Err with mapped error
+   */
   static tryCatch<T, E = unknown>(
     this: void,
     fn: () => T,
@@ -1188,7 +1775,15 @@ export class Result<T, E> {
     }
   }
 
-  /** Catches async exceptions */
+  /**
+   * Catches async exceptions and converts them to Err.
+   *
+   * @template T - Success value type
+   * @template E - Error type
+   * @param fn - Async function that may throw
+   * @param errorMapper - Optional mapper for thrown errors
+   * @returns Result containing a Promise of the success value
+   */
   static tryAsyncCatch<T, E = unknown>(
     this: void,
     fn: () => Promise<T>,
@@ -1200,7 +1795,7 @@ export class Result<T, E> {
       .then((v) => v)
       .catch((e) => {
         ctx.asyncErr = errorMapper ? errorMapper(e) : (e as E);
-        return ERR_VAL as unknown as T;
+        return ERR_VAL as T;
       });
 
     return Result[RESULT_INTERNAL].create<Promise<T>, E>(
@@ -1218,7 +1813,7 @@ export class Result<T, E> {
    * @example
    * ```ts
    * const result = Result.gen(function* () {
-   *   const value = yield* ExperimentalResult.Ok(42);
+   *   const value = yield* Result.Ok(42);
    *   return value * 2;
    * });
    * ```
@@ -1238,7 +1833,7 @@ export class Result<T, E> {
    * @example
    * ```ts
    * const result = await Result.asyncGen(async function* () {
-   *   const value = yield* $(ExperimentalResult.Ok(42));
+   *   const value = yield* $(Result.Ok(42));
    *   return value * 2;
    * });
    * ```
@@ -1249,5 +1844,303 @@ export class Result<T, E> {
       T,
       E
     >) as T;
+  }
+
+  /**
+   * Generator-based syntax for chaining Result operations (simplified, no adapter).
+   * Provides imperative-style code while maintaining functional error handling.
+   *
+   * Short-circuits on first Err, returning that error. Uses iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const result = Result.gen(function* () {
+   *   const a = yield* Result.Ok(1);
+   *   const b = yield* Result.Ok(2);
+   *   return a + b;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  static gen<Eff extends Result<any, any>, T>(
+    this: void,
+    // biome-ignore lint/suspicious/noExplicitAny: inference
+    genFn: () => Generator<Eff, T, any>,
+  ): Result<T, ExtractError<Eff>> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractError<Eff>>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is the Result that was yielded
+      let yielded = next.value as Result<unknown, unknown>;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(yielded)) {
+        stack = yielded.stack;
+        yielded = yielded.value as Result<unknown, unknown>;
+      }
+
+      if (yielded.isErr()) {
+        const err = yielded.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
+        // Early termination on error - return the Err result
+        currentResult = yielded as Result<T, ExtractError<Eff>>;
+        break;
+      }
+
+      // Unwrap the Ok value and pass it back to the generator
+      nextArg = yielded.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Generator-based syntax for chaining Result operations (with adapter).
+   * Uses an adapter function ($) for improved type inference.
+   *
+   * Short-circuits on first Err, returning that error. Uses iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const result = Result.genAdapter(function* ($) {
+   *   const a = yield* $(Result.Ok(1));
+   *   const b = yield* $(Result.Ok(2));
+   *   return a + b;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  static genAdapter<Eff extends ResultYieldWrap<any, any>, T>(
+    this: void,
+    genFn: (
+      adapter: <A, E>(result: Result<A, E>) => ResultYieldWrap<A, E>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
+    ) => Generator<Eff, T, any>,
+  ): Result<T, ExtractResultError<Eff>> {
+    const adapter = <A, E>(result: Result<A, E>): ResultYieldWrap<A, E> =>
+      new ResultYieldWrap(result);
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractResultError<Eff>>;
+
+    while (true) {
+      const next = iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is the ResultYieldWrap that was yielded
+      const wrapped = next.value as ResultYieldWrap<unknown, unknown>;
+      let result = wrapped.result;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(wrapped)) {
+        stack = wrapped.stack;
+        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+        result = (wrapped as any).value.result;
+      }
+
+      if (result.isErr()) {
+        const err = result.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
+        // Early termination on error - return the Err result
+        currentResult = result as unknown as Result<T, ExtractResultError<Eff>>;
+        break;
+      }
+
+      // Unwrap the Ok value and pass it back to the generator
+      nextArg = result.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Async generator-based syntax for chaining Result operations (simplified, no adapter).
+   * Use yield* with Result values directly. For Promise<Result<T, E>>, await first then yield*.
+   *
+   * Short-circuits on first Err, returning that error. Uses async iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
+   * const result = await Result.asyncGen(async function* () {
+   *   const a = yield* Result.Ok(1);
+   *   const dataResult = yield* $(await fetchData(a));
+   *   return a + dataResult.id;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: inference
+  static async asyncGen<Eff extends Result<any, any>, T>(
+    this: void,
+    // biome-ignore lint/suspicious/noExplicitAny: inference
+    genFn: () => AsyncGenerator<Eff, T, any>,
+  ): Promise<Result<T, ExtractError<Eff>>> {
+    const iterator = genFn();
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractError<Eff>>;
+
+    while (true) {
+      const next = await iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is a Result (user awaits promises before yielding)
+      let result = next.value as Result<unknown, unknown>;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(result)) {
+        stack = result.stack;
+        result = result.value as Result<unknown, unknown>;
+      }
+
+      if (result.isErr()) {
+        const err = result.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
+        // Early termination on error - return the Err result
+        currentResult = result as Result<T, ExtractError<Eff>>;
+        break;
+      }
+
+      // Unwrap the Ok value and pass it back to the generator
+      nextArg = result.unwrap();
+    }
+
+    return currentResult;
+  }
+
+  /**
+   * Async generator-based syntax for chaining Result operations (with adapter).
+   * Uses an adapter function ($) for improved type inference.
+   * Supports both Result<T, E> and Promise<Result<T, E>> for flexibility.
+   *
+   * Short-circuits on first Err, returning that error. Uses async iteration instead of
+   * recursion to avoid stack overflow on deep chains.
+   *
+   * @example
+   * ```ts
+   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
+   * const result = await Result.asyncGenAdapter(async function* ($) {
+   *   const a = yield* $(Result.Ok(1));
+   *   const data = yield* $(fetchData(a));
+   *   return a + data.id;
+   * });
+   * // Result<number, never>
+   * ```
+   */
+  static async asyncGenAdapter<
+    // biome-ignore lint/suspicious/noExplicitAny: inference
+    Eff extends AsyncResultYieldWrap<any, any>,
+    T,
+  >(
+    this: void,
+    genFn: (
+      adapter: <A, E2>(
+        result: Result<A, E2> | Promise<Result<A, E2>>,
+      ) => AsyncResultYieldWrap<A, E2>,
+      // biome-ignore lint/suspicious/noExplicitAny: inference
+    ) => AsyncGenerator<Eff, T, any>,
+  ): Promise<Result<T, ExtractAsyncResultError<Eff>>> {
+    const adapter = <A, E2>(
+      result: Result<A, E2> | Promise<Result<A, E2>>,
+    ): AsyncResultYieldWrap<A, E2> =>
+      new AsyncResultYieldWrap(Promise.resolve(result));
+
+    const iterator = genFn(adapter);
+
+    // Use iteration instead of recursion to avoid stack overflow
+    let nextArg: unknown;
+    let currentResult: Result<T, ExtractAsyncResultError<Eff>>;
+
+    while (true) {
+      const next = await iterator.next(nextArg);
+
+      if (next.done) {
+        // Generator completed successfully - wrap return value in Ok
+        currentResult = Result.Ok(next.value);
+        break;
+      }
+
+      // next.value is the AsyncResultYieldWrap that was yielded
+      const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>;
+      let result: Result<unknown, unknown>;
+      let stack: string | undefined;
+
+      if (isCapturedTrace(wrapped)) {
+        stack = wrapped.stack;
+        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+        result = await (wrapped as any).value.result;
+      } else {
+        result = await wrapped.result;
+      }
+
+      if (result.isErr()) {
+        const err = result.unwrapErr();
+        if (stack && err instanceof Error) {
+          const stackLines = stack.split("\n");
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n");
+            err.stack = `${err.name}: ${err.message}\n${userStack}`;
+          }
+        }
+        // Early termination on error - return the Err result
+        currentResult = result as Result<T, ExtractAsyncResultError<Eff>>;
+        break;
+      }
+
+      // Unwrap the Ok value and pass it back to the generator
+      nextArg = result.unwrap();
+    }
+
+    return currentResult;
   }
 }
