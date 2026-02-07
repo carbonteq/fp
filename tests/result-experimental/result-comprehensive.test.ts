@@ -476,7 +476,7 @@ describe("Aggregation", () => {
 describe("Utility Methods", () => {
   describe("tap()", () => {
     it("should execute side effect for Ok and return self", () => {
-      const sideEffect = mock((x: number) => console.log(x))
+      const sideEffect = mock((_x: number) => {})
       const result = Result.Ok(42)
       const tapped = result.tap(sideEffect)
       expect(sideEffect).toHaveBeenCalledWith(42)
@@ -484,7 +484,7 @@ describe("Utility Methods", () => {
     })
 
     it("should not execute side effect for Err", () => {
-      const sideEffect = mock((x: number) => console.log(x))
+      const sideEffect = mock((_x: number) => {})
       const result: Result<number, string> = Result.Err("error")
       result.tap(sideEffect)
       expect(sideEffect).not.toHaveBeenCalled()
@@ -493,7 +493,7 @@ describe("Utility Methods", () => {
 
   describe("tapErr()", () => {
     it("should execute side effect for Err and return self", () => {
-      const sideEffect = mock((e: string) => console.error(e))
+      const sideEffect = mock((_e: string) => {})
       const result: Result<number, string> = Result.Err("error")
       const tapped = result.tapErr(sideEffect)
       expect(sideEffect).toHaveBeenCalledWith("error")
@@ -501,13 +501,13 @@ describe("Utility Methods", () => {
     })
 
     it("should not execute side effect for Ok", () => {
-      const sideEffect = mock((e: string) => console.error(e))
+      const sideEffect = mock((_e: string) => {})
       Result.Ok(42).tapErr(sideEffect)
       expect(sideEffect).not.toHaveBeenCalled()
     })
 
     it("should execute side effect for async Err after resolution", async () => {
-      const sideEffect = mock((e: string) => console.error(e))
+      const sideEffect = mock((_e: string) => {})
       const result = await Result.tryAsyncCatch(
         async () => {
           throw new Error("boom")

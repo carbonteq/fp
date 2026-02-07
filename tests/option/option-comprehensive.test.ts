@@ -444,9 +444,7 @@ describe("Combining Options", () => {
 describe("Utility Methods", () => {
   describe("tap()", () => {
     it("should execute side effect for Some and return self", () => {
-      const sideEffect = mock((x: number) => {
-        console.log(x)
-      })
+      const sideEffect = mock((_x: number) => {})
       const opt = Option.Some(42)
       const result = opt.tap(sideEffect)
       expect(sideEffect).toHaveBeenCalledWith(42)
@@ -454,9 +452,7 @@ describe("Utility Methods", () => {
     })
 
     it("should not execute side effect for None", () => {
-      const sideEffect = mock((x: number) => {
-        console.log(x)
-      })
+      const sideEffect = mock((_x: number) => {})
       const opt: Option<number> = Option.None
       opt.tap(sideEffect)
       expect(sideEffect).not.toHaveBeenCalled()

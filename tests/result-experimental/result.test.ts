@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "bun:test"
+import { describe, expect, expectTypeOf, it, mock } from "bun:test"
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "@/errors"
 import type { ExperimentalOption as Option } from "@/option-experimental.js"
 import { ExperimentalResult as Result } from "@/result-experimental.js"
@@ -519,16 +519,18 @@ describe("Result type inference", () => {
 
     it("should correctly type tap (returns same type)", () => {
       const r = Result.Ok<number, Error>(42)
-      expectTypeOf(r.tap((n) => console.log(n))).toEqualTypeOf<
-        Result<number, Error>
-      >()
+      const sideEffect = mock((_n: number) => {})
+
+      expectTypeOf(r.tap(sideEffect)).toEqualTypeOf<Result<number, Error>>()
+      expect(sideEffect).toHaveBeenCalledWith(42)
     })
 
     it("should correctly type tapErr (returns same type)", () => {
       const r = Result.Ok<number, Error>(42)
-      expectTypeOf(r.tapErr((e) => console.error(e))).toEqualTypeOf<
-        Result<number, Error>
-      >()
+      const sideEffect = mock((_e: Error) => {})
+
+      expectTypeOf(r.tapErr(sideEffect)).toEqualTypeOf<Result<number, Error>>()
+      expect(sideEffect).not.toHaveBeenCalled()
     })
 
     it("should correctly type innerMap", () => {

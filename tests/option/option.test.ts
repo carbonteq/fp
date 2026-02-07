@@ -878,9 +878,10 @@ describe("Option type inference", () => {
 
     it("should correctly type tap (returns same type)", () => {
       const opt = Option.Some(42)
-      expectTypeOf(opt.tap((n) => console.log(n))).toEqualTypeOf<
-        Option<number>
-      >()
+      const sideEffect = mock((_n: number) => {})
+
+      expectTypeOf(opt.tap(sideEffect)).toEqualTypeOf<Option<number>>()
+      expect(sideEffect).toHaveBeenCalledWith(42)
     })
   })
 

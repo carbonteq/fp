@@ -423,9 +423,7 @@ describe("Transformation Methods", () => {
     })
 
     it("should not execute side effect for None", () => {
-      const sideEffect = mock((x: number) => {
-        console.log(x)
-      })
+      const sideEffect = mock((_x: number) => {})
       const opt: Option<number> = Option.None
       opt.tap(sideEffect)
       expect(sideEffect).not.toHaveBeenCalled()
@@ -444,9 +442,7 @@ describe("Transformation Methods", () => {
     })
 
     it("should not execute side effect for None", async () => {
-      const sideEffect = mock(async (x: number) => {
-        console.log(x)
-      })
+      const sideEffect = mock(async (_x: number) => {})
       const opt: Option<number> = Option.None
       await opt.tapAsync(sideEffect)
       expect(sideEffect).not.toHaveBeenCalled()

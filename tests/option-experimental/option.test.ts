@@ -689,9 +689,10 @@ describe("Option type inference", () => {
 
     it("should correctly type tap (returns same type)", () => {
       const opt = Option.Some(42)
-      expectTypeOf(opt.tap((n) => console.log(n))).toEqualTypeOf<
-        Option<number>
-      >()
+      const sideEffect = mock((_n: number) => {})
+
+      expectTypeOf(opt.tap(sideEffect)).toEqualTypeOf<Option<number>>()
+      expect(sideEffect).toHaveBeenCalledWith(42)
     })
 
     it("should reject async callbacks in tap type contract", () => {
@@ -704,8 +705,10 @@ describe("Option type inference", () => {
 
     it("should correctly type tapAsync (returns same type)", async () => {
       const opt = Option.Some(42)
-      const result = await opt.tapAsync((n) => Promise.resolve(console.log(n)))
+      const sideEffect = mock(async (_n: number) => {})
+      const result = await opt.tapAsync(sideEffect)
       expectTypeOf(result).toEqualTypeOf<Option<number>>()
+      expect(sideEffect).toHaveBeenCalledWith(42)
     })
   })
 
