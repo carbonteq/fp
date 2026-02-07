@@ -564,6 +564,54 @@ describe("match() builder - discriminated unions", () => {
       .exhaustive()
     expect(result).toBe(0)
   })
+
+  it("should keep custom Some/None union handlers typed to variants", () => {
+    type CustomMaybe =
+      | { readonly _tag: "Some"; value: number }
+      | { readonly _tag: "None"; reason: string }
+
+    const asCustomMaybe = (value: CustomMaybe): CustomMaybe => value
+
+    const some = asCustomMaybe({ _tag: "Some", value: 12 })
+    const none = asCustomMaybe({ _tag: "None", reason: "missing" })
+
+    const someResult = match<CustomMaybe>(some)
+      .with("Some", (v) => v.value)
+      .with("None", (v) => v.reason.length)
+      .exhaustive()
+
+    const noneResult = match<CustomMaybe>(none)
+      .with("Some", (v) => v.value)
+      .with("None", (v) => v.reason.length)
+      .exhaustive()
+
+    expect(someResult).toBe(12)
+    expect(noneResult).toBe(7)
+  })
+
+  it("should keep custom Ok/Err union handlers typed to variants", () => {
+    type CustomResult =
+      | { readonly _tag: "Ok"; data: number }
+      | { readonly _tag: "Err"; code: number }
+
+    const asCustomResult = (value: CustomResult): CustomResult => value
+
+    const ok = asCustomResult({ _tag: "Ok", data: 5 })
+    const err = asCustomResult({ _tag: "Err", code: 404 })
+
+    const okResult = match<CustomResult>(ok)
+      .with("Ok", (v) => v.data * 2)
+      .with("Err", (v) => v.code)
+      .exhaustive()
+
+    const errResult = match<CustomResult>(err)
+      .with("Ok", (v) => v.data * 2)
+      .with("Err", (v) => v.code)
+      .exhaustive()
+
+    expect(okResult).toBe(10)
+    expect(errResult).toBe(404)
+  })
 })
 
 // =============================================================================

@@ -25,14 +25,15 @@ type GetTags<T> = T extends { readonly _tag: infer Tag extends string }
  */
 type ExtractByTag<T, Tag> = T extends { readonly _tag: Tag } ? T : never
 
+type IsExactlyUnknown<T> = unknown extends T
+  ? ([T] extends [unknown] ? true : false)
+  : false
+
 /**
  * Extract the inner type from a discriminated union based on tag.
  *
- * For Option<T> with Tag="Some": Extracts T
- * For Result<T, E> with Tag="Ok": Extracts T
- * For Result<T, E> with Tag="Err": Extracts E
- * For other discriminated unions: only extracts when the narrowed variant
- * exposes an `unwrap()` method; otherwise resolves to `unknown`.
+ * For Option/Result-like variants, extracts via `unwrap`/`unwrapErr`.
+ * For other discriminated unions, falls back to the narrowed variant itself.
  */
 type GetInnerType<T, Tag extends string> = Tag extends "Some"
   ? T extends Option<infer V>
@@ -51,7 +52,9 @@ type GetInnerType<T, Tag extends string> = Tag extends "Some"
         : unknown
 
 type MatchInput<T, Tag extends string> = Tag extends "Some" | "Ok" | "Err"
-  ? GetInnerType<T, Tag>
+  ? IsExactlyUnknown<GetInnerType<T, Tag>> extends true
+    ? ExtractByTag<T, Tag>
+    : GetInnerType<T, Tag>
   : ExtractByTag<T, Tag>
 
 /**
