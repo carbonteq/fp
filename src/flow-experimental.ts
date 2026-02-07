@@ -153,11 +153,11 @@ type ExtractAsyncWrapError<Y> =
     ? E // UnwrappedNone is added via adapter overload for Option
     : never
 
-// biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
 /**
  * Experimental flow namespace for composing ExperimentalOption/ExperimentalResult
  * workflows with generator syntax.
  */
+// biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
 export class ExperimentalFlow {
   /** Runs a synchronous experimental flow generator and short-circuits on failure. */
   static gen<

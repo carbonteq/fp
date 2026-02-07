@@ -150,11 +150,11 @@ type ExtractAsyncWrapError<Y> =
     ? E // UnwrappedNone is added via adapter overload for Option
     : never
 
-// biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
 /**
  * Static namespace for composing stable Option/Result workflows via generators.
  * Short-circuits on yielded failures and returns a Result.
  */
+// biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
 export class Flow {
   /**
    * Runs a synchronous generator and short-circuits on yielded `Option.None`,
