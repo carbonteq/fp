@@ -1483,10 +1483,45 @@ export class Result<T, E> {
    * @see all
    */
   static any<U, F>(...results: Result<U, F>[]): Result<U, F[]> {
+    const errs: F[] = []
+    const pending: Result<U, F>[] = []
+
     for (const r of results) {
-      if (r.isOk()) return r as Result<U, F[]>
+      if (r.isOk()) {
+        if (isPromiseLike(r.#val)) {
+          pending.push(r)
+          continue
+        }
+        return r as Result<U, F[]>
+      }
+
+      errs.push(r.getErr())
     }
-    return Result.Err(results.map((r) => r.getErr()))
+
+    if (pending.length === 0) {
+      return Result.Err(errs)
+    }
+
+    const ctx: ResultCtx<F[]> = { asyncErr: NO_ERR }
+    const p = Promise.all(
+      pending.map(async (r) => {
+        const val = await (r.#val as Promise<unknown>)
+        const failed = r.#ctx.asyncErr !== NO_ERR || val === ERR_VAL
+        return { failed, val, err: r.getErr() }
+      }),
+    ).then((settled) => {
+      for (const item of settled) {
+        if (!item.failed) {
+          return item.val
+        }
+        errs.push(item.err)
+      }
+
+      ctx.asyncErr = errs
+      return ERR_VAL
+    })
+
+    return new Result(p as U, undefined as unknown as F[], ctx, "Ok")
   }
 
   // ==========================================================================

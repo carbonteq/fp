@@ -513,6 +513,23 @@ describe("Aggregation", () => {
       expect(result.isErr()).toBe(true)
       expect(result.unwrapErr()).toEqual([])
     })
+
+    it("should prefer immediate success over pending async failure", async () => {
+      const pendingErr = Result.fromPromise(
+        new Promise<Result<number, string>>((resolve) => {
+          setTimeout(() => resolve(Result.Err("late-fail")), 10)
+        }),
+      )
+      const immediateSuccess = Result.Ok<Promise<number>, string>(
+        Promise.resolve(42),
+      )
+
+      const result = Result.any(pendingErr, immediateSuccess)
+      const resolved = await result.toPromise()
+
+      expect(resolved.isOk()).toBe(true)
+      expect(resolved.unwrap()).toBe(42)
+    })
   })
 })
 
