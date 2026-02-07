@@ -202,6 +202,86 @@ interface ErrPatternWithPredicate<E = unknown> extends BasePattern<"Err"> {
  */
 export const P = {
   /**
+   * Predicate helper that checks if a value is in the `Some` state.
+   *
+   * @example
+   * ```ts
+   * match(option)
+   *   .when(P.IsSome, () => "has value")
+   *   .otherwise(() => "none");
+   * ```
+   */
+  IsSome: (value: MatchableValue): boolean => getEffectiveTag(value) === "Some",
+
+  /**
+   * Predicate helper that checks if a value is in the `None` state.
+   */
+  IsNone: (value: MatchableValue): boolean => getEffectiveTag(value) === "None",
+
+  /**
+   * Predicate helper that checks if a value is in the `Ok` state.
+   */
+  IsOk: (value: MatchableValue): boolean => getEffectiveTag(value) === "Ok",
+
+  /**
+   * Predicate helper that checks if a value is in the `Err` state.
+   */
+  IsErr: (value: MatchableValue): boolean => getEffectiveTag(value) === "Err",
+
+  /**
+   * Predicate helper for exact equality checks.
+   * Uses `Object.is` semantics.
+   *
+   * @example
+   * ```ts
+   * match(result)
+   *   .with(P.Ok(P.eq(42)), () => "exactly 42")
+   *   .with(P.Ok(), () => "other ok")
+   *   .with(P.Err(), () => "err")
+   *   .exhaustive();
+   * ```
+   */
+  eq:
+    <T>(expected: T) =>
+    (actual: T): boolean =>
+      Object.is(actual, expected),
+
+  /**
+   * Predicate helper for membership checks against a list of values.
+   * Uses `Object.is` semantics.
+   *
+   * @example
+   * ```ts
+   * match(result)
+   *   .with(P.Err(P.oneOf("timeout", "offline")), () => "retry")
+   *   .with(P.Err(), () => "fail")
+   *   .with(P.Ok(), () => "ok")
+   *   .exhaustive();
+   * ```
+   */
+  oneOf:
+    <T>(...expected: readonly T[]) =>
+    (actual: T): boolean =>
+      expected.some((item) => Object.is(item, actual)),
+
+  /**
+   * Predicate helper that negates another predicate.
+   *
+   * @example
+   * ```ts
+   * match(result)
+   *   .with(P.Ok(P.not(P.eq(42))), () => "not 42")
+   *   .with(P.Ok(), () => "exactly 42")
+   *   .with(P.Err(), () => "err")
+   *   .exhaustive();
+   * ```
+   */
+  not:
+    <T>(predicate: (value: T) => boolean) =>
+    (value: T): boolean =>
+      !predicate(value),
+
+  /**
    * Pattern that matches `Option.Some`.
    * Without predicate: consumes the tag for exhaustiveness.
    * With predicate: does NOT consume the tag (allows fallthrough).

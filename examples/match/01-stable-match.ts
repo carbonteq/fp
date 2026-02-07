@@ -55,6 +55,19 @@ const guarded = match(Option.Some(74))
   .exhaustive()
 console.log("guarded grade:", guarded)
 
+const retryPolicy = match(Result.Err("fatal") as Result<number, string>)
+  .with(P.Ok(), () => "none")
+  .with(P.Err(P.oneOf("timeout", "offline")), () => "retry")
+  .with(P.Err(P.not(P.oneOf("timeout", "offline"))), () => "do-not-retry")
+  .exhaustive()
+console.log("retry policy:", retryPolicy)
+
+const stateByPredicates = match(Result.Ok(1) as Result<number, string>)
+  .when(P.IsErr, () => "err")
+  .when(P.IsOk, () => "ok")
+  .otherwise(() => "other")
+console.log("state by predicates:", stateByPredicates)
+
 // -----------------------------------------------------------------------------
 // 3) when() + otherwise() + wildcard
 // -----------------------------------------------------------------------------
@@ -67,6 +80,12 @@ const status = match(Result.Ok({ attempts: 4, user: "alice" }))
   .with(P._, () => "ok")
   .exhaustive()
 console.log("status:", status)
+
+const fallbackStatus = match(Result.Err("boom") as Result<number, string>)
+  .with(P.Ok(P.not(P.eq(42))), () => "ok-not-42")
+  .with(P.Ok(P.eq(42)), () => "ok-42")
+  .otherwise(() => "fallback")
+console.log("fallback status:", fallbackStatus)
 
 // -----------------------------------------------------------------------------
 // 4) Generic discriminated union support

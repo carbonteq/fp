@@ -89,6 +89,7 @@ matchOpt(res, {
 - [Usage](#usage)
   - [The `Result` type](#the-result-type)
   - [The `Option` type](#the-option-type)
+  - [Fluent `match()` builder](#fluent-match-builder)
   - [The `ExperimentalResult` type (Experimental)](#the-experimentalresult-type-experimental)
   - [The `ExperimentalOption` type (Experimental)](#the-experimentaloption-type-experimental)
   - [The `Flow` namespace (Experimental)](#the-flow-namespace-experimental)
@@ -171,6 +172,40 @@ const mapped = Option.Some(5).map(async (x) => x * 2); // Option<Promise<number>
 const chained = Option.Some(5).flatMap(async (x) => Option.Some(x * 2)); // Option<Promise<number>>
 const filtered = Option.Some(5).filter(async (x) => x > 3); // Option<Promise<number>>
 const resolved = await filtered.toPromise(); // Promise<Option<number>>
+```
+
+## Fluent `match()` builder
+
+Use `match()` for fluent, exhaustive pattern matching across stable and experimental `Option`/`Result` values, plus generic discriminated unions.
+
+```typescript
+import { match, P, Result } from "@carbonteq/fp";
+
+const message = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.eq(42)), () => "exactly 42")
+  .with(P.Ok(P.not(P.oneOf(42, 43))), () => "ok but not 42 or 43")
+  .with(P.Ok(), (value) => `other ok: ${value}`)
+  .with(P.Err(), (error) => `error: ${error}`)
+  .exhaustive();
+
+const branch = match(Result.Err("timeout") as Result<number, string>)
+  .when(P.IsOk, () => "ok")
+  .when(P.IsErr, () => "err")
+  .otherwise(() => "other");
+```
+
+`match()` is intentionally synchronous. If you have async-inner stable values, settle first:
+
+```typescript
+import { match, Result } from "@carbonteq/fp";
+
+const asyncResult = Result.Ok(Promise.resolve(10)); // Result<Promise<number>, never>
+const settled = await asyncResult.toPromise(); // Promise<Result<number, never>>
+
+const label = match(settled)
+  .with("Ok", (value) => `value=${value}`)
+  .with("Err", () => "error")
+  .exhaustive();
 ```
 
 ---

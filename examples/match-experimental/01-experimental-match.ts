@@ -50,6 +50,20 @@ const severity = match(Result.Err({ code: 503, message: "unavailable" }))
   .exhaustive()
 console.log("severity:", severity)
 
+const alerting = match(Result.Err("fatal") as Result<number, string>)
+  .with(P.Ok(P.eq(42)), () => "special")
+  .with(P.Ok(), () => "ok")
+  .with(P.Err(P.oneOf("timeout", "offline")), () => "warn")
+  .with(P.Err(P.not(P.oneOf("timeout", "offline"))), () => "critical")
+  .exhaustive()
+console.log("alerting:", alerting)
+
+const stateByPredicates = match(Option.None as Option<number>)
+  .when(P.IsSome, () => "some")
+  .when(P.IsNone, () => "none")
+  .otherwise(() => "other")
+console.log("state by predicates:", stateByPredicates)
+
 // -----------------------------------------------------------------------------
 // 3) Generic discriminated unions
 // -----------------------------------------------------------------------------
@@ -103,6 +117,13 @@ async function runAsyncExamples(): Promise<void> {
     .with("None", () => "role:none")
     .exhaustive()
   console.log("role:", roleText)
+
+  const rolePolicy = match(settledOption)
+    .with(P.Some(P.not(P.eq("ADMIN"))), (role) => `limited:${role}`)
+    .with(P.Some(P.eq("ADMIN")), () => "full-access")
+    .with(P.None(), () => "no-access")
+    .exhaustive()
+  console.log("role policy:", rolePolicy)
 
   // You can still construct Result<Promise<T>, E> manually, but match() does not
   // accept async-inner values directly. Settle first, then wrap/match.

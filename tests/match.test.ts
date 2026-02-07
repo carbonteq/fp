@@ -412,6 +412,51 @@ describe("match() builder - with P patterns", () => {
 // =============================================================================
 
 describe("match() builder - predicate guards", () => {
+  it("should support P.eq helper in guarded patterns", () => {
+    const result = match(Result.Ok(42) as Result<number, string>)
+      .with(P.Ok(P.eq(42)), () => "exact")
+      .with(P.Ok(), () => "other")
+      .with(P.Err(), () => "err")
+      .exhaustive()
+    expect(result).toBe("exact")
+  })
+
+  it("should support P.oneOf helper in guarded patterns", () => {
+    const result = match(Result.Err("timeout") as Result<number, string>)
+      .with(P.Ok(), () => "ok")
+      .with(P.Err(P.oneOf("timeout", "offline")), () => "retry")
+      .with(P.Err(), () => "fail")
+      .exhaustive()
+    expect(result).toBe("retry")
+  })
+
+  it("should support P.not helper with P.eq", () => {
+    const result = match(Result.Ok(41) as Result<number, string>)
+      .with(P.Ok(P.not(P.eq(42))), (value: number) => `not-42:${value}`)
+      .with(P.Ok(), () => "is-42")
+      .with(P.Err(), () => "err")
+      .exhaustive()
+    expect(result).toBe("not-42:41")
+  })
+
+  it("should support P.not helper with P.oneOf", () => {
+    const result = match(Result.Err("fatal") as Result<number, string>)
+      .with(P.Ok(), () => "ok")
+      .with(P.Err(P.not(P.oneOf("timeout", "offline"))), () => "non-retryable")
+      .with(P.Err(), () => "retryable")
+      .exhaustive()
+    expect(result).toBe("non-retryable")
+  })
+
+  it("should support nested predicate helpers in Option matching", () => {
+    const result = match(Option.Some(13) as Option<number>)
+      .with(P.Some(P.not(P.oneOf(10, 11, 12))), (value: number) => value * 2)
+      .with(P.Some(), () => 0)
+      .with(P.None(), () => -1)
+      .exhaustive()
+    expect(result).toBe(26)
+  })
+
   it("should match with predicate guard on Some", () => {
     const result = match(Option.Some(100))
       .with(
@@ -497,6 +542,22 @@ describe("match() builder - otherwise()", () => {
 // =============================================================================
 
 describe("match() builder - when()", () => {
+  it("should support P.IsSome/P.IsNone helpers", () => {
+    const result = match(Option.Some(5) as Option<number>)
+      .when(P.IsSome, () => "some")
+      .when(P.IsNone, () => "none")
+      .otherwise(() => "other")
+    expect(result).toBe("some")
+  })
+
+  it("should support P.IsOk/P.IsErr helpers", () => {
+    const result = match(Result.Err("boom") as Result<number, string>)
+      .when(P.IsOk, () => "ok")
+      .when(P.IsErr, () => "err")
+      .otherwise(() => "other")
+    expect(result).toBe("err")
+  })
+
   it("should match with when predicate", () => {
     const opt = Option.Some(100)
     const result = match(opt)
@@ -635,6 +696,39 @@ describe("UnmatchedCaseError", () => {
 // =============================================================================
 
 describe("P namespace", () => {
+  it("should create IsSome/IsNone predicate helpers", () => {
+    expect(P.IsSome(Option.Some(1))).toBe(true)
+    expect(P.IsSome(Option.None as Option<number>)).toBe(false)
+    expect(P.IsNone(Option.None as Option<number>)).toBe(true)
+    expect(P.IsNone(Option.Some(1))).toBe(false)
+  })
+
+  it("should create IsOk/IsErr predicate helpers", () => {
+    expect(P.IsOk(Result.Ok(1))).toBe(true)
+    expect(P.IsOk(Result.Err("x") as Result<number, string>)).toBe(false)
+    expect(P.IsErr(Result.Err("x") as Result<number, string>)).toBe(true)
+    expect(P.IsErr(Result.Ok(1))).toBe(false)
+  })
+
+  it("should create eq predicate helper", () => {
+    const is42 = P.eq(42)
+    expect(is42(42)).toBe(true)
+    expect(is42(41)).toBe(false)
+  })
+
+  it("should create oneOf predicate helper", () => {
+    const isHttpErr = P.oneOf(400, 401, 404)
+    expect(isHttpErr(400)).toBe(true)
+    expect(isHttpErr(404)).toBe(true)
+    expect(isHttpErr(500)).toBe(false)
+  })
+
+  it("should create not predicate helper", () => {
+    const isNot42 = P.not(P.eq(42))
+    expect(isNot42(42)).toBe(false)
+    expect(isNot42(43)).toBe(true)
+  })
+
   it("should create Some pattern without predicate", () => {
     const pattern = P.Some()
     expect(pattern._patternTag).toBe("Some")
