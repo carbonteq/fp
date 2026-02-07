@@ -118,11 +118,19 @@ describe("XFlow.asyncGen", () => {
   })
 
   test("throws on unknown yielded type", async () => {
-    await expect(
-      XFlow.asyncGen(async function* () {
-        yield 123 as unknown as Option<number>
-        return 1
-      } as () => AsyncGenerator<Option<number>, number, unknown>),
-    ).rejects.toThrow("ExperimentalFlow.asyncGen yielded unknown type")
+    await XFlow.asyncGen(async function* () {
+      yield 123 as unknown as Option<number>
+      return 1
+    } as () => AsyncGenerator<Option<number>, number, unknown>).then(
+      () => {
+        throw new Error("Expected XFlow.asyncGen to reject")
+      },
+      (error: unknown) => {
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toContain(
+          "ExperimentalFlow.asyncGen yielded unknown type",
+        )
+      },
+    )
   })
 })

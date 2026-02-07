@@ -312,7 +312,14 @@ describe("README Examples - Option Type", () => {
       // fromPromise wraps the promise - the Option is Some containing the Promise
       expect(userOpt.isSome()).toBe(true)
 
-      await expect(userOpt.unwrap()).rejects.toThrow(UnwrappedNone)
+      await userOpt.unwrap().then(
+        () => {
+          throw new Error("Expected unwrap to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(UnwrappedNone)
+        },
+      )
       const resolved = await userOpt.toPromise()
       expect(resolved.isNone()).toBe(true)
     })

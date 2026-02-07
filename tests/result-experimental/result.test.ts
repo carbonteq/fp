@@ -62,27 +62,43 @@ describe("async matching behavior", () => {
   it("foldAsync propagates Ok handler rejection", async () => {
     const r = Result.Ok<number, string>(42)
 
-    await expect(
-      r.foldAsync(
+    await r
+      .foldAsync(
         async () => {
           throw new Error("boom")
         },
         async () => "fallback",
-      ),
-    ).rejects.toThrow("boom")
+      )
+      .then(
+        () => {
+          throw new Error("Expected foldAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("boom")
+        },
+      )
   })
 
   it("matchAsync propagates Ok handler rejection", async () => {
     const r = Result.Ok<number, string>(42)
 
-    await expect(
-      r.matchAsync({
+    await r
+      .matchAsync({
         Ok: async () => {
           throw new Error("boom")
         },
         Err: async () => "fallback",
-      }),
-    ).rejects.toThrow("boom")
+      })
+      .then(
+        () => {
+          throw new Error("Expected matchAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("boom")
+        },
+      )
   })
 })
 
@@ -231,7 +247,7 @@ describe("Result type inference", () => {
       const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42))
 
       // Sync mapper on Promise<T>: Result<Promise<U>, E>
-      expectTypeOf(r.map((n) => n.toString())).toEqualTypeOf<
+      expectTypeOf(r.map((n) => JSON.stringify(n))).toEqualTypeOf<
         Result<string, Error>
       >()
     })
@@ -240,7 +256,7 @@ describe("Result type inference", () => {
       const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42))
 
       // Async mapper on Promise<T>: Result<Promise<U>, E>
-      expectTypeOf(r.map(async (n) => n.toString())).toEqualTypeOf<never>()
+      expectTypeOf(r.map(async (n) => JSON.stringify(n))).toEqualTypeOf<never>()
     })
 
     it("should correctly type mapErr", () => {
@@ -266,7 +282,7 @@ describe("Result type inference", () => {
 
       // flatMap on Promise<T>: Result<Promise<U>, E | E2>
       expectTypeOf(
-        r.flatMap((n) => Result.Ok<string, TypeError>(n.toString())),
+        r.flatMap((n) => Result.Ok<string, TypeError>(JSON.stringify(n))),
       ).toEqualTypeOf<Result<string, Error | TypeError>>()
     })
 
@@ -303,7 +319,7 @@ describe("Result type inference", () => {
       const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42))
 
       // Sync zip on Promise<T>: Result<Promise<[T, U]>, E>
-      expectTypeOf(r.zip((n) => n.toString())).toEqualTypeOf<
+      expectTypeOf(r.zip((n) => JSON.stringify(n))).toEqualTypeOf<
         Result<[Promise<number>, string], Error>
       >()
     })

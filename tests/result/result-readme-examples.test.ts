@@ -423,14 +423,14 @@ describe("README Examples - Result Type", () => {
       const result = Result.Ok(42)
       const decorated = result.mapBoth(
         (val) => `Success: ${val}`,
-        (err) => `Error: ${err}`,
+        () => "Error",
       )
       expect(decorated.isOk()).toBe(true)
       expect(decorated.unwrap()).toBe("Success: 42")
 
       const error = Result.Err("Something failed")
       const decoratedError = error.mapBoth(
-        (val) => `Success: ${val}`,
+        () => "Success",
         (err) => `Error: ${err}`,
       )
       expect(decoratedError.isErr()).toBe(true)
@@ -664,7 +664,10 @@ describe("README Examples - Result Type", () => {
             status: "confirmed" as const,
             order: order,
           }))
-          .mapErr((error) => `Order processing failed: ${error}`)
+          .mapErr(
+            (error) =>
+              `Order processing failed: ${Array.isArray(error) ? error.join(", ") : error}`,
+          )
       }
 
       const order: Order = {
@@ -788,6 +791,7 @@ describe("README Examples - Result Type", () => {
           ])
           .flatMap(createUserProfile)
           .flatMap(sendVerificationEmail)
+          .mapErr((error) => (Array.isArray(error) ? error.join(", ") : error))
           .toPromise()
 
         return res

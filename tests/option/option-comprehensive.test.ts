@@ -106,7 +106,14 @@ describe("Constructors", () => {
 
     it("should reject unwrap for Promise<None>", async () => {
       const asyncOpt = Option.fromPromise(Promise.resolve(Option.None))
-      await expect(asyncOpt.unwrap()).rejects.toThrow(UnwrappedNone)
+      await asyncOpt.unwrap().then(
+        () => {
+          throw new Error("Expected unwrap to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(UnwrappedNone)
+        },
+      )
     })
   })
 })

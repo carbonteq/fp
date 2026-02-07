@@ -50,12 +50,12 @@ if (email) {
 } else {
   console.error("Email not found");
 }
-// Output: User test@test.com has address: Some Address
+// Example output: User test@test.com has address: Some Address
 ```
 
 Now imagine if we had more complex use cases that involved more than two optional values. We would have to nest if statements and handle errors manually. This is where `fp` comes in.
 
-### With using the `fp` library
+### Using the `fp` library
 
 ```typescript
 import { Option, matchOpt } from "@carbonteq/fp";
@@ -80,7 +80,7 @@ matchOpt(res, {
     console.error("User or Address not found");
   },
 });
-// Output: User test@test.com has address: Some Address
+// Example output: User test@test.com has address: Some Address
 ```
 
 ## Table of Contents
@@ -284,7 +284,7 @@ async function applyBonus() {
   return balanceOption;
 }
 
-console.log(await applyBonus()); // Output: Some(110)
+console.log(await applyBonus()); // Example output: Some(110)
 ```
 
 #### `flatMap`
@@ -331,7 +331,7 @@ const processUser = async (
   return validationResult;
 };
 
-console.log(await processUser("Alice", 30)); // Output: Result.Ok("User Alice saved successfully!")
+console.log(await processUser("Alice", 30)); // Example output: Result.Ok("User Alice saved successfully!")
 
 /* validationResult is of type Result<string, Error> instead of Result<Result<string, Error>, Error> (which is what would have happened if we used map instead of flatMap) */
 ```
@@ -362,7 +362,7 @@ async function applyDiscount(
   return originalPrice; //originalPrice is of type Result<[number, number], Error>
 }
 
-console.log(await applyDiscount("123")); // Output: Result.Ok([100, 90])
+console.log(await applyDiscount("123")); // Example output: Result.Ok([100, 90])
 ```
 
 Here `derivedPair` is a `Result<[number, number], Error>`. Note that `T` = `100` and `U` = `90`.
@@ -401,7 +401,7 @@ async function fetchProductDetails(
   return productDetails; // Option<[number, number]>
 }
 
-console.log(await fetchProductDetails("123")); // Output: Option.Some([100, 50])
+console.log(await fetchProductDetails("123")); // Example output: Option.Some([100, 50])
 ```
 
 ## Comparison of `map`, `flatMap`, `zip`, and `flatZip`
@@ -1061,7 +1061,7 @@ const logged = result.tapErr((err) => {
   console.error(`[Error Log] ${new Date().toISOString()}: ${err}`);
 });
 console.log(logged); // Err("Connection failed")
-// Output: [Error Log] 2025-01-07T...: Connection failed
+// Example output: [Error Log] 2025-01-07T...: Connection failed
 ```
 
 #### `Result.orElse`
@@ -1307,7 +1307,7 @@ matchRes(result, {
   },
 });
 
-// Output:
+// Example output:
 // Order confirmed! Order ID: ORD-1716888600000
 // Total: $59.98
 // Order: {"productId":"PROD-123","quantity":2,"userId":"USER-456"}
@@ -1424,7 +1424,7 @@ async function main() {
 }
 
 main();
-// Output:
+// Example output:
 // Verification email sent to newuser@example.com
 // Email: newuser@example.com
 // Registration successful!

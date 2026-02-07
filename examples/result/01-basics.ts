@@ -8,7 +8,7 @@ console.log("err isErr:", err.isErr())
 
 const matched = ok.match({
   Ok: (value) => `Value: ${value}`,
-  Err: (error) => `Error: ${error}`,
+  Err: () => "Error",
 })
 
 console.log("match:", matched)

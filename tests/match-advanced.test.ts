@@ -67,16 +67,24 @@ describe("Option.foldAsync() - advanced", () => {
   })
 
   it("should propagate async errors in onSome", async () => {
-    await expect(
-      Option.Some(42).foldAsync(
+    await Option.Some(42)
+      .foldAsync(
         async (_val) => {
           throw new Error("Async error")
         },
         async () => {
           return 0
         },
-      ),
-    ).rejects.toThrow("Async error")
+      )
+      .then(
+        () => {
+          throw new Error("Expected foldAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("Async error")
+        },
+      )
   })
 
   it("should preserve return types from async branches", async () => {
@@ -118,16 +126,24 @@ describe("Option.matchAsync() - advanced", () => {
   })
 
   it("should propagate async errors in Some handler", async () => {
-    await expect(
-      Option.Some(42).matchAsync({
+    await Option.Some(42)
+      .matchAsync({
         Some: async (_val) => {
           throw new Error("Handler error")
         },
         None: async () => {
           return "fallback"
         },
-      }),
-    ).rejects.toThrow("Handler error")
+      })
+      .then(
+        () => {
+          throw new Error("Expected matchAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("Handler error")
+        },
+      )
   })
 
   it("should work with async database operations", async () => {
@@ -296,16 +312,24 @@ describe("Result.foldAsync() - advanced", () => {
   })
 
   it("should propagate async errors in onOk", async () => {
-    await expect(
-      Result.Ok(42).foldAsync(
+    await Result.Ok(42)
+      .foldAsync(
         async (_val) => {
           throw new Error("Handler failed")
         },
         async (_err) => {
           return 0
         },
-      ),
-    ).rejects.toThrow("Handler failed")
+      )
+      .then(
+        () => {
+          throw new Error("Expected foldAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("Handler failed")
+        },
+      )
   })
 
   it("should handle complex async workflows", async () => {
@@ -358,16 +382,24 @@ describe("Result.matchAsync() - advanced", () => {
   })
 
   it("should propagate async errors in Ok handler", async () => {
-    await expect(
-      Result.Ok(42).matchAsync({
+    await Result.Ok(42)
+      .matchAsync({
         Ok: async (_val) => {
           throw new Error("Handler error")
         },
         Err: async () => {
           return "fallback"
         },
-      }),
-    ).rejects.toThrow("Handler error")
+      })
+      .then(
+        () => {
+          throw new Error("Expected matchAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("Handler error")
+        },
+      )
   })
 
   it("should work with async database operations", async () => {

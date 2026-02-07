@@ -45,27 +45,43 @@ describe("async matching behavior", () => {
   it("foldAsync propagates Some handler rejection", async () => {
     const opt = Option.Some(42)
 
-    await expect(
-      opt.foldAsync(
+    await opt
+      .foldAsync(
         async () => {
           throw new Error("boom")
         },
         async () => 0,
-      ),
-    ).rejects.toThrow("boom")
+      )
+      .then(
+        () => {
+          throw new Error("Expected foldAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("boom")
+        },
+      )
   })
 
   it("matchAsync propagates Some handler rejection", async () => {
     const opt = Option.Some(42)
 
-    await expect(
-      opt.matchAsync({
+    await opt
+      .matchAsync({
         Some: async () => {
           throw new Error("boom")
         },
         None: async () => 0,
-      }),
-    ).rejects.toThrow("boom")
+      })
+      .then(
+        () => {
+          throw new Error("Expected matchAsync to reject")
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error)
+          expect((error as Error).message).toContain("boom")
+        },
+      )
   })
 })
 

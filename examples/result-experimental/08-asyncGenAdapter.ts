@@ -334,7 +334,7 @@ const processItemsAsync = async (items: number[]) => {
   return gen
 }
 const itemsResult = await processItemsAsync([1, 2, 3, 4, 5])
-console.log("11. Process items:", (await itemsResult).unwrap()) // 24 (6 + 8 + 10)
+console.log("11. Process items:", itemsResult.unwrap()) // 24 (6 + 8 + 10)
 
 // Example 12: asyncGenAdapter with conditional logic
 const conditionalAsync = (async () => {
