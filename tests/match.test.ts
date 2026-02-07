@@ -457,6 +457,15 @@ describe("match() builder - predicate guards", () => {
     expect(result).toBe(26)
   })
 
+  it("should support P.all and P.any aliases in guarded patterns", () => {
+    const result = match(Result.Ok(42) as Result<number, string>)
+      .with(P.Ok(P.all(P.not(P.eq(0)), P.any(P.eq(42), P.eq(43)))), () => "hit")
+      .with(P.Ok(), () => "miss")
+      .with(P.Err(), () => "err")
+      .exhaustive()
+    expect(result).toBe("hit")
+  })
+
   it("should match with predicate guard on Some", () => {
     const result = match(Option.Some(100))
       .with(
@@ -727,6 +736,38 @@ describe("P namespace", () => {
     const isNot42 = P.not(P.eq(42))
     expect(isNot42(42)).toBe(false)
     expect(isNot42(43)).toBe(true)
+  })
+
+  it("should create and/all predicate helpers", () => {
+    const isPositiveEven = P.and(
+      (x: number) => x > 0,
+      (x: number) => x % 2 === 0,
+    )
+    const isPositiveEvenAlias = P.all(
+      (x: number) => x > 0,
+      (x: number) => x % 2 === 0,
+    )
+
+    expect(isPositiveEven(4)).toBe(true)
+    expect(isPositiveEven(3)).toBe(false)
+    expect(isPositiveEvenAlias(6)).toBe(true)
+    expect(isPositiveEvenAlias(-2)).toBe(false)
+  })
+
+  it("should create or/any predicate helpers", () => {
+    const isSmallOrLarge = P.or(
+      (x: number) => x < 10,
+      (x: number) => x > 100,
+    )
+    const isSmallOrLargeAlias = P.any(
+      (x: number) => x < 10,
+      (x: number) => x > 100,
+    )
+
+    expect(isSmallOrLarge(5)).toBe(true)
+    expect(isSmallOrLarge(50)).toBe(false)
+    expect(isSmallOrLargeAlias(150)).toBe(true)
+    expect(isSmallOrLargeAlias(42)).toBe(false)
   })
 
   it("should create Some pattern without predicate", () => {

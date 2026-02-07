@@ -64,6 +64,13 @@ const stateByPredicates = match(Option.None as Option<number>)
   .otherwise(() => "other")
 console.log("state by predicates:", stateByPredicates)
 
+const combinedPredicates = match(Result.Ok(43) as Result<number, string>)
+  .with(P.Ok(P.all(P.not(P.eq(0)), P.any(P.eq(42), P.eq(43)))), () => "hit")
+  .with(P.Ok(), () => "miss")
+  .with(P.Err(), () => "err")
+  .exhaustive()
+console.log("combined predicates:", combinedPredicates)
+
 // -----------------------------------------------------------------------------
 // 3) Generic discriminated unions
 // -----------------------------------------------------------------------------

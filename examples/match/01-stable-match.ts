@@ -68,6 +68,13 @@ const stateByPredicates = match(Result.Ok(1) as Result<number, string>)
   .otherwise(() => "other")
 console.log("state by predicates:", stateByPredicates)
 
+const combinedPredicates = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.all(P.not(P.eq(0)), P.any(P.eq(42), P.eq(43)))), () => "hit")
+  .with(P.Ok(), () => "miss")
+  .with(P.Err(), () => "err")
+  .exhaustive()
+console.log("combined predicates:", combinedPredicates)
+
 // -----------------------------------------------------------------------------
 // 3) when() + otherwise() + wildcard
 // -----------------------------------------------------------------------------

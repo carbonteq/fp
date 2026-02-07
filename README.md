@@ -192,6 +192,12 @@ const branch = match(Result.Err("timeout") as Result<number, string>)
   .when(P.IsOk, () => "ok")
   .when(P.IsErr, () => "err")
   .otherwise(() => "other");
+
+const combined = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.all(P.not(P.eq(0)), P.any(P.eq(42), P.eq(43)))), () => "hit")
+  .with(P.Ok(), () => "miss")
+  .with(P.Err(), () => "err")
+  .exhaustive();
 ```
 
 `match()` is intentionally synchronous. If you have async-inner stable values, settle first:

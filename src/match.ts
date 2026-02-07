@@ -86,6 +86,19 @@ type HasPromiseLikePayload<T> = true extends
 type SyncMatchable<T extends MatchableValue> =
   HasPromiseLikePayload<T> extends true ? never : T
 
+function predicateAnd<T>(
+  ...predicates: Array<(value: T) => boolean>
+): (value: T) => boolean {
+  return (value: T): boolean =>
+    predicates.every((predicate) => predicate(value))
+}
+
+function predicateOr<T>(
+  ...predicates: Array<(value: T) => boolean>
+): (value: T) => boolean {
+  return (value: T): boolean => predicates.some((predicate) => predicate(value))
+}
+
 /**
  * Represents a compile-time exhaustiveness error.
  * When pattern matching is incomplete, this type surfaces the missing cases.
@@ -280,6 +293,26 @@ export const P = {
     <T>(predicate: (value: T) => boolean) =>
     (value: T): boolean =>
       !predicate(value),
+
+  /**
+   * Predicate helper that requires all predicates to match.
+   */
+  and: predicateAnd,
+
+  /**
+   * Alias of `P.and`.
+   */
+  all: predicateAnd,
+
+  /**
+   * Predicate helper that requires at least one predicate to match.
+   */
+  or: predicateOr,
+
+  /**
+   * Alias of `P.or`.
+   */
+  any: predicateOr,
 
   /**
    * Pattern that matches `Option.Some`.
