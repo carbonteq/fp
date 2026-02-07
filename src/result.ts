@@ -871,7 +871,8 @@ export class Result<T, E> {
    * Unlike `zip` which derives a value from the original, `flatZip` works with
    * two independent Results. If either is Err, propagates the first error.
    *
-   * For async Results, use `flatZipAsync` instead.
+   * Supports both sync and async Results. Async combinations return
+   * `Result<Promise<[T, U]>, E | E2>`.
    *
    * @param fn - Function that receives the value and returns another Result
    * @returns Result<[T, U], E | E2> containing tuple of both values, or error
@@ -1185,7 +1186,7 @@ export class Result<T, E> {
    * If the Result is Err, returns it unchanged without running validators.
    *
    * Supports both sync and async validators. If any validator is async,
-   * returns `Promise<Result<T, E | VE[]>>`.
+   * returns `Result<Promise<T>, E | VE[]>`.
    *
    * @param validators - Array of validator functions that return Result
    * @returns Result<T, E | VE[]> with original value or array of all errors
@@ -1203,14 +1204,13 @@ export class Result<T, E> {
    * Result.Ok(-5).validate(validators);                // Err(["must be positive", "must be even"])
    * Result.Err("init").validate(validators);           // Err("init") - validators not run
    *
-   * // With async validators (returns Promise<Result<...>>)
+   * // With async validators (returns Result<Promise<T>, ...>)
    * await Result.Ok(data).validate([
    *   async (d) => await validateEmail(d),
    *   async (d) => await validatePhone(d),
    * ]);
    * ```
    *
-   * @see validateAsync
    * @see all
    */
   validate<VE extends unknown[]>(
@@ -1368,7 +1368,7 @@ export class Result<T, E> {
    *
    * @example
    * ```ts
-   * Result.all(Result.Ok(1), Result.Ok(2), ExperimentalResult.Ok(3));     // Ok([1, 2, 3])
+   * Result.all(Result.Ok(1), Result.Ok(2), Result.Ok(3));     // Ok([1, 2, 3])
    * Result.all(Result.Ok(1), Result.Err("a"), Result.Err("b")); // Err(["a", "b"])
    * Result.all();                                            // Ok([])
    *
