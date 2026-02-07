@@ -6,11 +6,53 @@ import { ExperimentalResult as Result } from "./result-experimental.js"
 import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
 
 function isOption<T>(value: unknown): value is Option<T> {
-  return value instanceof Option
+  if (value instanceof Option) {
+    return true
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const optionLike = value as {
+    _tag?: unknown
+    isSome?: unknown
+    isNone?: unknown
+    unwrap?: unknown
+  }
+
+  return (
+    (optionLike._tag === "Some" || optionLike._tag === "None") &&
+    typeof optionLike.isSome === "function" &&
+    typeof optionLike.isNone === "function" &&
+    typeof optionLike.unwrap === "function"
+  )
 }
 
 function isResult<T, E>(value: unknown): value is Result<T, E> {
-  return value instanceof Result
+  if (value instanceof Result) {
+    return true
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const resultLike = value as {
+    _tag?: unknown
+    isOk?: unknown
+    isErr?: unknown
+    unwrap?: unknown
+    unwrapErr?: unknown
+  }
+
+  return (
+    (resultLike._tag === "Ok" || resultLike._tag === "Err") &&
+    typeof resultLike.isOk === "function" &&
+    typeof resultLike.isErr === "function" &&
+    typeof resultLike.unwrap === "function" &&
+    typeof resultLike.unwrapErr === "function"
+  )
 }
 
 /**
