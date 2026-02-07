@@ -279,11 +279,26 @@ export class Option<T> {
    * @throws UnwrappedNone when called on None
    * @returns The contained value
    */
-  unwrap(): T {
+  unwrap(this: Option<never>): never
+  unwrap(this: Option<Promise<T>>): Promise<T>
+  unwrap(this: Option<T>): T
+  unwrap() {
     if (this.isNone()) {
       throw UNWRAPPED_NONE_ERR
     }
-    return this.#val
+
+    const curr = this.#val
+    if (isPromiseLike(curr)) {
+      const ctx = this.#ctx
+      return curr.then((value) => {
+        if (value === NONE_VAL || ctx.promiseNoneSlot) {
+          throw UNWRAPPED_NONE_ERR
+        }
+        return value
+      })
+    }
+
+    return curr
   }
 
   /**
@@ -313,9 +328,21 @@ export class Option<T> {
    *
    * @returns The contained value, or null when None
    */
-  safeUnwrap(): T | null {
+  safeUnwrap(this: Option<never>): null
+  safeUnwrap(this: Option<Promise<T>>): Promise<T | null>
+  safeUnwrap(this: Option<T>): T | null
+  safeUnwrap() {
     if (this.isNone()) return null
-    return this.#val
+
+    const curr = this.#val
+    if (isPromiseLike(curr)) {
+      const ctx = this.#ctx
+      return curr.then((value) =>
+        value === NONE_VAL || ctx.promiseNoneSlot ? null : value,
+      )
+    }
+
+    return curr
   }
 
   /**
@@ -443,8 +470,9 @@ export class Option<T> {
     const curr = this.#val
     if (isPromiseLike(curr)) {
       const p = curr as Promise<Curr>
+      const ctx = this.#ctx
       return p.then(async (v) => {
-        if (v === NONE_VAL) return defaultVal
+        if (v === NONE_VAL || ctx.promiseNoneSlot) return defaultVal
         return fn(v)
       })
     }
@@ -755,7 +783,7 @@ export class Option<T> {
     let inner: Curr
     if (isPromiseLike(curr)) {
       const awaited = await curr
-      if (awaited === NONE_VAL) {
+      if (awaited === NONE_VAL || this.#ctx.promiseNoneSlot) {
         return Option.None
       }
       inner = awaited as Curr

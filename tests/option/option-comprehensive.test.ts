@@ -103,6 +103,11 @@ describe("Constructors", () => {
       const resolved = await asyncOpt.toPromise()
       expect(resolved.isNone()).toBe(true)
     })
+
+    it("should reject unwrap for Promise<None>", async () => {
+      const asyncOpt = Option.fromPromise(Promise.resolve(Option.None))
+      await expect(asyncOpt.unwrap()).rejects.toThrow(UnwrappedNone)
+    })
   })
 })
 
