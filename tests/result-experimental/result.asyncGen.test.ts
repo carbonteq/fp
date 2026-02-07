@@ -54,6 +54,22 @@ describe("ExperimentalResult.asyncGen", () => {
       expect(reachedAfterErr).toBe(false)
     })
 
+    it("should run finally block on Err short-circuit", async () => {
+      let finalized = false
+
+      const result = await Result.asyncGen(async function* () {
+        try {
+          yield* Result.Err<string, number>("error")
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isErr()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should track intermediate variables", async () => {
       const result = await Result.asyncGen(async function* () {
         const a = yield* Result.Ok(10)

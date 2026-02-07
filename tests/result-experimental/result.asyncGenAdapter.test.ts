@@ -33,6 +33,22 @@ describe("ExperimentalResult.asyncGenAdapter", () => {
       expect(reached).toBe(false)
     })
 
+    it("should run finally block on Err short-circuit", async () => {
+      let finalized = false
+
+      const result = await Result.asyncGenAdapter(async function* ($) {
+        try {
+          yield* $(Result.Err("error" as const))
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isErr()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should work with no yields", async () => {
       const result = await Result.asyncGenAdapter(async function* (_$) {
         return 42

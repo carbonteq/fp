@@ -1546,6 +1546,7 @@ export class ExperimentalOption<T> {
       }
 
       if (yielded.isNone()) {
+        iterator.return?.(undefined as unknown as T)
         // Early termination on None - return singleton None
         currentResult = ExperimentalOption.None
         break
@@ -1638,6 +1639,7 @@ export class ExperimentalOption<T> {
       }
 
       if (option.isNone()) {
+        iterator.return?.(undefined as unknown as T)
         // Early termination on None - return singleton None
         currentResult = ExperimentalOption.None
         break
@@ -1734,6 +1736,7 @@ export class ExperimentalOption<T> {
       }
 
       if (option.isNone()) {
+        await iterator.return?.(undefined as unknown as T)
         // Early termination on None - return singleton None
         currentResult = ExperimentalOption.None
         break
@@ -1836,6 +1839,7 @@ export class ExperimentalOption<T> {
       }
 
       if (option.isNone()) {
+        await iterator.return?.(undefined as unknown as T)
         // Early termination on None - return singleton None
         currentResult = ExperimentalOption.None
         break

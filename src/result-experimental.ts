@@ -1600,6 +1600,7 @@ export class ExperimentalResult<T, E> {
             err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
+        iterator.return?.(undefined as unknown as T)
         // Early termination on error - return the Err result
         currentResult = yielded as ExperimentalResult<T, ExtractError<Eff>>
         break
@@ -1678,6 +1679,7 @@ export class ExperimentalResult<T, E> {
             err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
+        iterator.return?.(undefined as unknown as T)
         // Early termination on error - return the Err result
         currentResult = result as ExperimentalResult<T, ExtractResultError<Eff>>
         break
@@ -1750,6 +1752,7 @@ export class ExperimentalResult<T, E> {
             err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
+        await iterator.return?.(undefined as unknown as T)
         // Early termination on error - return the Err result
         currentResult = result as ExperimentalResult<T, ExtractError<Eff>>
         break
@@ -1839,6 +1842,7 @@ export class ExperimentalResult<T, E> {
             err.stack = `${err.name}: ${err.message}\n${userStack}`
           }
         }
+        await iterator.return?.(undefined as unknown as T)
         // Early termination on error - return the Err result
         currentResult = result as ExperimentalResult<
           T,

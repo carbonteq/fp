@@ -53,6 +53,22 @@ describe("ExperimentalOption.asyncGen", () => {
       expect(reachedAfterNone).toBe(false)
     })
 
+    it("should run finally block on None short-circuit", async () => {
+      let finalized = false
+
+      const result = await Option.asyncGen(async function* () {
+        try {
+          yield* Option.None
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isNone()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should return singleton None", async () => {
       const result1 = await Option.asyncGen(async function* () {
         yield* Option.None

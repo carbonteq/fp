@@ -31,6 +31,22 @@ describe("ExperimentalResult.genAdapter", () => {
       expect(reached).toBe(false)
     })
 
+    it("should run finally block on Err short-circuit", () => {
+      let finalized = false
+
+      const result = Result.genAdapter(function* ($) {
+        try {
+          yield* $(Result.Err("error" as const))
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isErr()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should work with no yields", () => {
       const result = Result.genAdapter(function* (_$) {
         return 42

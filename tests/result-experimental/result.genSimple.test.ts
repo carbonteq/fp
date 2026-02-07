@@ -52,6 +52,22 @@ describe("ExperimentalResult.gen", () => {
       expect(reachedAfterErr).toBe(false)
     })
 
+    it("should run finally block on Err short-circuit", () => {
+      let finalized = false
+
+      const result = Result.gen(function* () {
+        try {
+          yield* Result.Err<string, number>("error")
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isErr()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should track intermediate variables", () => {
       const result = Result.gen(function* () {
         const a = yield* Result.Ok(10)

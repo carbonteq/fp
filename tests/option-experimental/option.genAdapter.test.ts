@@ -30,6 +30,22 @@ describe("ExperimentalOption.genAdapter", () => {
       expect(reached).toBe(false)
     })
 
+    it("should run finally block on None short-circuit", () => {
+      let finalized = false
+
+      const result = Option.genAdapter(function* ($) {
+        try {
+          yield* $(Option.None)
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isNone()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should work with no yields", () => {
       const result = Option.genAdapter(function* (_$) {
         return 42

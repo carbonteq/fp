@@ -51,6 +51,22 @@ describe("ExperimentalOption.gen", () => {
       expect(reachedAfterNone).toBe(false)
     })
 
+    it("should run finally block on None short-circuit", () => {
+      let finalized = false
+
+      const result = Option.gen(function* () {
+        try {
+          yield* Option.None
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isNone()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should return singleton None", () => {
       const result1 = Option.gen(function* () {
         yield* Option.None

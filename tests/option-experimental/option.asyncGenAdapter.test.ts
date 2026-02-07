@@ -32,6 +32,22 @@ describe("ExperimentalOption.asyncGenAdapter", () => {
       expect(reached).toBe(false)
     })
 
+    it("should run finally block on None short-circuit", async () => {
+      let finalized = false
+
+      const result = await Option.asyncGenAdapter(async function* ($) {
+        try {
+          yield* $(Option.None)
+          return 1
+        } finally {
+          finalized = true
+        }
+      })
+
+      expect(result.isNone()).toBe(true)
+      expect(finalized).toBe(true)
+    })
+
     it("should work with no yields", async () => {
       const result = await Option.asyncGenAdapter(async function* (_$) {
         return 42
