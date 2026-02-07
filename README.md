@@ -182,7 +182,7 @@ Use `match()` for fluent, exhaustive pattern matching across stable and experime
 import { match, P, Result } from "@carbonteq/fp";
 
 const message = match(Result.Ok(42) as Result<number, string>)
-  .with(P.Ok(P.eq(42)), () => "exactly 42")
+  .with(P.Ok(P.eq(42)), (value) => `exactly ${value}`)
   .with(P.Ok(P.not(P.oneOf(42, 43))), () => "ok but not 42 or 43")
   .with(P.Ok(), (value) => `other ok: ${value}`)
   .with(P.Err(), (error) => `error: ${error}`)
@@ -199,6 +199,13 @@ const combined = match(Result.Ok(42) as Result<number, string>)
   .with(P.Err(), () => "err")
   .exhaustive();
 ```
+
+Handler inputs:
+
+- `.with(P.Ok(...), handler)` receives the unwrapped `Ok` value.
+- `.with(P.Err(...), handler)` receives the unwrapped `Err` value.
+- `.with(P.Some(...), handler)` receives the unwrapped `Some` value.
+- `.with(P._, handler)` and `.when(...)` handlers receive the whole matched value.
 
 `match()` is intentionally synchronous. If you have async-inner stable values, settle first:
 

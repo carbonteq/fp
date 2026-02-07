@@ -44,3 +44,17 @@ For a full list of Result/Option examples, see:
 - `examples/result-experimental/index.ts`
 - `examples/option-experimental/index.ts`
 - `examples/match-experimental/index.ts`
+
+## match() handler inputs (quick snippet)
+
+```ts
+import { P, Result, match } from "@carbonteq/fp";
+
+const text = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.eq(42)), (value) => `exact:${value}`) // value is unwrapped Ok
+  .with(P.Ok(), (value) => `ok:${value}`) // value is unwrapped Ok
+  .with(P.Err(), (error) => `err:${error}`) // error is unwrapped Err
+  .exhaustive();
+```
+
+For a full runnable version, see `examples/match/01-stable-match.ts` and `examples/match-experimental/01-experimental-match.ts`.

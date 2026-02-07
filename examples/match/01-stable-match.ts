@@ -75,6 +75,13 @@ const combinedPredicates = match(Result.Ok(42) as Result<number, string>)
   .exhaustive()
 console.log("combined predicates:", combinedPredicates)
 
+const exactValueHandler = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.eq(42)), (value) => `exact:${value}`)
+  .with(P.Ok(), (value) => `other-ok:${value}`)
+  .with(P.Err(), (error) => `err:${error}`)
+  .exhaustive()
+console.log("exact value handler:", exactValueHandler)
+
 // -----------------------------------------------------------------------------
 // 3) when() + otherwise() + wildcard
 // -----------------------------------------------------------------------------

@@ -13,11 +13,7 @@
     "url": "https://github.com/carbonteq/fp/issues"
   },
   "type": "module",
-  "files": [
-    "dist",
-    "README.md",
-    "examples"
-  ],
+  "files": ["dist", "README.md", "examples"],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
