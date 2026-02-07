@@ -1105,7 +1105,7 @@ export class Option<T> {
    * // Complex pipeline with multiple optional steps
    * async function processLead(email: string): Promise<Option<Lead>> {
    *   return await Option.asyncGen(async function* () {
-   *     const normalized = yield* Some(normalizeEmail(email));
+   *     const normalized = yield* Option.Some(normalizeEmail(email));
    *     const existing = yield* await findExistingLead(normalized);
    *     const enriched = yield* await enrichLeadData(existing);
    *     const validated = yield* validateLead(enriched);

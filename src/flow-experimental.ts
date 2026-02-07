@@ -58,11 +58,11 @@ function isResult<T, E>(value: unknown): value is Result<T, E> {
 /**
  * Base class for errors that can be directly yielded in Flow generators.
  * Extend this class instead of Error to enable `yield* new MyError(...)`
- * in `Flow.gen` and `Flow.asyncGen`.
+ * in `ExperimentalFlow.gen` and `ExperimentalFlow.asyncGen`.
  *
  * @example
  * ```typescript
- * class ValidationError extends FlowError {
+ * class ValidationError extends ExperimentalFlowError {
  *   readonly _tag = "ValidationError";
  *   constructor(message: string) {
  *     super(message);
@@ -70,7 +70,7 @@ function isResult<T, E>(value: unknown): value is Result<T, E> {
  *   }
  * }
  *
- * const result = Flow.gen(function* () {
+ * const result = ExperimentalFlow.gen(function* () {
  *   if (value < 0) {
  *     yield* new ValidationError("Value must be positive");
  *   }

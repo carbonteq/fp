@@ -143,7 +143,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const result = Result.Err("failed");
+   * const result = ExperimentalResult.Err("failed");
    * if (result.isErr()) {
    *   // TypeScript knows error is accessible: "failed"
    *   console.log(result.unwrapErr()); // "failed"
@@ -166,9 +166,9 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * function saveToDb(): Result<UNIT, DbError> {
+   * function saveToDb(): ExperimentalResult<UNIT, DbError> {
    *   // ... save logic
-   *   return Result.UNIT_RESULT;
+   *   return ExperimentalResult.UNIT_RESULT;
    * }
    *
    * const result = saveToDb();
@@ -192,7 +192,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).toString();      // "Result::Ok<42>"
-   * Result.Err("fail").toString(); // "Result::Err<fail>"
+   * ExperimentalResult.Err("fail").toString(); // "Result::Err<fail>"
    * ```
    */
   toString(): string {
@@ -217,8 +217,8 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).unwrap();           // 42
-   * Result.Err(new Error("fail")).unwrap(); // throws Error("fail")
-   * Result.Err("fail").unwrap();      // throws UnwrappedOkWithErr
+   * ExperimentalResult.Err(new Error("fail")).unwrap(); // throws Error("fail")
+   * ExperimentalResult.Err("fail").unwrap(); // throws UnwrappedOkWithErr
    * ```
    *
    * @see unwrapOr
@@ -246,7 +246,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * Result.Err("fail").unwrapErr();   // "fail"
+   * ExperimentalResult.Err("fail").unwrapErr(); // "fail"
    * ExperimentalResult.Ok(42).unwrapErr();        // throws UnwrappedErrWithOk
    * ```
    */

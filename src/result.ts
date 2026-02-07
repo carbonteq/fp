@@ -2065,10 +2065,11 @@ export class Result<T, E> {
    *
    * @example
    * ```ts
-   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
+   * const fetchData = (id: number): Promise<Result<{ id: number }, string>> =>
+   *   Promise.resolve(Result.Ok({ id }));
    * const result = await Result.asyncGen(async function* () {
    *   const a = yield* Result.Ok(1);
-   *   const dataResult = yield* $(await fetchData(a));
+   *   const dataResult = yield* await fetchData(a);
    *   return a + dataResult.id;
    * });
    * // Result<number, never>
@@ -2135,7 +2136,8 @@ export class Result<T, E> {
    *
    * @example
    * ```ts
-   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
+   * const fetchData = (id: number): Promise<Result<{ id: number }, string>> =>
+   *   Promise.resolve(Result.Ok({ id }));
    * const result = await Result.asyncGenAdapter(async function* ($) {
    *   const a = yield* $(Result.Ok(1));
    *   const data = yield* $(fetchData(a));
