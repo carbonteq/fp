@@ -489,20 +489,17 @@ export class ExperimentalResult<T, E> {
    *
    * @template U - The result type
    * @param cases - Partial object with optional `Ok` and `Err` handlers
-   * @param defaultValue - Value to return for unhandled cases
+   * @param getDefault - Lazy default function for unhandled cases
    * @returns The result of the matching handler or the default
    *
    * @example
    * ```ts
    * // Only handle Ok, default for Err
-   * ExperimentalResult.Ok(42).matchPartial({ Ok: (v) => v * 2 }, 0);     // 84
-   * Result.Err("fail").matchPartial({ Ok: (v) => v * 2 }, 0); // 0
+   * ExperimentalResult.Ok(42).matchPartial({ Ok: (v) => v * 2 }, () => 0); // 84
+   * ExperimentalResult.Err("fail").matchPartial({ Ok: (v) => v * 2 }, () => 0); // 0
    *
    * // Only handle Err for logging
-   * result.matchPartial(
-   *   { Err: (e) => { logError(e); return null; } },
-   *   (v) => v  // pass through Ok values
-   * );
+   * result.matchPartial({ Err: (e) => { logError(e); return null; } }, () => null);
    *
    * // Lazy default with function
    * result.matchPartial(
@@ -1473,8 +1470,8 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const result = await Result.asyncGen(async function* () {
-   *   const value = yield* $(ExperimentalResult.Ok(42));
+   * const result = await ExperimentalResult.asyncGen(async function* () {
+   *   const value = yield* ExperimentalResult.Ok(42);
    *   return value * 2;
    * });
    * ```
@@ -1702,13 +1699,16 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
-   * const result = await Result.asyncGen(async function* () {
+   * const fetchData = async (
+   *   id: number,
+   * ): Promise<ExperimentalResult<{ id: number }, string>> =>
+   *   ExperimentalResult.Ok({ id });
+   * const result = await ExperimentalResult.asyncGen(async function* () {
    *   const a = yield* ExperimentalResult.Ok(1);
-   *   const dataResult = yield* $(await fetchData(a));
+   *   const dataResult = yield* (await fetchData(a));
    *   return a + dataResult.id;
    * });
-   * // Result<number, never>
+   * // ExperimentalResult<number, string>
    * ```
    */
   // biome-ignore lint/suspicious/noExplicitAny: inference
@@ -1772,13 +1772,16 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const fetchData = (id: number): Promise<Result<{id: number}, string>> => ({ id });
-   * const result = await Result.asyncGenAdapter(async function* ($) {
+   * const fetchData = async (
+   *   id: number,
+   * ): Promise<ExperimentalResult<{ id: number }, string>> =>
+   *   ExperimentalResult.Ok({ id });
+   * const result = await ExperimentalResult.asyncGenAdapter(async function* ($) {
    *   const a = yield* $(ExperimentalResult.Ok(1));
    *   const data = yield* $(fetchData(a));
    *   return a + data.id;
    * });
-   * // Result<number, never>
+   * // ExperimentalResult<number, string>
    * ```
    */
   static async asyncGenAdapter<
