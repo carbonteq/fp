@@ -2,7 +2,7 @@
   "name": "@carbonteq/fp",
   "version": "0.9.1",
   "publish": {
-    "include": ["src", "README.md", "LICENCE", "package.json", "deno.jsonc"]
+    "include": ["src", "README.md", "LICENSE", "package.json", "deno.jsonc"]
   },
   "exports": {
     ".": "./src/index.ts",
