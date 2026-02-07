@@ -520,6 +520,30 @@ describe("match() builder - advanced", () => {
     expect(result).toBe("C")
   })
 
+  it("regression: string tag handlers receive inner values", () => {
+    const someResult = match(Option.Some<number>(75))
+      .with("Some", (value: number) => value + 5)
+      .with("None", () => 0)
+      .exhaustive()
+
+    const errResult = match(Result.Err<string, number>("boom"))
+      .with("Ok", () => 0)
+      .with("Err", (error: string) => error.length)
+      .exhaustive()
+
+    expect(someResult).toBe(80)
+    expect(errResult).toBe(4)
+  })
+
+  it("regression: no-predicate P handlers receive inner values", () => {
+    const result = match(Result.Ok<number, string>(10))
+      .with(P.Ok(), (value: number) => value * 2)
+      .with(P.Err(), (error: string) => error.length)
+      .exhaustive()
+
+    expect(result).toBe(20)
+  })
+
   it("should handle mixed P patterns for Result", () => {
     const result = match(Result.Ok<number, never>(75))
       .with(

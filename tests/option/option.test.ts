@@ -680,6 +680,14 @@ describe("Option type inference", () => {
       >()
     })
 
+    it("regression: flatZip tuple uses receiver inner type", () => {
+      const opt: Option<Promise<number>> = Option.Some(Promise.resolve(42))
+
+      expectTypeOf(opt.flatZip((n) => Option.Some(`${n}`))).toEqualTypeOf<
+        Option<Promise<[number, string]>>
+      >()
+    })
+
     it("should correctly type flatZip on async Option with async mapper", () => {
       const opt = Option.Some(Promise.resolve(42))
 
