@@ -1,7 +1,7 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js"
 import { ExperimentalOption as Option } from "./option-experimental.js"
 import { UNIT } from "./unit.js"
-import { CapturedTrace, isCapturedTrace } from "./utils.js"
+import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
 
 export type UnitResult<E = never> = ExperimentalResult<UNIT, E>
 
@@ -1050,8 +1050,8 @@ export class ExperimentalResult<T, E> {
     const baseVal = this.#val as T
     const results = validators.map((v) => v(baseVal))
 
-    // Check if any result is a promise
-    if (results.some((r) => r instanceof Promise)) {
+    // Check if any result is promise-like (includes thenables)
+    if (results.some((r) => isPromiseLike(r))) {
       return Promise.all(results).then((resolved) => {
         const errs: unknown[] = []
         for (const r of resolved as ExperimentalResult<unknown, unknown>[]) {

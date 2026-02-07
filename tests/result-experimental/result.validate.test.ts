@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test"
+import { runInNewContext } from "node:vm"
 import { ExperimentalResult as Result } from "@/result-experimental.js"
 
 const validateOk = (_n: number): Result<string, string> => Result.Ok("Success")
@@ -80,6 +81,20 @@ describe("ExperimentalResult.validate behavior", () => {
     expect(validated.unwrapErr()).toEqual(["Failure", "Failure"])
     expect(mockerA).toHaveBeenCalledTimes(1)
     expect(mockerB).toHaveBeenCalledTimes(1)
+  })
+
+  it("should handle thenable validators in validate", async () => {
+    const thenableValidator = ((_n: number) =>
+      runInNewContext("Promise.resolve(Result.Err('ThenableFailure'))", {
+        Result,
+      }) as Promise<Result<string, string>>) as (
+      n: number,
+    ) => Promise<Result<string, string>>
+
+    const validated = await Result.Ok(2).validate([thenableValidator])
+
+    expect(validated.isErr()).toBeTrue()
+    expect(validated.unwrapErr()).toEqual(["ThenableFailure"])
   })
 
   // it("should return errors if failure validating Result<T, Promise<E>>", async () => {
