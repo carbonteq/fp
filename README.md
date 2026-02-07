@@ -369,7 +369,7 @@ Here `derivedPair` is a `Result<[number, number], Error>`. Note that `T` = `100`
 
 #### `flatZip`
 
-Combines the current `Result<T, E>` with another `Result<U, E2>`, or the current `Option<T>` with another `Option<U>`. Unlike zip, which pairs a value with a derived one, flatZip works with **two independent Result/Option values** and combines their contents into a tuple `[T, U]`. It ensures the Result/Option values are Ok/Some to proceed; otherwise, it propagates the first encountered Err/None.
+Combines the current `Result<T, E>` with a **dependent** `Result<U, E2>` produced from `T`, or the current `Option<T>` with a dependent `Option<U>` produced from `T`. Unlike `zip`, which pairs a value with a plain derived value, `flatZip` expects the callback to return a `Result`/`Option` and then flattens the outcome into `[T, U]`. It proceeds only when both steps are `Ok`/`Some`; otherwise, it propagates the first `Err`/`None`.
 
 Lets say we want to combine the product price and product stock into a tuple `[number, number]`.
 
@@ -408,11 +408,11 @@ console.log(await fetchProductDetails("123")); // Output: Option.Some([100, 50])
 
 | **Method**            | **`map`**                                                         | **`flatMap`**                                                                                                                       | **`zip`**                                                                                  | **`flatZip`**                                                                                                |
 | --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| **Purpose**           | Transforms the value inside an `Ok` or `Some`.                    | Chains dependent computations where each computation returns a `Result` or `Option`.                                                | Combines the current value with another derived value into a tuple `[T, U]`.               | Combines two independent `Result` or `Option` values into a tuple `[T, U]`.                                  |
+| **Purpose**           | Transforms the value inside an `Ok` or `Some`.                    | Chains dependent computations where each computation returns a `Result` or `Option`.                                                | Combines the current value with another derived value into a tuple `[T, U]`.               | Chains a dependent computation returning `Result`/`Option` and combines both values into `[T, U]`.          |
 | **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` to transform the current value into another `Result` or `Option`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.           | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` that returns another `Result` or `Option`. |
 | **Output**            | `Result<U, E>`, `Option<U>`                                       | `Result<U, E>`, `Option<U>`                                                                                                         | `Result<[T, U], E>`, `Option<[T, U]>`                                                      | `Result<[T, U], E>`, `Option<[T, U]>`.                                                                       |
 | **Error Propagation** | Propagates `Err`/`None` if the `Result`/`Option` is `Err`/`None`. | Propagates the first `Err`/`None` encountered in the chain.                                                                         | Propagates `Err`/`None` if the current `Result`/`Option` or derived value is `Err`/`None`. | Propagates the first `Err`/`None` encountered between the two `Result`/`Option` values.                      |
-| **Use Case**          | When you want to transform a value inside `Ok`/`Some`.            | When the next computation depends on the current value and returns a `Result`/`Option`.                                             | When you want to pair the current value with a derived one.                                | When you want to combine two independent `Result`/`Option` values into a tuple.                              |
+| **Use Case**          | When you want to transform a value inside `Ok`/`Some`.            | When the next computation depends on the current value and returns a `Result`/`Option`.                                             | When you want to pair the current value with a derived one.                                | When you want to pair the current value with a dependent `Result`/`Option` computation.                     |
 
 ---
 
@@ -971,7 +971,7 @@ console.log(alreadyFailed); // Err("Network error") - short-circuits
 ```typescript
 import { Result } from "@carbonteq/fp";
 
-const res = Result.Err<number, Error>(new Error("boom")).mapErr(
+const res = Result.Err<Error, number>(new Error("boom")).mapErr(
   (e) => e.message,
 );
 console.log(res); // Err("boom")
