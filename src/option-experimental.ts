@@ -655,6 +655,7 @@ export class ExperimentalOption<T> {
    * Async pattern matching using positional arguments.
    *
    * Async variant of `fold` for when handlers return Promises.
+   * Rejections from `onSome` are propagated (not converted to `None`).
    *
    * @template U - The result type of both branches
    * @param onSome - Async handler called with the value if `Some`
@@ -693,6 +694,7 @@ export class ExperimentalOption<T> {
    * Async pattern matching on both states of the ExperimentalOption.
    *
    * Async variant of `match` for when handlers return Promises.
+   * Rejections from `Some` handler are propagated (not converted to `None`).
    *
    * @template U - The result type of both branches
    * @param cases - Object containing async handlers for both states
@@ -729,22 +731,22 @@ export class ExperimentalOption<T> {
    * Pattern matches with a subset of cases, using a default for unhandled cases.
    *
    * Unlike `match` which requires all cases, `matchPartial` allows handling
-   * only specific cases with a fallback default value or function.
+   * only specific cases with a fallback default function.
    *
    * @template U - The result type
    * @param cases - Partial object with optional `Some` and `None` handlers
-   * @param defaultValue - Value to return for unhandled cases
+   * @param getDefault - Lazy default function for unhandled cases
    * @returns The result of the matching handler or the default
    *
    * @example
    * ```ts
    * // Only handle Some, default for None
-   * ExperimentalOption.Some(42).matchPartial({ Some: (v) => v * 2 }, 0);  // 84
-   * ExperimentalOption.None.matchPartial({ Some: (v) => v * 2 }, 0);      // 0
+   * ExperimentalOption.Some(42).matchPartial({ Some: (v) => v * 2 }, () => 0); // 84
+   * ExperimentalOption.None.matchPartial({ Some: (v) => v * 2 }, () => 0); // 0
    *
    * // Only handle None
-   * ExperimentalOption.Some(42).matchPartial({ None: () => -1 }, 100);    // 100
-   * ExperimentalOption.None.matchPartial({ None: () => -1 }, 100);        // -1
+   * ExperimentalOption.Some(42).matchPartial({ None: () => -1 }, () => 100); // 100
+   * ExperimentalOption.None.matchPartial({ None: () => -1 }, () => 100); // -1
    *
    * // Lazy default with function
    * experimentalOption.matchPartial(
@@ -1269,10 +1271,9 @@ export class ExperimentalOption<T> {
    *
    * // Practical: audit trail
    * const result = ExperimentalOption.Some(transaction)
-   *   .tap(t => auditLog("start", t.id))
-   *   .flatMap(t => process(t))
-   *   .tap(r => auditLog("success", r.id))
-   *   .tapErr(e => auditLog("error", e.message));
+   *   .tap((t) => auditLog("start", t.id))
+   *   .flatMap((t) => process(t))
+   *   .tap((r) => auditLog("success", r.id));
    * ```
    *
    * @see {@link tapAsync} for async side effects
@@ -1694,7 +1695,7 @@ export class ExperimentalOption<T> {
    * // Complex pipeline with multiple optional steps
    * async function processLead(email: string): Promise<ExperimentalOption<Lead>> {
    *   return await ExperimentalOption.asyncGen(async function* () {
-   *     const normalized = yield* Some(normalizeEmail(email));
+   *     const normalized = yield* ExperimentalOption.Some(normalizeEmail(email));
    *     const existing = yield* await findExistingLead(normalized);
    *     const enriched = yield* await enrichLeadData(existing);
    *     const validated = yield* validateLead(enriched);
