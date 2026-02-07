@@ -406,8 +406,8 @@ describe("ExperimentalOption.asyncGen", () => {
         throw new Error("Network error")
       }
 
-      expect(
-        await Option.asyncGen(async function* () {
+      await expect(
+        Option.asyncGen(async function* () {
           const value = yield* await failingFetch()
           return value
         }),

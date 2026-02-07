@@ -434,8 +434,8 @@ describe("Option.asyncGenAdapter", () => {
         throw new Error("Network error")
       }
 
-      expect(
-        await Option.asyncGenAdapter(async function* ($) {
+      await expect(
+        Option.asyncGenAdapter(async function* ($) {
           const value = yield* $(failingFetch())
           return value
         }),
