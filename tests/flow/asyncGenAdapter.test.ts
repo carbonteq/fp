@@ -121,4 +121,16 @@ describe("Flow.asyncGenAdapter", () => {
     expect(result.isErr()).toBe(true)
     expect(result.unwrapErr()).toBeInstanceOf(ValidationError)
   })
+
+  test("maps adapter promise rejection into Result.Err", async () => {
+    const rejection = new Error("adapter rejected")
+
+    const result = await Flow.asyncGenAdapter(async function* ($) {
+      yield* $(Promise.reject(rejection) as Promise<Result<number, Error>>)
+      return 1
+    })
+
+    expect(result.isErr()).toBe(true)
+    expect(result.unwrapErr()).toBe(rejection)
+  })
 })

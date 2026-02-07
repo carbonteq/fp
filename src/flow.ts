@@ -401,7 +401,19 @@ export class Flow {
         wrapped = wrapped as AsyncFlowYieldWrap<unknown, unknown>
       }
 
-      const value = await wrapped.value
+      let value: Option<unknown> | Result<unknown, unknown>
+      try {
+        value = await wrapped.value
+      } catch (error) {
+        if (stack && error instanceof Error) {
+          const stackLines = stack.split("\n")
+          if (stackLines.length > 2) {
+            const userStack = stackLines.slice(2).join("\n")
+            error.stack = `${error.name}: ${error.message}\n${userStack}`
+          }
+        }
+        return Result.Err(error) as Result<T, ExtractAsyncWrapError<Eff>>
+      }
 
       if (isOption(value)) {
         if (value.isNone()) {
