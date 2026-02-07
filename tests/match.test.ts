@@ -388,6 +388,23 @@ describe("match() builder - with P patterns", () => {
       .exhaustive()
     expect(result).toBe("error: fail")
   })
+
+  it("should support typed wildcard P._", () => {
+    const result = match(Option.Some(42) as Option<number>)
+      .with(P._, (opt) => (opt.isSome() ? opt.unwrap() * 2 : 0))
+      .exhaustive()
+
+    expect(result).toBe(84)
+  })
+
+  it("should use wildcard as final catch-all", () => {
+    const result = match(Result.Err("boom") as Result<number, string>)
+      .with("Ok", () => 1)
+      .with(P._, (value) => (value._tag === "Err" ? 2 : 0))
+      .exhaustive()
+
+    expect(result).toBe(2)
+  })
 })
 
 // =============================================================================

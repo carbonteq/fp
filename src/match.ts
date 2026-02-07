@@ -313,6 +313,16 @@ interface MatchBuilder<T, Matched extends string, Returns> {
   ): MatchBuilder<T, Matched, Returns | R>
 
   /**
+   * Add a wildcard pattern case that matches any remaining value.
+   *
+   * This consumes all tags for exhaustiveness checking.
+   */
+  with<R>(
+    pattern: WildcardPattern,
+    handler: MatchHandler<T, R>,
+  ): MatchBuilder<T, GetTags<T>, Returns | R>
+
+  /**
    * Add a predicate-based match case.
    * The predicate is tested against the value regardless of its tag.
    *
