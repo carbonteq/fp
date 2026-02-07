@@ -1278,7 +1278,9 @@ export class ExperimentalOption<T> {
    *
    * @see {@link tapAsync} for async side effects
    */
-  tap(fn: (val: T) => void): ExperimentalOption<T> {
+  tap<F extends (val: T) => unknown>(
+    fn: ReturnType<F> extends PromiseLike<unknown> ? never : F,
+  ): ExperimentalOption<T> {
     if (this.isSome()) {
       fn(this.#val)
     }

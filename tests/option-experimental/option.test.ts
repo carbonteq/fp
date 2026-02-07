@@ -678,6 +678,14 @@ describe("Option type inference", () => {
       >()
     })
 
+    it("should reject async callbacks in tap type contract", () => {
+      const opt = Option.Some(42)
+      // @ts-expect-error tap is sync-only; use tapAsync for async side effects
+      opt.tap(async (n) => {
+        void n
+      })
+    })
+
     it("should correctly type tapAsync (returns same type)", async () => {
       const opt = Option.Some(42)
       const result = await opt.tapAsync((n) => Promise.resolve(console.log(n)))
