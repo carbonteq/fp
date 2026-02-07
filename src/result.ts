@@ -696,21 +696,27 @@ export class Result<T, E> {
       return new Result(p, parentErr as E | E2, newCtx, "Ok")
     }
 
-    // Sync flatMap - return the inner result directly
-    if (mapped._tag === "Err") {
+    const normalized = Result.flatMapInnerHelper(newCtx, mapped)
+
+    if (isPromiseLike(normalized)) {
+      return new Result(
+        normalized as Promise<U>,
+        parentErr as E | E2,
+        newCtx,
+        "Ok",
+      )
+    }
+
+    if (normalized === ERR_VAL) {
       return new Result(
         ERR_VAL as U,
-        mapped.getErr() as E | E2,
-        { asyncErr: NO_ERR },
+        newCtx.asyncErr !== NO_ERR ? newCtx.asyncErr : (parentErr as E | E2),
+        newCtx,
         "Err",
       )
     }
-    return new Result(
-      mapped.#val as U,
-      parentErr as E | E2,
-      { asyncErr: NO_ERR },
-      "Ok",
-    )
+
+    return new Result(normalized as U, parentErr as E | E2, newCtx, "Ok")
   }
 
   /**
