@@ -11,8 +11,8 @@
         }
       },
       "language_servers": [
-        "tsgo",
-        "!vtsls",
+        "!tsgo",
+        "vtsls",
         "oxfmt",
         "oxlint",
         "biome"

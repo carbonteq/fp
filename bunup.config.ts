@@ -1,6 +1,6 @@
-import { defineConfig } from "bunup";
+import { defineConfig } from "bunup"
 
-const isProd = process.env.NODE_ENV === "production";
+const isProd = process.env.NODE_ENV === "production"
 
 export default defineConfig({
   sourceBase: "./src",
@@ -20,4 +20,4 @@ export default defineConfig({
   drop: isProd ? ["console"] : undefined,
   exports: false,
   // exports: true
-});
+})

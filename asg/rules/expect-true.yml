@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
-
-id: expect-true
-language: TypeScript
-rule:
-  pattern: expect($OBJ).toBeTrue()
-fix: assert.strictEqual($OBJ, true)

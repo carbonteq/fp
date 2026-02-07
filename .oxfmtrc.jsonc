@@ -9,12 +9,13 @@
     "**/*.json",
     "**/*.jsonc",
     "**/*.md",
-    "**/*.toml"
+    "**/*.toml",
+    "**/*.yml"
   ],
   "printWidth": 80, // like biome
   "useTabs": false,
   "tabWidth": 2,
-  "semi": true,
+  "semi": false,
   "singleQuote": false,
   "trailingComma": "all",
   "bracketSpacing": true,

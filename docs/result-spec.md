@@ -1,4 +1,4 @@
-# Result<T, E> Type Specification
+# Result<T, E> Type Specification (Simplified)
 
 ## Overview
 
@@ -8,7 +8,7 @@ The `Result<T, E>` type provides a **type-safe, composable way to handle operati
 
 - **Type Safety**: Compile-time guarantees about success/failure states
 - **Composability**: Chain operations without nested try-catch blocks
-- **Async Support**: Seamless handling of both sync and async operations
+- **Explicit Async Boundaries**: Async operations return `Promise<Result<T, E>>` - standard Promise semantics
 - **Error Context**: Rich error information with type-safe propagation
 - **Functional Style**: Pure functions with predictable behavior
 
@@ -21,7 +21,7 @@ The `Result<T, E>` type provides a **type-safe, composable way to handle operati
 States must be explicitly represented and checkable at both compile-time and runtime:
 
 ```typescript
-type Result<T, E> = Ok<T, E> | Err<T, E>
+type Result<T, E> = Ok<T, E> | Err<T, E>;
 ```
 
 ### 2. Referential Transparency
@@ -36,18 +36,22 @@ All transformation methods must be pure - given the same input, they produce the
 Operations on the error track propagate without executing transformation functions:
 
 ```typescript
-Result.Err("fail").map(x => expensiveComputation(x))  // Never calls expensiveComputation
+Result.Err("fail").map((x) => expensiveComputation(x)); // Never calls expensiveComputation
 ```
 
-### 4. Type-Level Async Tracking
+### 4. Explicit Promise Returns
 
-When operations involve Promises, the return type accurately reflects this:
+Async behavior is explicit via `*Async` variants. Sync methods never accept
+Promise-returning mappers.
+
+When using `*Async` variants, the return type is **always** `Promise<Result<T, E>>`:
 
 ```typescript
-Result<T, E> + sync mapper  → Result<U, E>
-Result<T, E> + async mapper → Result<Promise<U>, E>
-Result<Promise<T>, E> + any mapper → Result<Promise<U>, E>
+Result<T, E> + sync mapper      → Result<U, E>
+Result<T, E> + async mapper     → Promise<Result<U, E>> (via *Async)
 ```
+
+This aligns with standard JavaScript/TypeScript async patterns.
 
 ### 5. Error Type Unification
 
@@ -66,7 +70,7 @@ Result should be covariant in `T` and `E` to support subtyping.
 ## Core Definition
 
 ```typescript
-type Result<T, E> = Ok<T, E> | Err<T, E>
+type Result<T, E> = Ok<T, E> | Err<T, E>;
 
 interface Ok<T, E> {
   readonly _tag: "Ok";
@@ -89,9 +93,8 @@ interface Err<T, E> {
 | `Err` | `<E, T = never>(error: E): Result<T, E>` | Creates Err containing `error` |
 | `fromNullable` | `<T, E>(value: T \| null \| undefined, error: E): Result<NonNullable<T>, E>` | Ok if non-nullish |
 | `fromPredicate` | `<T, E>(value: T, pred: (v: T) => boolean, error: E): Result<T, E>` | Ok if predicate passes |
-| `fromPromise` | `<T, E>(promise: Promise<Result<T, E>>): Result<Promise<T>, E>` | Wraps async Result |
-| `tryCatch` | `<T, E>(fn: () => T, errorMapper?: (e: unknown) => E): Result<T, E>` | Catches sync exceptions |
-| `tryAsyncCatch` | `<T, E>(fn: () => Promise<T>, errorMapper?: (e: unknown) => E): Result<Promise<T>, E>` | Catches async exceptions |
+| `tryCatch` | `<T, E = unknown>(fn: () => T, errorMapper?: (e: unknown) => E): Result<T, E>` | Catches sync exceptions |
+| `tryAsyncCatch` | `<T, E = unknown>(fn: () => Promise<T>, errorMapper?: (e: unknown) => E): Promise<Result<T, E>>` | Catches async exceptions |
 
 > **Note:** `tryCatch` and `tryAsyncCatch` are named this way because `try` is a reserved keyword in JavaScript/TypeScript and cannot be used as a method name directly.
 
@@ -105,23 +108,26 @@ Result.UNIT_RESULT: Result<Unit, never>  // Singleton for void-success
 
 ```typescript
 // Direct construction
-const ok = Result.Ok(42);                  // Ok(42)
-const err = Result.Err("failed");          // Err("failed")
+const ok = Result.Ok(42); // Ok(42)
+const err = Result.Err("failed"); // Err("failed")
 
 // From nullable values
-Result.fromNullable(user, "User not found");  // Ok(user) or Err("User not found")
-Result.fromNullable(null, "Not found");       // Err("Not found")
+Result.fromNullable(user, "User not found"); // Ok(user) or Err("User not found")
+Result.fromNullable(null, "Not found"); // Err("Not found")
 
 // From predicate
-Result.fromPredicate(age, x => x >= 18, "Must be adult");  // Ok or Err
+Result.fromPredicate(age, (x) => x >= 18, "Must be adult"); // Ok or Err
 
 // From throwing function
-Result.tryCatch(() => JSON.parse(data), e => new ParseError(e));
+Result.tryCatch(
+  () => JSON.parse(data),
+  (e) => new ParseError(e),
+);
 
 // From async throwing function
-Result.tryAsyncCatch(
-  () => fetch(url).then(r => r.json()),
-  e => new NetworkError(e)
+await Result.tryAsyncCatch(
+  () => fetch(url).then((r) => r.json()),
+  (e) => new NetworkError(e),
 );
 
 // Unit result for void operations
@@ -148,7 +154,7 @@ const result = Result.Ok(42);
 
 if (result.isOk()) {
   // TypeScript knows result.value is accessible
-  console.log(result.value);  // 42
+  console.log(result.value); // 42
 }
 
 if (result.isErr()) {
@@ -177,28 +183,28 @@ const ok = Result.Ok(42);
 const err = Result.Err(new Error("failed"));
 
 // unwrap - throws on Err
-ok.unwrap();                               // 42
-err.unwrap();                              // re-throws Error (preserves stack)
+ok.unwrap(); // 42
+err.unwrap(); // re-throws Error (preserves stack)
 
 // unwrapOr - safe with default
-ok.unwrapOr(0);                            // 42
-err.unwrapOr(0);                           // 0
+ok.unwrapOr(0); // 42
+err.unwrapOr(0); // 0
 
 // unwrapOrElse - compute recovery from error
-err.unwrapOrElse(e => computeFallback(e)); // calls with error
+err.unwrapOrElse((e) => computeFallback(e)); // calls with error
 
 // unwrapErr - get error value
-err.unwrapErr();                           // Error("failed")
-ok.unwrapErr();                            // throws UnwrapError
+err.unwrapErr(); // Error("failed")
+ok.unwrapErr(); // throws UnwrapError
 
 // safeUnwrap - null for Err
-ok.safeUnwrap();                           // 42
-err.safeUnwrap();                          // null
+ok.safeUnwrap(); // 42
+err.safeUnwrap(); // null
 
 // match - exhaustive pattern matching
 const message = result.match({
   Ok: (value) => `Success: ${value}`,
-  Err: (error) => `Failed: ${error.message}`
+  Err: (error) => `Failed: ${error.message}`,
 });
 ```
 
@@ -210,13 +216,10 @@ const message = result.match({
 
 Transforms the success value while preserving error state.
 
-**Signatures:**
+**Signature:**
 
 ```typescript
-map<U>(this: Result<Promise<T>, E>, fn: (val: T) => Promise<U>): Result<Promise<U>, E>;
-map<U>(this: Result<Promise<T>, E>, fn: (val: T) => U): Result<Promise<U>, E>;
-map<U>(this: Result<T, E>, fn: (val: T) => Promise<U>): Result<Promise<U>, E>;
-map<U>(this: Result<T, E>, fn: (val: T) => U): Result<U, E>;
+map<U>(fn: (val: T) => U): Result<U, E>;
 ```
 
 **Behavior:**
@@ -227,23 +230,34 @@ map<U>(this: Result<T, E>, fn: (val: T) => U): Result<U, E>;
 **Examples:**
 
 ```typescript
-Ok(42).map(x => x * 2)                     // Ok(84)
-Err("error").map(x => x * 2)               // Err("error")
-Ok(42).map(async x => x + 10)              // Ok(Promise<52>)
-Ok(Promise.resolve(42)).map(x => x * 2)    // Ok(Promise<84>)
+Ok(42).map((x) => x * 2); // Ok(84)
+Err("error").map((x) => x * 2); // Err("error")
+```
+
+### `mapAsync<U>(fn): Promise<Result<U, E>>`
+
+Transforms the success value using an async mapper.
+
+**Signature:**
+
+```typescript
+mapAsync<U>(fn: (val: T) => Promise<U>): Promise<Result<U, E>>;
+```
+
+**Examples:**
+
+```typescript
+Ok(42).mapAsync(async (x) => x + 10); // Promise<Ok(52)>
 ```
 
 ### `flatMap<U, E2>(fn): Result<U, E | E2>`
 
 Chains operations that return Results, flattening and unifying error types.
 
-**Signatures:**
+**Signature:**
 
 ```typescript
-flatMap<U, E2>(this: Result<Promise<T>, E>, fn: (val: T) => Promise<Result<U, E2>>): Result<Promise<U>, E | E2>;
-flatMap<U, E2>(this: Result<Promise<T>, E>, fn: (val: T) => Result<U, E2>): Result<Promise<U>, E | E2>;
-flatMap<U, E2>(this: Result<T, E>, fn: (val: T) => Promise<Result<U, E2>>): Result<Promise<U>, E | E2>;
-flatMap<U, E2>(this: Result<T, E>, fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
+flatMap<U, E2>(fn: (val: T) => Result<U, E2>): Result<U, E | E2>;
 ```
 
 **Behavior:**
@@ -256,64 +270,97 @@ flatMap<U, E2>(this: Result<T, E>, fn: (val: T) => Result<U, E2>): Result<U, E |
 ```typescript
 // Success chain
 Ok(42)
-  .flatMap(x => Ok(x + 1))                 // Ok(43)
-  .flatMap(x => Err("too big"));           // Err("too big")
+  .flatMap((x) => Ok(x + 1)) // Ok(43)
+  .flatMap((x) => Err("too big")); // Err("too big")
 
 // Error propagation
-Err("initial").flatMap(x => Ok(x + 1));    // Err("initial")
+Err("initial").flatMap((x) => Ok(x + 1)); // Err("initial")
 
-// Async support
-Ok(42).flatMap(async x => Ok(x * 3));      // Result<Promise<126>, string>
+// Async support via flatMapAsync
+Ok(42).flatMapAsync(async (x) => Ok(x * 3)); // Promise<Ok(126)>
+```
 
+### `flatMapAsync<U, E2>(fn): Promise<Result<U, E | E2>>`
+
+Chains operations that return `Promise<Result<...>>`.
+
+**Signature:**
+
+```typescript
+flatMapAsync<U, E2>(fn: (val: T) => Promise<Result<U, E2>>): Promise<Result<U, E | E2>>;
+```
+
+**Examples:**
+
+```typescript
 // Chaining fallible operations
 parseUserId(input)
-  .flatMap(id => fetchUser(id))
-  .flatMap(user => validatePermissions(user))
-  .map(user => user.email);
+  .flatMap((id) => fetchUser(id)) // Promise<Result<User, string>>
+  .then((r) => r.flatMap((user) => validatePermissions(user)))
+  .then((r) => r.map((user) => user.email));
 ```
 
 ### `zip<U>(fn): Result<[T, U], E>`
 
 Pairs the original value with a derived value.
 
-**Signatures:**
+**Signature:**
 
 ```typescript
-zip<U>(this: Result<Promise<T>, E>, fn: (val: T) => Promise<U>): Result<Promise<[T, U]>, E>;
-zip<U>(this: Result<Promise<T>, E>, fn: (val: T) => U): Result<Promise<[T, U]>, E>;
-zip<U>(this: Result<T, E>, fn: (val: T) => Promise<U>): Result<Promise<[T, U]>, E>;
-zip<U>(this: Result<T, E>, fn: (val: T) => U): Result<[T, U], E>;
+zip<U>(fn: (val: T) => U): Result<[T, U], E>;
 ```
 
 **Examples:**
 
 ```typescript
-Ok(42).zip(x => x * 10)                    // Ok([42, 420])
-Err("error").zip(x => x * 10)              // Err("error")
+Ok(42).zip((x) => x * 10); // Ok([42, 420])
+Err("error").zip((x) => x * 10); // Err("error")
 
 // Keep original while computing derived
-Ok(user).zip(u => u.permissions.length)    // Ok([user, 5])
+Ok(user).zip((u) => u.permissions.length); // Ok([user, 5])
+
+// Async version
+Ok(user).zipAsync(async (u) => await fetchCount(u)); // Promise<Ok<[user, number]>>
+```
+
+### `zipAsync<U>(fn): Promise<Result<[T, U], E>>`
+
+Pairs the original value with a derived async value.
+
+**Signature:**
+
+```typescript
+zipAsync<U>(fn: (val: T) => Promise<U>): Promise<Result<[T, U], E>>;
 ```
 
 ### `flatZip<U, E2>(fn): Result<[T, U], E | E2>`
 
 Pairs the original value with a value from another Result.
 
-**Signatures:**
+**Signature:**
 
 ```typescript
-flatZip<U, E2>(this: Result<Promise<T>, E>, fn: (val: T) => Promise<Result<U, E2>>): Result<Promise<[T, U]>, E | E2>;
-flatZip<U, E2>(this: Result<Promise<T>, E>, fn: (val: T) => Result<U, E2>): Result<Promise<[T, U]>, E | E2>;
-flatZip<U, E2>(this: Result<T, E>, fn: (val: T) => Promise<Result<U, E2>>): Result<Promise<[T, U]>, E | E2>;
-flatZip<U, E2>(this: Result<T, E>, fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
+flatZip<U, E2>(fn: (val: T) => Result<U, E2>): Result<[T, U], E | E2>;
 ```
 
 **Examples:**
 
 ```typescript
 Ok(42)
-  .flatZip(x => Ok(x + 5))                 // Ok([42, 47])
-  .flatZip(([a, b]) => Err("invalid"));    // Err("invalid")
+  .flatZip((x) => Ok(x + 5)) // Ok([42, 47])
+  .flatZip(([a, b]) => Err("invalid")); // Err("invalid")
+```
+
+### `flatZipAsync<U, E2>(fn): Promise<Result<[T, U], E | E2>>`
+
+Pairs the original value with a value from another async Result.
+
+**Signature:**
+
+```typescript
+flatZipAsync<U, E2>(
+  fn: (val: T) => Promise<Result<U, E2>>
+): Promise<Result<[T, U], E | E2>>;
 ```
 
 ---
@@ -324,11 +371,10 @@ Ok(42)
 
 Transforms the error while preserving success value.
 
-**Signatures:**
+**Signature:**
 
 ```typescript
 mapErr<E2>(fn: (err: E) => E2): Result<T, E2>;
-mapErr<E2>(fn: (err: E) => Promise<E2>): Result<T, Promise<E2>>;
 ```
 
 **Behavior:**
@@ -339,12 +385,26 @@ mapErr<E2>(fn: (err: E) => Promise<E2>): Result<T, Promise<E2>>;
 **Examples:**
 
 ```typescript
-Err("network error").mapErr(e => `Network: ${e}`);  // Err("Network: network error")
-Ok(42).mapErr(e => `Error: ${e}`);                   // Ok(42)
+Err("network error").mapErr((e) => `Network: ${e}`); // Err("Network: network error")
+Ok(42).mapErr((e) => `Error: ${e}`); // Ok(42)
+
+// Async error transformation
+Err("timeout").mapErrAsync(async (e) => await formatError(e)); // Promise<Err(...)>>
 
 // Add context to errors
-fetchData()
-  .mapErr(e => new ContextualError("Failed to fetch data", e));
+fetchData().then((r) =>
+  r.mapErr((e) => new ContextualError("Failed to fetch data", e)),
+);
+```
+
+### `mapErrAsync<E2>(fn): Promise<Result<T, E2>>`
+
+Transforms the error using an async mapper.
+
+**Signature:**
+
+```typescript
+mapErrAsync<E2>(fn: (err: E) => Promise<E2>): Promise<Result<T, E2>>;
 ```
 
 ### `mapBoth<T2, E2>(fnOk, fnErr): Result<T2, E2>`
@@ -361,14 +421,27 @@ mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (err: E) => E2): Result<T2, E2>;
 
 ```typescript
 Ok(42).mapBoth(
-  val => `Success: ${val}`,
-  err => `Failure: ${err}`
-);  // Ok("Success: 42")
+  (val) => `Success: ${val}`,
+  (err) => `Failure: ${err}`,
+); // Ok("Success: 42")
 
 Err("timeout").mapBoth(
-  val => `Success: ${val}`,
-  err => `Failure: ${err}`
-);  // Err("Failure: timeout")
+  (val) => `Success: ${val}`,
+  (err) => `Failure: ${err}`,
+); // Err("Failure: timeout")
+```
+
+### `mapBothAsync<T2, E2>(fnOk, fnErr): Promise<Result<T2, E2>>`
+
+Transforms both tracks using async mappers.
+
+**Signature:**
+
+```typescript
+mapBothAsync<T2, E2>(
+  fnOk: (val: T) => Promise<T2>,
+  fnErr: (err: E) => Promise<E2>
+): Promise<Result<T2, E2>>;
 ```
 
 ### `orElse<T2, E2>(fn): Result<T | T2, E2>`
@@ -391,11 +464,30 @@ orElse<T2, E2>(fn: (err: E) => Result<T2, E2>): Result<T | T2, E2>;
 ```typescript
 // Recovery with fallback
 fetchFromPrimary()
-  .orElse(e => fetchFromBackup())
-  .orElse(e => Ok(defaultValue));
+  .flatMap((e) => fetchFromBackup())
+  .flatMap((e) => Ok(defaultValue));
 
 // Transform error type
-Err("not found").orElse(e => Err(new NotFoundError(e)));
+Err("not found").orElse((e) => Err(new NotFoundError(e)));
+
+// Async recovery
+await fetchData().then((r) =>
+  r.orElseAsync(async (e) => {
+    return await fetchBackupData();
+  }),
+);
+```
+
+### `orElseAsync<T2, E2>(fn): Promise<Result<T | T2, E2>>`
+
+Recovers from error by providing a fallback async Result.
+
+**Signature:**
+
+```typescript
+orElseAsync<T2, E2>(
+  fn: (err: E) => Promise<Result<T2, E2>>
+): Promise<Result<T | T2, E2>>;
 ```
 
 ### `zipErr<E2>(fn): Result<T, E | E2>`
@@ -412,9 +504,22 @@ zipErr<E2>(fn: (val: T) => Result<unknown, E2>): Result<T, E | E2>;
 **Examples:**
 
 ```typescript
-Ok(42).zipErr(x => Ok(x * 10));            // Ok(42)
-Ok(42).zipErr(x => Err("validation"));     // Err("validation")
-Err("initial").zipErr(x => Err("second")); // Err("initial")
+Ok(42).zipErr((x) => Ok(x * 10)); // Ok(42)
+Ok(42).zipErr((x) => Err("validation")); // Err("validation")
+Err("initial").zipErr((x) => Err("second")); // Err("initial")
+```
+
+### `zipErrAsync<E2>(fn): Promise<Result<T, E | E2>>`
+
+Allows a validation/binding step on the Ok track that can introduce a new error
+while preserving the original Ok value, using an async Result.
+
+**Signature:**
+
+```typescript
+zipErrAsync<E2>(
+  fn: (val: T) => Promise<Result<unknown, E2>>
+): Promise<Result<T, E | E2>>;
 ```
 
 ---
@@ -449,19 +554,39 @@ Ok(42).validate(validators)                // Ok(42)
 Ok(101).validate(validators)               // Err(["must be < 100"])
 Ok(-5).validate(validators)                // Err(["must be positive", "must be even"])
 
+// Async validators
+Ok(data).validateAsync([
+  async d => await validateEmail(d),
+  async d => await validatePhone(d),
+]);
+
+### `validateAsync<VE>(validators): Promise<Result<T, E | VE[]>>`
+
+Runs async validators, collecting ALL errors (not fail-fast).
+
+**Signature:**
+```
+
+```typescript
+validateAsync<VE>(
+  validators: Array<(val: T) => Promise<Result<unknown, VE>>>
+): Promise<Result<T, E | VE[]>>;
+```
+
 // Form validation
 Ok(formData).validate([
   validateEmail,
   validatePassword,
   validateUsername,
 ]);
-```
+
+```text
 
 ---
 
 ## Aggregation
 
-### `Result.all(...results): Result<T[], E[]>`
+### `Result.all(...results): Result<T[], E[]> | Promise<Result<T[], E[]>>`
 
 Combines multiple Results into one.
 
@@ -470,24 +595,26 @@ Combines multiple Results into one.
 - All Ok → `Ok([...values])` with preserved tuple types
 - Any Err → `Err([...errors])` collecting ALL errors
 
+```
+
 ```typescript
-Result.all(Ok(1), Ok(2), Ok(3))            // Ok([1, 2, 3])
-Result.all(Ok(1), Err("a"), Err("b"))      // Err(["a", "b"])
-Result.all()                               // Ok([]) - vacuous truth
+Result.all(Ok(1), Ok(2), Ok(3)); // Ok([1, 2, 3])
+Result.all(Ok(1), Err("a"), Err("b")); // Err(["a", "b"])
+Result.all(); // Ok([]) - vacuous truth
 
-// Mixed sync/async
-Result.all(
+// Async Results
+await Result.all(
   Ok(1),
-  Ok(Promise.resolve(2)),
-  Err("error")
-);  // Result<Promise<[1, 2]>, ["error"]>
+  await asyncValidate(2), // Promise<Result<number, string>>
+  Ok(3),
+); // Result<[number, number, number], string[]>
 
-// Parallel validation
-Result.all(
+// Parallel async validation
+await Promise.all([
   validateEmail(email),
   validatePassword(password),
-  validateAge(age)
-);
+  validateAge(age),
+]).then((results) => Result.all(...results));
 ```
 
 ### `Result.any(...results): Result<T, E[]>`
@@ -495,17 +622,259 @@ Result.all(
 Returns first Ok, or collects all errors.
 
 ```typescript
-Result.any(Err("a"), Ok(2), Ok(3))         // Ok(2)
-Result.any(Err("a"), Err("b"), Err("c"))   // Err(["a", "b", "c"])
-Result.any()                               // Err([]) - no success possible
+Result.any(Err("a"), Ok(2), Ok(3)); // Ok(2)
+Result.any(Err("a"), Err("b"), Err("c")); // Err(["a", "b", "c"])
+Result.any(); // Err([]) - no success possible
 
 // Fallback chain
-Result.any(
-  fetchFromCache(key),
-  fetchFromDb(key),
-  fetchFromRemote(key)
-);
+Result.any(fetchFromCache(key), fetchFromDb(key), fetchFromRemote(key));
 ```
+
+---
+
+## Generator-Based Combinators
+
+### `Result.gen(genFn): Result<T, E>`
+
+Generator-based syntax for chaining Result operations (simplified, no adapter).
+
+Provides imperative-style code while maintaining functional error handling.
+
+**Short-circuits on first Err**, returning that error. Uses iteration instead of recursion to avoid stack overflow on deep chains.
+
+**Signature:**
+
+```typescript
+gen<T, E>(
+  genFn: () => Generator<Result<unknown, E>, T, unknown>
+): Result<T, E>;
+```
+
+**Examples:**
+
+```typescript
+// Simple sync chain
+const result = Result.gen(function* () {
+  const a = yield* Result.Ok(1);
+  const b = yield* Result.Ok(2);
+  return a + b;
+});
+// Result<number, never> -> Ok(3)
+
+// Error short-circuit
+const result = Result.gen(function* () {
+  const a = yield* Result.Ok(1);
+  const b = yield* Result.Err("fail"); // Short-circuits here
+  const c = yield* Result.Ok(3); // Never executes
+  return a + b + c;
+});
+// Result<number, string> -> Err("fail")
+
+// Multi-step validation
+const validated = Result.gen(function* () {
+  const rawData = yield* parseInput(input);
+  const validated = yield* validateSchema(rawData);
+  const sanitized = yield* sanitize(validated);
+  return sanitized;
+});
+
+// Chaining fallible operations
+const user = Result.gen(function* () {
+  const id = yield* parseUserId(input);
+  const user = yield* fetchUser(id);
+  const profile = yield* user.profile;
+  return profile;
+});
+```
+
+**Key Characteristics:**
+
+- `yield*` with `Result<T, E>` unwraps the value or short-circuits on Err
+- The return value is automatically wrapped in `Ok`
+- Type inference tracks error types through the chain
+- Stack-safe (uses iteration, not recursion)
+
+### `Result.genAdapter(genFn): Result<T, E>`
+
+Generator-based syntax with adapter function for improved type inference.
+
+**Signature:**
+
+```typescript
+genAdapter<T, E>(
+  genFn: (
+    $: <A, E2>(result: Result<A, E2>) => ResultYieldWrap<A, E2>
+  ) => Generator<ResultYieldWrap<unknown, E>, T, unknown>
+): Result<T, E>;
+```
+
+**Examples:**
+
+```typescript
+// Better type inference for complex chains
+const result = Result.genAdapter(function* ($) {
+  // $() wraps Results and enables better IDE/type inference
+  const a = yield* $(Result.Ok(1));
+  const b = yield* $(Result.Ok(2));
+  return a + b;
+});
+
+// Error handling with different error types
+type ParseError = { type: "parse" };
+type ValidationError = { type: "validation" };
+
+const result = Result.genAdapter(function* ($) {
+  const id = yield* $(parseId(input)); // Result<number, ParseError>
+  const user = yield* $(fetchUser(id)); // Result<User, string>
+  const valid = yield* $(validate(user)); // Result<User, ValidationError>
+  return valid;
+});
+// Result<User, ParseError | string | ValidationError>
+```
+
+**When to use `genAdapter` vs `gen`:**
+
+- Use `gen` for simple chains with consistent error types
+- Use `genAdapter` for better IDE support and type inference in complex chains
+
+### `Result.asyncGen(genFn): Promise<Result<T, E>>`
+
+Async generator-based syntax for chaining Result operations (simplified, no adapter).
+
+Use `yield*` with `Result<T, E>` values directly. For `Promise<Result<T, E>>`, await first then yield*.
+
+**Short-circuits on first Err**, returning that error. Uses async iteration instead of recursion to avoid stack overflow on deep chains.
+
+**Signature:**
+
+```typescript
+asyncGen<T, E>(
+  genFn: () => AsyncGenerator<Result<unknown, E>, T, unknown>
+): Promise<Result<T, E>>;
+```
+
+**Examples:**
+
+```typescript
+// Simple async chain
+const result = await Result.asyncGen(async function* () {
+  const a = yield* Result.Ok(1);
+  const b = yield* await asyncOperation(a); // await Promise<Result> first
+  const c = yield* Result.Ok(3);
+  return a + b + c;
+});
+// Promise<Result<number, never>> -> Ok(result)
+
+// Error short-circuit in async
+const result = await Result.asyncGen(async function* () {
+  const data = yield* await fetchData();
+  const parsed = yield* parse(data); // Short-circuits on Err
+  const validated = yield* validate(parsed); // Never executes
+  return validated;
+});
+// Promise<Result<Validated, ParseError>> -> Err(...)
+
+// Mixed sync/async workflow
+const result = await Result.asyncGen(async function* () {
+  const id = yield* parseInt(input); // sync
+  const user = yield* await fetchUser(id); // async
+  const permissions = yield* user.permissions; // sync
+  const hasAccess = yield* await checkAccess(permissions); // async
+  return hasAccess;
+});
+
+// Complex pipeline with error handling
+async function processOrder(
+  orderId: string,
+): Promise<Result<Receipt, OrderError>> {
+  return await Result.asyncGen(async function* () {
+    const order = yield* await fetchOrder(orderId);
+    const validated = yield* validateOrder(order);
+    const payment = yield* await processPayment(validated);
+    const shipment = yield* await arrangeShipment(payment);
+    return createReceipt(shipment);
+  });
+}
+```
+
+**Key Characteristics:**
+
+- `yield*` with `Result<T, E>` directly unwraps or short-circuits
+- `await Promise<Result<T, E>>` then `yield*` the resolved result
+- The return value is automatically wrapped in `Ok` and returned as a Promise
+- Type inference tracks error types through async chain
+- Stack-safe (uses async iteration, not recursion)
+
+### `Result.asyncGenAdapter(genFn): Promise<Result<T, E>>`
+
+Async generator-based syntax with adapter function for improved type inference.
+
+Supports both `Result<T, E>` and `Promise<Result<T, E>>` for flexibility.
+
+**Signature:**
+
+```typescript
+asyncGenAdapter<T, E>(
+  genFn: (
+    $: <A, E2>(result: Result<A, E2> | Promise<Result<A, E2>>) => AsyncResultYieldWrap<A, E2>
+  ) => AsyncGenerator<AsyncResultYieldWrap<unknown, E>, T, unknown>
+): Promise<Result<T, E>>;
+```
+
+**Examples:**
+
+```typescript
+// No need to manually await - adapter handles it
+const result = await Result.asyncGenAdapter(async function* ($) {
+  const a = yield* $(Result.Ok(1)); // sync Result
+  const b = yield* $(asyncOperation(a)); // Promise<Result> - auto-awaited
+  const c = yield* $(Result.Ok(3));
+  return a + b + c;
+});
+
+// Complex workflow with mixed errors
+type DbError = { type: "db" };
+type ApiError = { type: "api" };
+type ValidationError = { type: "validation" };
+
+const result = await Result.asyncGenAdapter(async function* ($) {
+  const config = yield* $(loadConfig()); // Result<Config, DbError>
+  const userData = yield* $(fetchUser(config.userId)); // Promise<Result<User, ApiError>>
+  const validated = yield* $(validate(userData)); // Result<User, ValidationError>
+  const enriched = yield* $(enrichUserData(validated)); // Promise<Result<Enriched, ApiError>>
+  return enriched;
+});
+// Promise<Result<Enriched, DbError | ApiError | ValidationError>>
+
+// Real-world API pipeline
+async function processPayment(
+  cartId: string,
+): Promise<Result<Receipt, PaymentError>> {
+  return await Result.asyncGenAdapter(async function* ($) {
+    const cart = yield* $(getCart(cartId));
+    const items = yield* $(validateInventory(cart.items));
+    const total = yield* $(calculateTotal(items));
+    const payment = yield* $(chargePayment(total));
+    const receipt = yield* $(generateReceipt(payment));
+    return receipt;
+  });
+}
+```
+
+**When to use `asyncGenAdapter` vs `asyncGen`:**
+
+- Use `asyncGen` when you want explicit `await` for async operations
+- Use `asyncGenAdapter` for cleaner syntax with mixed sync/async and better type inference
+
+### Generator Recommendations
+
+| Use Case | Recommended Method |
+|----------|-------------------|
+| Simple sync chains (1-5 operations) | Method chaining (`map`, `flatMap`) |
+| Complex sync chains (5+ operations, multiple yields) | `Result.gen` or `Result.genAdapter` |
+| Simple async chains | Method chaining with `.then()` |
+| Complex async chains with interleaved sync/async | `Result.asyncGen` or `Result.asyncGenAdapter` |
+| Best type inference with mixed errors | `genAdapter` / `asyncGenAdapter` |
 
 ---
 
@@ -517,7 +886,6 @@ Result.any(
 | `tapErr` | `(fn: (err: E) => void): Result<T, E>` | Side effect on Err, returns self |
 | `flip` | `(): Result<E, T>` | Swaps Ok and Err |
 | `toOption` | `(): Option<T>` | Discards error information |
-| `toPromise` | `(): Promise<Result<Awaited<T>, E>>` | Resolve inner Promise |
 | `innerMap` | `<U>(fn: (el: T[number]) => U): Result<U[], E>` | Map over array elements |
 | `toString` | `(): string` | String representation |
 
@@ -526,197 +894,78 @@ Result.any(
 ```typescript
 // tap - logging without breaking chain
 Ok(user)
-  .tap(u => console.log(`Processing ${u.name}`))
-  .tapErr(e => console.error(`Failed: ${e}`))
-  .map(u => u.email);
+  .tap((u) => console.log(`Processing ${u.name}`))
+  .tapErr((e) => console.error(`Failed: ${e}`))
+  .map((u) => u.email);
 
 // flip - swap success and error
-Ok(42).flip()                              // Err(42)
-Err("x").flip()                            // Ok("x")
+Ok(42).flip(); // Err(42)
+Err("x").flip(); // Ok("x")
 
 // toOption - discard error info
-Ok(42).toOption()                          // Some(42)
-Err("x").toOption()                        // None
-
-// toPromise - resolve inner promise
-const result: Result<Promise<number>, string> = Ok(Promise.resolve(42));
-await result.toPromise();                  // Ok(42)
+Ok(42).toOption(); // Some(42)
+Err("x").toOption(); // None
 
 // innerMap - map over array contents
-Ok([1, 2, 3]).innerMap(x => x * 2)         // Ok([2, 4, 6])
-Err("x").innerMap(x => x * 2)              // Err("x")
+Ok([1, 2, 3]).innerMap((x) => x * 2); // Ok([2, 4, 6])
+Err("x").innerMap((x) => x * 2); // Err("x")
 
 // toString
-Ok(42).toString()                          // "Ok(42)"
-Err("fail").toString()                     // "Err(fail)"
+Ok(42).toString(); // "Ok(42)"
+Err("fail").toString(); // "Err(fail)"
 ```
 
 ---
 
-## Async Handling Strategy
+## Async/Sync Interleaved Patterns
 
-### The Inner-Promise Model
-
-Result uses the **inner-promise model** where async operations result in `Result<Promise<T>, E>` rather than `Promise<Result<T, E>>`.
-
-**Rationale:**
-
-1. **Chain preservation**: Allows continued method chaining without await
-2. **Lazy evaluation**: Async work deferred until explicitly awaited
-3. **Type accuracy**: Return type precisely reflects when async occurs
-
-### Promise Infection Rules
-
-| Current State | Mapper Type | Result |
-|--------------|-------------|--------|
-| `Result<T, E>` | `(T) => U` | `Result<U, E>` |
-| `Result<T, E>` | `(T) => Promise<U>` | `Result<Promise<U>, E>` |
-| `Result<Promise<T>, E>` | `(T) => U` | `Result<Promise<U>, E>` |
-| `Result<Promise<T>, E>` | `(T) => Promise<U>` | `Result<Promise<U>, E>` |
-
-### Promise Resolution
-
-Use `toPromise()` to resolve inner promises:
+### Method Chaining with .then()
 
 ```typescript
-const result: Result<Promise<number>, string> = Ok(5).map(async x => x * 2);
-const resolved: Promise<Result<number, string>> = result.toPromise();
-const final: Result<number, string> = await resolved;  // Ok(10)
+// Once you hit an async operation, use *Async variants
+Ok(5)
+  .map((x) => x * 2) // Result<number, never>
+  .mapAsync(async (x) => await fetchData(x)) // Promise<Result<Data, never>>
+  .then((r) => r.map((d) => d.name)) // Promise<Result<string, never>>
+  .then((r) => r.mapErr((e) => new AppError(e))) // Promise<Result<string, AppError>>
+  .then((r) => {
+    if (r.isOk()) {
+      console.log(r.unwrap());
+    }
+    return r;
+  });
 ```
 
-### Err Short-Circuit with Async
-
-When async is involved but state is Err, the promise should resolve immediately:
+### Generators for Complex Workflows
 
 ```typescript
-const result: Result<Promise<number>, string> = Err("fail").map(async x => x * 2);
-const resolved = await result.toPromise();  // Err("fail") (no async work done)
-```
-
-### Async/Sync Interleaved Chaining
-
-A critical capability is **seamless interleaving of sync and async operations** in a single chain. Once a chain becomes async (via an async mapper or `Result<Promise<T>, E>`), subsequent sync operations are automatically lifted into the async context.
-
-#### Type Progression Through Chains
-
-```typescript
-Ok(5)                                      // Result<number, never>
-  .map(x => x * 2)                         // Result<number, never> - sync
-  .map(async x => fetchData(x))            // Result<Promise<Data>, never> - becomes async
-  .map(data => data.name)                  // Result<Promise<string>, never> - sync lifted
-  .flatMap(name => validateName(name))     // Result<Promise<string>, ValidationError> - sync lifted
-  .mapErr(e => new AppError(e))            // Result<Promise<string>, AppError> - error track
-  .toPromise()                             // Promise<Result<string, AppError>>
-```
-
-#### Detailed Type Inference
-
-| Step | Operation | Input Type | Mapper Type | Output Type |
-|------|-----------|------------|-------------|-------------|
-| 1 | `Ok(5)` | - | - | `Result<number, never>` |
-| 2 | `.map(x => x * 2)` | `Result<number, E>` | `number => number` | `Result<number, E>` |
-| 3 | `.map(async x => fetch(x))` | `Result<number, E>` | `number => Promise<Data>` | `Result<Promise<Data>, E>` |
-| 4 | `.map(d => d.name)` | `Result<Promise<Data>, E>` | `Data => string` | `Result<Promise<string>, E>` |
-| 5 | `.flatMap(n => validate(n))` | `Result<Promise<string>, E>` | `string => Result<string, VE>` | `Result<Promise<string>, E \| VE>` |
-| 6 | `.mapErr(e => wrap(e))` | `Result<Promise<string>, E>` | `E => AppError` | `Result<Promise<string>, AppError>` |
-| 7 | `.toPromise()` | `Result<Promise<string>, E>` | - | `Promise<Result<string, E>>` |
-
-#### Key Semantics
-
-1. **Async infection is permanent**: Once `T` becomes `Promise<U>`, all subsequent operations maintain the Promise wrapper until `toPromise()` is called.
-
-2. **Sync mappers are lifted**: When applied to `Result<Promise<T>, E>`, a sync mapper `(T) => U` is automatically composed with the inner promise: `promise.then(mapper)`.
-
-3. **Async mappers chain properly**: When applied to `Result<Promise<T>, E>`, an async mapper `(T) => Promise<U>` chains correctly: `promise.then(mapper)` (no double-wrapping).
-
-4. **flatMap flattens correctly**: `Result<Promise<T>, E>.flatMap(f: T => Result<U, E2>)` produces `Result<Promise<U>, E | E2>`, not `Result<Promise<Result<U, E2>>, E>`.
-
-5. **Error types accumulate**: Each `flatMap` unions the new error type with existing error types.
-
-6. **Err short-circuits all operations**: If the Result is Err at any point, no Ok-track mappers execute regardless of sync/async nature.
-
-7. **Error track stays sync**: `mapErr` operates on the error value directly; it doesn't interact with the Promise in the Ok track.
-
-#### Implementation Contract
-
-For `Result<Promise<T>, E>.map(f: T => U)`:
-
-```typescript
-// Conceptually:
-Ok(promise).map(f) === Ok(promise.then(f))
-Err(e).map(f) === Err(e)  // f never called, no promise created
-```
-
-For `Result<Promise<T>, E>.flatMap(f: T => Result<U, E2>)`:
-
-```typescript
-// Conceptually:
-Ok(promise).flatMap(f) === Ok(promise.then(v => {
-  const result = f(v);
-  return result.isOk() ? result.unwrap() : PROPAGATE_ERR(result.unwrapErr());
-}))
-// Error from inner Result must be captured and propagated
-```
-
-#### Real-World Example
-
-```typescript
-// Mixed sync/async pipeline with error handling
-function processOrder(orderId: string): Promise<Result<Receipt, OrderError>> {
-  return Ok(orderId)
-    .map(id => parseInt(id, 10))                    // sync: parse ID
-    .flatMap(id => isNaN(id) 
-      ? Err(new ValidationError("Invalid ID")) 
-      : Ok(id))                                     // sync: validate
-    .map(async id => await fetchOrder(id))          // async: fetch
-    .map(order => order.items)                      // sync: extract (lifted)
-    .flatMap(items => items.length > 0 
-      ? Ok(items) 
-      : Err(new ValidationError("Empty order")))   // sync: validate (lifted)
-    .map(async items => await calculateTotal(items)) // async: calculate
-    .flatMap(async total => await processPayment(total)) // async: payment
-    .map(payment => ({ orderId, payment, timestamp: Date.now() })) // sync: receipt
-    .mapErr(e => new OrderError("Order processing failed", e))     // wrap errors
-    .toPromise();
+// Generators shine for complex async workflows
+async function processWorkflow(input: string): Promise<Result<Output, Error>> {
+  return await Result.asyncGenAdapter(async function* ($) {
+    const parsed = yield* $(parseInput(input));
+    const fetched = yield* $(await fetchData(parsed));
+    const validated = yield* $(validate(fetched));
+    const transformed = yield* $(transform(validated));
+    const saved = yield* $(await saveToDb(transformed));
+    return saved;
+  });
 }
+```
 
-// Usage
-const result = await processOrder("123");
-result.match({
-  Ok: receipt => console.log("Success:", receipt),
-  Err: error => console.error("Failed:", error.message)
+### Mixed: Methods for simple, generators for complex
+
+```typescript
+// Use method chaining for simple transformations
+const parsed = parseInput(input).flatMap((p) => validate(p));
+
+// Switch to generator for complex async workflow
+const result = await Result.asyncGenAdapter(async function* ($) {
+  const data = yield* $(parsed);
+  const enriched = yield* $(await enrich(data));
+  const validated = yield* $(validate(enriched));
+  const saved = yield* $(await save(validated));
+  return saved;
 });
-```
-
-#### Error Handling in Async Chains
-
-When an async operation throws or rejects, the behavior depends on where it occurs:
-
-```typescript
-Ok(5)
-  .map(async x => {
-    if (x < 0) throw new Error("negative");  // This becomes a rejected promise
-    return x * 2;
-  })
-  .toPromise()  // Promise rejects with Error("negative")
-```
-
-To capture async errors as `Err` values, use `Result.tryAsyncCatch` or handle at the boundary:
-
-```typescript
-// Option 1: Use tryAsyncCatch for individual operations
-Ok(5)
-  .flatMap(x => Result.tryAsyncCatch(
-    async () => riskyOperation(x),
-    e => new OperationError(e)
-  ))
-  .toPromise()
-
-// Option 2: Catch at the boundary
-Ok(5)
-  .map(async x => riskyOperation(x))
-  .toPromise()
-  .catch(e => Err(new OperationError(e)))
 ```
 
 ---
@@ -748,25 +997,6 @@ Ok(5)
 | innerMap on non-array | `Ok(5).innerMap(f)` | Throws `TypeError` | Runtime check |
 | flip on Ok | `Ok(5).flip()` | `Err(5)` | - |
 | flip on Err | `Err("x").flip()` | `Ok("x")` | - |
-| Rejected promise in map | `Ok(5).map(async () => { throw "x" })` | `Ok(Promise<rejected>)` | Rejection preserved |
-| Err with async mapper | `Err("e").map(async x => x)` | `Err("e")` (sync) | No promise created |
-
-### Async/Sync Chaining Edge Cases
-
-| Case | Input | Expected Type | Notes |
-|------|-------|---------------|-------|
-| Sync after async | `Ok(5).map(async x => x).map(y => y + 1)` | `Result<Promise<number>, E>` | Sync lifted into async |
-| Multiple async | `Ok(5).map(async x => x).map(async y => y)` | `Result<Promise<number>, E>` | No double Promise |
-| flatMap after async map | `Ok(5).map(async x => x).flatMap(y => Ok(y))` | `Result<Promise<number>, E>` | flatMap lifted |
-| flatMap returning async | `Ok(5).flatMap(async x => Ok(x))` | `Result<Promise<number>, E>` | Async flatMap |
-| Err flatMap returns Ok | `Ok(5).flatMap(x => Err("e")).flatMap(y => Ok(y))` | `Result<number, string>` | Err propagates |
-| zip after async | `Ok(5).map(async x => x).zip(y => y * 2)` | `Result<Promise<[number, number]>, E>` | Zip lifted |
-| mapErr on async Ok | `Ok(5).map(async x => x).mapErr(e => e)` | `Result<Promise<number>, E>` | mapErr doesn't affect Ok |
-| mapErr on Err (async chain) | `Err("e").map(async x => x).mapErr(e => e.toUpperCase())` | `Result<Promise<never>, string>` | Error transformed |
-| toPromise on sync | `Ok(5).toPromise()` | `Promise<Result<number, E>>` | Wraps in resolved Promise |
-| toPromise on Err | `Err("e").toPromise()` | `Promise<Result<never, string>>` | Resolves to Err |
-| Chained toPromise | `Ok(5).map(async x => x).toPromise()` | `Promise<Result<number, E>>` | Unwraps inner Promise |
-| Error type accumulation | `Ok(5).flatMap(x => Err("a" as const)).flatMap(x => Err(1 as const))` | `Result<never, "a" \| 1>` | Union of error types |
 
 ### Type Narrowing
 
@@ -804,9 +1034,8 @@ interface Err<T, E> {
 ```typescript
 type UnitResult<E = never> = Result<Unit, E>;
 
-type UnwrapResult<R> = R extends Result<infer T, infer E> 
-  ? { ok: T; err: E } 
-  : never;
+type UnwrapResult<R> =
+  R extends Result<infer T, infer E> ? { ok: T; err: E } : never;
 
 type UnwrapResultOk<R> = R extends Result<infer T, unknown> ? T : never;
 type UnwrapResultErr<R> = R extends Result<unknown, infer E> ? E : never;
@@ -831,25 +1060,38 @@ class UnwrapError extends Error {
 
 ---
 
-## Implementation Considerations
-
-### Recommended Strategy
-
-1. **Class-based with discriminated tag**: Single class with `_tag` discriminant
-2. **Private sentinel values**: Use Symbols for internal state representation
-3. **Context object for async tracking**: Track async state without wrapping in Promise
-4. **Singleton UNIT_RESULT**: Single instance for void-success operations
-
-### Performance Guidelines
-
-1. **Avoid unnecessary allocations**: Share context objects across chains
-2. **Lazy async**: Only create Promises when mappers are actually async
-3. **Short-circuit early**: Check state before invoking mappers
-4. **Re-throw Error instances**: Preserve stack traces when unwrapping Err(Error)
-
----
-
 ## Migration Guide
+
+### From Inner-Promise Model
+
+If migrating from the old `Result<Promise<T>, E>` model:
+
+**Before:**
+
+```typescript
+Ok(5)
+  .map((x) => x * 2)
+  .mapAsync(async (x) => await fetchData(x))
+  .map((data) => data.name)
+  .toPromise();
+```
+
+**After:**
+
+```typescript
+// Option 1: Explicit Promise chaining
+Ok(5)
+  .map((x) => x * 2)
+  .mapAsync(async (x) => await fetchData(x))
+  .then((r) => r.map((data) => data.name));
+
+// Option 2: Use asyncGenAdapter (recommended for complex flows)
+await Result.asyncGenAdapter(async function* ($) {
+  const x = yield* $(Ok(5).map((v) => v * 2));
+  const data = yield* $(await fetchData(x));
+  return data.name;
+});
+```
 
 ### From try/catch
 
@@ -867,7 +1109,7 @@ function parseJson(s: string): Data {
 function parseJson(s: string): Result<Data, ParseError> {
   return Result.tryCatch(
     () => JSON.parse(s),
-    e => new ParseError(e)
+    (e) => new ParseError(e),
   );
 }
 ```
@@ -885,8 +1127,8 @@ async function fetchUser(id: string): Promise<User> {
 // After
 async function fetchUser(id: string): Promise<Result<User, HttpError>> {
   const res = await fetch(`/users/${id}`);
-  if (!res.ok) return Err(new HttpError(res.status));
-  return Ok(await res.json());
+  if (!res.ok) return Result.Err(new HttpError(res.status));
+  return Result.Ok(await res.json());
 }
 ```
 
@@ -898,10 +1140,18 @@ const username = user?.profile?.settings?.username ?? "anonymous";
 
 // After
 const username = Result.Ok(user)
-  .map(u => u.profile)
-  .map(p => p.settings)
-  .map(s => s.username)
+  .map((u) => u.profile)
+  .map((p) => p.settings)
+  .map((s) => s.username)
   .unwrapOr("anonymous");
+
+// Or use gen for better readability
+const username = Result.gen(function* () {
+  const u = yield* Result.fromNullable(user);
+  const p = yield* Result.fromNullable(u.profile);
+  const s = yield* Result.fromNullable(p.settings);
+  return s.username;
+}).unwrapOr("anonymous");
 ```
 
 ---
@@ -912,7 +1162,7 @@ const username = Result.Ok(user)
 
 ```typescript
 async function fetchUserData(userId: string): Promise<Result<User, ApiError>> {
-  return Result.tryAsyncCatch(
+  return await Result.tryAsyncCatch(
     async () => {
       const response = await fetch(`/api/users/${userId}`);
       if (!response.ok) {
@@ -920,43 +1170,69 @@ async function fetchUserData(userId: string): Promise<Result<User, ApiError>> {
       }
       return response.json();
     },
-    e => e instanceof HttpError ? e : new ApiError(String(e))
-  ).toPromise();
+    (e) => (e instanceof HttpError ? e : new ApiError(String(e))),
+  );
 }
 
 // Usage
 const result = await fetchUserData("123");
 const userName = result
-  .map(user => user.name)
-  .map(name => name.toUpperCase())
-  .safeUnwrap();  // string | null
+  .map((user) => user.name)
+  .map((name) => name.toUpperCase())
+  .safeUnwrap(); // string | null
 ```
 
 ### Form Validation
 
 ```typescript
-function validateUser(data: { email: string; age: number }): Result<ValidUser, string[]> {
+function validateUser(data: {
+  email: string;
+  age: number;
+}): Result<ValidUser, string[]> {
   return Ok(data).validate([
-    d => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email) 
-      ? Ok(true) 
-      : Err("Invalid email format"),
-    d => d.age >= 0 && d.age <= 150 
-      ? Ok(true) 
-      : Err("Age must be between 0 and 150"),
+    (d) =>
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)
+        ? Ok(true)
+        : Err("Invalid email format"),
+    (d) =>
+      d.age >= 0 && d.age <= 150
+        ? Ok(true)
+        : Err("Age must be between 0 and 150"),
   ]);
 }
 ```
 
-### Async Operation Chaining
+### Complex Async Operation Chaining
 
 ```typescript
-async function processOrder(orderId: string): Promise<Result<Confirmation, OrderError>> {
-  return fetchOrder(orderId)
-    .flatMap(order => validateOrder(order))
-    .flatMap(order => processPayment(order))
-    .flatMap(payment => updateInventory(payment))
-    .flatMap(result => sendConfirmation(result))
-    .toPromise();
+async function processOrder(
+  orderId: string,
+): Promise<Result<Confirmation, OrderError>> {
+  return await Result.asyncGenAdapter(async function* ($) {
+    const order = yield* $(fetchOrder(orderId));
+    const validated = yield* $(validateOrder(order));
+    const payment = yield* $(await processPayment(validated));
+    const inventory = yield* $(await updateInventory(payment));
+    const confirmation = yield* $(await sendConfirmation(inventory));
+    return confirmation;
+  });
+}
+```
+
+### Multi-Error Validation with Generators
+
+```typescript
+async function validateUserData(
+  data: UserData,
+): Promise<Result<Validated, ValidationError[]>> {
+  return await Result.asyncGenAdapter(async function* ($) {
+    const basic = yield* $(validateBasicInfo(data));
+    const email = yield* $(await validateEmailAsync(data.email));
+    const phone = yield* $(await validatePhoneAsync(data.phone));
+
+    // Collect all validation errors
+    return yield* $(Ok(basic).validate([() => email, () => phone]));
+  });
 }
 ```
 
@@ -966,11 +1242,12 @@ async function processOrder(orderId: string): Promise<Result<Confirmation, Order
 
 | Category | Methods |
 |----------|---------|
-| Constructors | `Ok`, `Err`, `fromNullable`, `fromPredicate`, `fromPromise`, `tryCatch`, `tryAsyncCatch`, `UNIT_RESULT` |
+| Constructors | `Ok`, `Err`, `fromNullable`, `fromPredicate`, `tryCatch`, `tryAsyncCatch`, `UNIT_RESULT` |
 | State | `isOk`, `isErr`, `isUnit` |
 | Extract | `unwrap`, `unwrapOr`, `unwrapOrElse`, `unwrapErr`, `safeUnwrap`, `match` |
-| Transform Ok | `map`, `flatMap`, `zip`, `flatZip` |
-| Transform Err | `mapErr`, `mapBoth`, `orElse`, `zipErr` |
-| Validate | `validate` |
+| Transform Ok | `map`, `flatMap`, `zip`, `flatZip`, `mapAsync`, `flatMapAsync`, `zipAsync`, `flatZipAsync` |
+| Transform Err | `mapErr`, `mapBoth`, `orElse`, `zipErr`, `mapErrAsync`, `mapBothAsync`, `orElseAsync`, `zipErrAsync` |
+| Validate | `validate`, `validateAsync` |
 | Combine | `all`, `any` |
-| Utility | `tap`, `tapErr`, `flip`, `toOption`, `toPromise`, `innerMap`, `toString` |
+| Generators | `gen`, `genAdapter`, `asyncGen`, `asyncGenAdapter` |
+| Utility | `tap`, `tapErr`, `flip`, `toOption`, `innerMap`, `toString` |

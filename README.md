@@ -35,13 +35,13 @@ function getUserByEmail(user: { email?: string }): string | null {
   return user.email ? user.email : null;
 }
 
-function getUserAdress(user: { email?: string }): string | null {
-  return user.email ? "Some Address" : null;
+function getUserAddress(email: string): string | null {
+  return email ? "Some Address" : null;
 }
 
 const email = getUserByEmail({ email: "test@test.com" });
 if (email) {
-  const address = getUserAdress(email);
+  const address = getUserAddress(email);
   if (address) {
     console.log(`User ${email} has address: ${address}`);
   } else {
@@ -50,12 +50,12 @@ if (email) {
 } else {
   console.error("Email not found");
 }
-// Output: User test@test.com has address: Some Address
+// Example output: User test@test.com has address: Some Address
 ```
 
 Now imagine if we had more complex use cases that involved more than two optional values. We would have to nest if statements and handle errors manually. This is where `fp` comes in.
 
-### With using the `fp` library
+### Using the `fp` library
 
 ```typescript
 import { Option, matchOpt } from "@carbonteq/fp";
@@ -64,12 +64,12 @@ function getUserByEmail(user: { email?: string }): Option<string> {
   return user.email ? Option.Some(user.email) : Option.None;
 }
 
-function getUserAddress(user: { email?: string }): Option<string> {
-  return user.email ? Option.Some("Some Address") : Option.None;
+function getUserAddress(email: string): Option<string> {
+  return Option.Some("Some Address");
 }
 
 const res = getUserByEmail({ email: "test@test.com" }).flatZip((email) =>
-  getUserAddress({ email }),
+  getUserAddress(email),
 );
 
 matchOpt(res, {
@@ -80,14 +80,19 @@ matchOpt(res, {
     console.error("User or Address not found");
   },
 });
-// Output: User test@test.com has address: Some Address
+// Example output: User test@test.com has address: Some Address
 ```
 
 ## Table of Contents
 
+- [Examples](#examples)
 - [Usage](#usage)
   - [The `Result` type](#the-result-type)
   - [The `Option` type](#the-option-type)
+  - [Fluent `match()` builder](#fluent-match-builder)
+  - [The `ExperimentalResult` type (Experimental)](#the-experimentalresult-type-experimental)
+  - [The `ExperimentalOption` type (Experimental)](#the-experimentaloption-type-experimental)
+  - [The `Flow` namespaces](#the-flow-namespaces)
   - [Cheatsheet](#cheatsheet)
     - [map](#map)
     - [flatMap](#flatmap)
@@ -105,6 +110,15 @@ matchOpt(res, {
   - [Synchronous Pipeline](#synchronous-pipeline)
   - [Asynchronous Pipeline](#asynchronous-pipeline)
 
+## Examples
+
+Examples are split between stable and experimental APIs.
+
+- Stable runnable examples live under `examples/result/`, `examples/option/`, and `examples/flow/`.
+- Experimental runnable examples live under `examples/result-experimental/`, `examples/option-experimental/`, and `examples/flow-experimental/`.
+
+See `examples/README.md` for the runnable index and file paths.
+
 ## Usage
 
 ## The `Result` type
@@ -118,6 +132,21 @@ const res1: Result<number, string> = Result.Ok(5); // Contains the value 5
 const res2: Result<number, string> = Result.Err("Some Error"); // Contains the error "Some Error"
 ```
 
+Async variants
+
+In the stable API, async mappers/binders are allowed on the same methods. The async work stays inside the Result, so the return type is `Result<Promise<T>, E>`. Use `toPromise()` when you need `Promise<Result<T, E>>`.
+
+```typescript
+// Sync
+Result.Ok(5).map((x) => x * 2); // Result<number, never>
+Result.Ok(5).flatMap((x) => Result.Ok(x * 2));
+
+// Async (stable)
+const mapped = Result.Ok(5).map(async (x) => x * 2); // Result<Promise<number>, never>
+const chained = Result.Ok(5).flatMap(async (x) => Result.Ok(x * 2)); // Result<Promise<number>, never>
+const resolved = await chained.toPromise(); // Promise<Result<number, never>>
+```
+
 ## The `Option` type
 
 The `Option` type represents a value that might or might not be present. It eliminates the need for manual checks for `null` or `undefined`.
@@ -129,6 +158,117 @@ const opt1: Option<number> = Option.Some(5); // Contains the value 5
 const opt2: Option<number> = Option.None; // Contains no value (None)
 ```
 
+Async variants
+
+In the stable API, async mappers/predicates are allowed on the same methods. The async work stays inside the Option, so the return type is `Option<Promise<T>>`. Use `toPromise()` when you need `Promise<Option<T>>`.
+
+```typescript
+// Sync
+Option.Some(5).map((x) => x * 2); // Option<number>
+Option.Some(5).flatMap((x) => Option.Some(x * 2));
+
+// Async (stable)
+const mapped = Option.Some(5).map(async (x) => x * 2); // Option<Promise<number>>
+const chained = Option.Some(5).flatMap(async (x) => Option.Some(x * 2)); // Option<Promise<number>>
+const filtered = Option.Some(5).filter(async (x) => x > 3); // Option<Promise<number>>
+const resolved = await filtered.toPromise(); // Promise<Option<number>>
+```
+
+## Fluent `match()` builder
+
+Use `match()` for fluent, exhaustive pattern matching across stable and experimental `Option`/`Result` values, plus generic discriminated unions.
+
+```typescript
+import { match, P, Result } from "@carbonteq/fp";
+
+const message = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.eq(42)), () => "exactly 42")
+  .with(P.Ok(P.not(P.oneOf(42, 43))), () => "ok but not 42 or 43")
+  .with(P.Ok(), (value) => `other ok: ${value}`)
+  .with(P.Err(), (error) => `error: ${error}`)
+  .exhaustive();
+
+const branch = match(Result.Err("timeout") as Result<number, string>)
+  .when(P.IsOk, () => "ok")
+  .when(P.IsErr, () => "err")
+  .otherwise(() => "other");
+
+const combined = match(Result.Ok(42) as Result<number, string>)
+  .with(P.Ok(P.all(P.not(P.eq(0)), P.any(P.eq(42), P.eq(43)))), () => "hit")
+  .with(P.Ok(), () => "miss")
+  .with(P.Err(), () => "err")
+  .exhaustive();
+```
+
+`match()` is intentionally synchronous. If you have async-inner stable values, settle first:
+
+```typescript
+import { match, Result } from "@carbonteq/fp";
+
+const asyncResult = Result.Ok(Promise.resolve(10)); // Result<Promise<number>, never>
+const settled = await asyncResult.toPromise(); // Promise<Result<number, never>>
+
+const label = match(settled)
+  .with("Ok", (value) => `value=${value}`)
+  .with("Err", () => "error")
+  .exhaustive();
+```
+
+---
+
+## The `ExperimentalResult` type (Experimental)
+
+`ExperimentalResult` differs from the stable `Result` by providing explicit async methods like `mapAsync` and `flatMapAsync` that return `Promise<ExperimentalResult<T, E>>` directly, rather than returning `Result<Promise<T>, E>` and requiring `toPromise()`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) used by `Flow`.
+
+```typescript
+import { ExperimentalResult } from "@carbonteq/fp";
+```
+
+## The `ExperimentalOption` type (Experimental)
+
+`ExperimentalOption` mirrors the stable `Option` API but provides explicit async methods like `mapAsync`, `flatMapAsync`, and `filterAsync` that return `Promise<ExperimentalOption<T>>` rather than `Option<Promise<T>>`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) and is the `Option` type used by `Flow`.
+
+```typescript
+import { ExperimentalOption } from "@carbonteq/fp";
+```
+
+---
+
+## The `Flow` namespaces
+
+`Flow` is the stable generator namespace and works with stable `Option` + `Result`, returning stable `Result`.
+
+```typescript
+import { Flow, Option, Result, UnwrappedNone } from "@carbonteq/fp";
+
+const result = Flow.gen(function* () {
+  const a = yield* Option.Some(5);
+  const b = yield* Result.Ok(10);
+  const c = yield* Option.fromNullable(20);
+  return a + b + c;
+});
+
+// Result<number, UnwrappedNone>
+```
+
+`ExperimentalFlow` is the experimental counterpart and works with `ExperimentalOption` + `ExperimentalResult`, returning `ExperimentalResult`.
+
+```typescript
+import {
+  ExperimentalFlow,
+  ExperimentalOption,
+  ExperimentalResult,
+} from "@carbonteq/fp";
+
+const result = ExperimentalFlow.gen(function* () {
+  const a = yield* ExperimentalOption.Some(5);
+  const b = yield* ExperimentalResult.Ok(10);
+  return a + b;
+});
+```
+
+Both namespaces provide `gen`, `genAdapter`, `asyncGen`, and `asyncGenAdapter`.
+
 ---
 
 ## Cheatsheet
@@ -136,6 +276,8 @@ const opt2: Option<number> = Option.None; // Contains no value (None)
 ### `map`
 
 Transforms the `Some` or `Ok` value inside `Option` or `Result`.
+
+If your mapper is async, `map` returns `Option<Promise<U>>` or `Result<Promise<U>, E>`. Use `toPromise()` when you need a resolved `Option`/`Result`.
 
 Let's say we want to apply a 10% bonus to the account balance of a user.
 
@@ -159,7 +301,7 @@ async function applyBonus() {
   return balanceOption;
 }
 
-console.log(await applyBonus()); // Output: Some(110)
+console.log(await applyBonus()); // Example output: Some(110)
 ```
 
 #### `flatMap`
@@ -206,7 +348,7 @@ const processUser = async (
   return validationResult;
 };
 
-console.log(await processUser("Alice", 30)); // Output: Result.Ok("User Alice saved successfully!")
+console.log(await processUser("Alice", 30)); // Example output: Result.Ok("User Alice saved successfully!")
 
 /* validationResult is of type Result<string, Error> instead of Result<Result<string, Error>, Error> (which is what would have happened if we used map instead of flatMap) */
 ```
@@ -237,14 +379,14 @@ async function applyDiscount(
   return originalPrice; //originalPrice is of type Result<[number, number], Error>
 }
 
-console.log(await applyDiscount("123")); // Output: Result.Ok([100, 90])
+console.log(await applyDiscount("123")); // Example output: Result.Ok([100, 90])
 ```
 
 Here `derivedPair` is a `Result<[number, number], Error>`. Note that `T` = `100` and `U` = `90`.
 
 #### `flatZip`
 
-Combines the current `Result<T, E>` with another `Result<U, E2>`, or the current `Option<T>` with another `Option<U>`. Unlike zip, which pairs a value with a derived one, flatZip works with **two independent Result/Option values** and combines their contents into a tuple `[T, U]`. It ensures the Result/Option values are Ok/Some to proceed; otherwise, it propagates the first encountered Err/None.
+Combines the current `Result<T, E>` with a **dependent** `Result<U, E2>` produced from `T`, or the current `Option<T>` with a dependent `Option<U>` produced from `T`. Unlike `zip`, which pairs a value with a plain derived value, `flatZip` expects the callback to return a `Result`/`Option` and then flattens the outcome into `[T, U]`. It proceeds only when both steps are `Ok`/`Some`; otherwise, it propagates the first `Err`/`None`.
 
 Lets say we want to combine the product price and product stock into a tuple `[number, number]`.
 
@@ -258,10 +400,10 @@ async function fetchProductPrice(productId: string): Promise<Option<number>> {
   return Option.Some(100);
 }
 
-// Simulated function to fetch product stock
-async function fetchProductStock(productId: string): Promise<Option<number>> {
-  // Simulate fetching stock from a database
-  await Promise.resolve(productId);
+// Simulated function to fetch product stock (receives price, returns Option)
+async function fetchProductStock(price: number): Promise<Option<number>> {
+  // Simulate fetching stock from a database based on price
+  await Promise.resolve(price);
   return Option.Some(50);
 }
 
@@ -276,18 +418,18 @@ async function fetchProductDetails(
   return productDetails; // Option<[number, number]>
 }
 
-console.log(await fetchProductDetails("123")); // Output: Option.Some([100, 50])
+console.log(await fetchProductDetails("123")); // Example output: Option.Some([100, 50])
 ```
 
 ## Comparison of `map`, `flatMap`, `zip`, and `flatZip`
 
 | **Method**            | **`map`**                                                         | **`flatMap`**                                                                                                                       | **`zip`**                                                                                  | **`flatZip`**                                                                                                |
 | --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| **Purpose**           | Transforms the value inside an `Ok` or `Some`.                    | Chains dependent computations where each computation returns a `Result` or `Option`.                                                | Combines the current value with another derived value into a tuple `[T, U]`.               | Combines two independent `Result` or `Option` values into a tuple `[T, U]`.                                  |
+| **Purpose**           | Transforms the value inside an `Ok` or `Some`.                    | Chains dependent computations where each computation returns a `Result` or `Option`.                                                | Combines the current value with another derived value into a tuple `[T, U]`.               | Chains a dependent computation returning `Result`/`Option` and combines both values into `[T, U]`.          |
 | **Input**             | A function `(val: T) => U`.                                       | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` to transform the current value into another `Result` or `Option`. | A function `(val: T) => U` to derive a new value `U` from the current value `T`.           | A function `(val: T) => Result<U, E2>` or `(val: T) => Option<U>` that returns another `Result` or `Option`. |
 | **Output**            | `Result<U, E>`, `Option<U>`                                       | `Result<U, E>`, `Option<U>`                                                                                                         | `Result<[T, U], E>`, `Option<[T, U]>`                                                      | `Result<[T, U], E>`, `Option<[T, U]>`.                                                                       |
 | **Error Propagation** | Propagates `Err`/`None` if the `Result`/`Option` is `Err`/`None`. | Propagates the first `Err`/`None` encountered in the chain.                                                                         | Propagates `Err`/`None` if the current `Result`/`Option` or derived value is `Err`/`None`. | Propagates the first `Err`/`None` encountered between the two `Result`/`Option` values.                      |
-| **Use Case**          | When you want to transform a value inside `Ok`/`Some`.            | When the next computation depends on the current value and returns a `Result`/`Option`.                                             | When you want to pair the current value with a derived one.                                | When you want to combine two independent `Result`/`Option` values into a tuple.                              |
+| **Use Case**          | When you want to transform a value inside `Ok`/`Some`.            | When the next computation depends on the current value and returns a `Result`/`Option`.                                             | When you want to pair the current value with a derived one.                                | When you want to pair the current value with a dependent `Result`/`Option` computation.                     |
 
 ---
 
@@ -338,18 +480,15 @@ async function findUserById(id: number): Promise<Option<number>> {
   return Option.Some(id);
 }
 
-// A safe function that returns a string error message if the user is not found, instead of throwing an exception
-async function safeFindUserById(id: number): Promise<Option<string>> {
-  const res = (await findUserById(id)).mapOr(
-    `User not found`,
-    (res) => `User: ${res}`,
-  );
-  return res;
+// A safe function that returns a string message (not an Option) - mapOr returns the value directly
+async function safeFindUserById(id: number): Promise<string> {
+  const userOpt = await findUserById(id);
+  return userOpt.mapOr(`User not found`, (res) => `User: ${res}`);
 }
 
 // Example usage
-console.log(await safeFindUserById(10)); // Some(User: 10)
-console.log(await safeFindUserById(0)); // Some(User not found)
+console.log(await safeFindUserById(10)); // User: 10
+console.log(await safeFindUserById(0)); // User not found
 ```
 
 #### `all`
@@ -383,6 +522,7 @@ type Like = {
 type Reply = {
   replyId: string;
   postId: Post["postId"];
+  data: string;
   createdAt: Date | string;
   author: User["userId"];
 };
@@ -447,11 +587,11 @@ async function getUserData(userId: string) {
   const hash = userIdRes.flatMap(generateHash);
 
   const userData = await Result.all(
-    user, // Result<Promise<T>, E>
-    posts, // Result<Promise<T>, E>
-    likes, // Result<Promise<T>, E>
-    replies, // Result<Promise<T>, E>
-    hash, // Result<T, E>
+    user,
+    posts,
+    likes,
+    replies,
+    hash,
   ).toPromise();
 
   matchRes(userData, {
@@ -547,9 +687,10 @@ const validatedOk = Result.Ok("password321!").validate([
 ]);
 console.log(validatedOk.unwrap()); // password321!
 
-const validatedErr = await Result.Ok("pword")
-  .validate([hasMinimumLength, hasSpecialCharacters])
-  .toPromise();
+const validatedErr = Result.Ok("pword").validate([
+  hasMinimumLength,
+  hasSpecialCharacters,
+]);
 console.log(validatedErr.unwrapErr()); // [Error: Password must be at least 8 characters, Error: Password must contain at least one special character]
 
 const validatedErrs = await Result.Ok("password123!")
@@ -558,7 +699,7 @@ const validatedErrs = await Result.Ok("password123!")
 console.log(validatedErrs.unwrapErr()); // [Error: New password cannot be the same as previous password]
 ```
 
-#### `unwrap`, `safeUnwrapErr`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
+#### `unwrap`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
 
 These functions are used to extract the value from a `Result`. Note that **only `unwrap` and `safeUnwrap` are available for `Option`**.
 
@@ -660,11 +801,7 @@ Creates a `Result` based on a predicate function - returns `Ok` with the value i
 import { Result } from "@carbonteq/fp";
 
 const score = 85;
-const passed = Result.fromPredicate(
-  score,
-  (s) => s >= 60,
-  "Score too low",
-);
+const passed = Result.fromPredicate(score, (s) => s >= 60, "Score too low");
 console.log(passed); // Ok(85)
 
 const failed = Result.fromPredicate(45, (s) => s >= 60, "Score too low");
@@ -685,7 +822,7 @@ import { Result } from "@carbonteq/fp";
 function parseJson(json: string): Result<unknown, Error> {
   return Result.tryCatch(
     () => JSON.parse(json),
-    (e) => e instanceof Error ? e : new Error(String(e)),
+    (e) => (e instanceof Error ? e : new Error(String(e))),
   );
 }
 
@@ -700,17 +837,19 @@ Wraps an asynchronous operation in a `Result`, catching any exceptions and conve
 ```typescript
 import { Result } from "@carbonteq/fp";
 
-async function fetchUserData(id: string): Result<Promise<{ name: string }>, Error> {
+async function fetchUserData(
+  id: string,
+): Promise<Result<{ name: string }, Error>> {
   return Result.tryAsyncCatch(
     async () => {
       const response = await fetch(`/api/users/${id}`);
       return response.json();
     },
-    (e) => e instanceof Error ? e : new Error(String(e)),
+    (e) => (e instanceof Error ? e : new Error(String(e))),
   );
 }
 
-const user = await fetchUserData("123").toPromise();
+const user = await fetchUserData("123");
 console.log(user); // Ok({ name: "..." }) or Err(Error: ...)
 ```
 
@@ -814,36 +953,6 @@ const optFromErr = failure.toOption();
 console.log(optFromErr); // None
 ```
 
-#### `Option.fromPromise`
-
-Wraps a `Promise<Option<T>>` as an `Option<Promise<T>>`, enabling async chaining.
-
-```typescript
-import { Option } from "@carbonteq/fp";
-
-async function fetchUser(id: string): Promise<Option<{ name: string }>> {
-  return id === "1" ? Option.Some({ name: "Alice" }) : Option.None;
-}
-
-const userOpt = Option.fromPromise(fetchUser("1"));
-console.log(userOpt); // Some(Promise<{ name: "Alice" }>)
-```
-
-#### `Result.fromPromise`
-
-Wraps a `Promise<Result<T, E>>` as a `Result<Promise<T>, E>`, enabling async chaining.
-
-```typescript
-import { Result } from "@carbonteq/fp";
-
-async function fetchData(id: string): Promise<Result<string, Error>> {
-  return id === "1" ? Result.Ok("Data") : Result.Err(new Error("Not found"));
-}
-
-const dataRes = Result.fromPromise(fetchData("1"));
-console.log(dataRes); // Ok(Promise<"Data">)
-```
-
 #### `Result.zipErr`
 
 Runs a validation/binding function on the Ok value that can produce a new error, while preserving the original Ok value. If the function returns an `Err`, that error is returned. If the initial result is already `Err`, it short-circuits and returns that error.
@@ -853,7 +962,9 @@ import { Result } from "@carbonteq/fp";
 
 const checkPermissions = (userId: string) =>
   Result.Ok(userId).zipErr((id) =>
-    id === "guest" ? Result.Err("Guest users have limited access") : Result.Ok(undefined)
+    id === "guest"
+      ? Result.Err("Guest users have limited access")
+      : Result.Ok(undefined),
   );
 
 const admin = checkPermissions("admin-123");
@@ -865,8 +976,9 @@ console.log(guest); // Err("Guest users have limited access")
 const okNoChange = Result.Ok("42").zipErr((id) => Result.Ok(id.length));
 console.log(okNoChange); // Ok("42")
 
-const alreadyFailed = Result.Err<string, string>("Network error")
-  .zipErr(() => Result.Err("Validation error"));
+const alreadyFailed = Result.Err<string, string>("Network error").zipErr(() =>
+  Result.Err("Validation error"),
+);
 console.log(alreadyFailed); // Err("Network error") - short-circuits
 ```
 
@@ -877,17 +989,18 @@ console.log(alreadyFailed); // Err("Network error") - short-circuits
 ```typescript
 import { Result } from "@carbonteq/fp";
 
-const res = Result.Err<number, Error>(new Error("boom"))
-  .mapErr((e) => e.message);
+const res = Result.Err<Error, number>(new Error("boom")).mapErr(
+  (e) => e.message,
+);
 console.log(res); // Err("boom")
 
 const ok = Result.Ok("42").zipErr((value) =>
-  value === "0" ? Result.Err("invalid") : Result.Ok(value.length)
+  value === "0" ? Result.Err("invalid") : Result.Ok(value.length),
 );
 console.log(ok); // Ok("42")
 
 const err = Result.Ok("0").zipErr((value) =>
-  value === "0" ? Result.Err("invalid") : Result.Ok(value.length)
+  value === "0" ? Result.Err("invalid") : Result.Ok(value.length),
 );
 console.log(err); // Err("invalid")
 ```
@@ -920,7 +1033,9 @@ Executes a side effect function for `Some` or `Ok` values, then returns the orig
 import { Result } from "@carbonteq/fp";
 
 // Simulated database functions
-async function findUserById(userId: number): Promise<Result<Record<string, number>, string>> {
+async function findUserById(
+  userId: number,
+): Promise<Result<Record<string, number>, string>> {
   // Simulate a database lookup
   await Promise.resolve(userId);
   if (userId === 0) {
@@ -929,7 +1044,10 @@ async function findUserById(userId: number): Promise<Result<Record<string, numbe
   return Result.Ok({ id: userId, balance: 100 });
 }
 
-function updateBalance(user: Record<string, number>, amount: number): Result<Record<string, number>, string> {
+function updateBalance(
+  user: Record<string, number>,
+  amount: number,
+): Result<Record<string, number>, string> {
   if (user.balance < amount) {
     return Result.Err("Insufficient funds");
   }
@@ -940,7 +1058,9 @@ function updateBalance(user: Record<string, number>, amount: number): Result<Rec
 const res = (await findUserById(1))
   .tap((user) => console.log(`[Audit] User found: ${user.id}`))
   .flatMap((user) => updateBalance(user, 10))
-  .tap((updated) => console.log(`[Transaction] New balance: $${updated.balance}`))
+  .tap((updated) =>
+    console.log(`[Transaction] New balance: $${updated.balance}`),
+  )
   .tapErr((error) => console.error(`[Alert] Transaction failed: ${error}`));
 
 console.log(res); // Result.Ok({ id: 1, balance: 90 })
@@ -958,7 +1078,7 @@ const logged = result.tapErr((err) => {
   console.error(`[Error Log] ${new Date().toISOString()}: ${err}`);
 });
 console.log(logged); // Err("Connection failed")
-// Output: [Error Log] 2025-01-07T...: Connection failed
+// Example output: [Error Log] 2025-01-07T...: Connection failed
 ```
 
 #### `Result.orElse`
@@ -969,11 +1089,15 @@ Recovers from an error by providing a fallback `Result`. If the current result i
 import { Result } from "@carbonteq/fp";
 
 function fetchFromCache(id: string): Result<string, Error> {
-  return id === "cached" ? Result.Ok("Cached data") : Result.Err(new Error("Not in cache"));
+  return id === "cached"
+    ? Result.Ok("Cached data")
+    : Result.Err(new Error("Not in cache"));
 }
 
 function fetchFromAPI(id: string): Result<string, Error> {
-  return id === "1" ? Result.Ok("API data") : Result.Err(new Error("Not found"));
+  return id === "1"
+    ? Result.Ok("API data")
+    : Result.Err(new Error("Not found"));
 }
 
 const cached = fetchFromCache("cached").orElse((err) => fetchFromAPI("1"));
@@ -1008,6 +1132,51 @@ const allNone = Option.any(Option.None, Option.None, Option.None);
 console.log(allNone); // None
 ```
 
+#### `ExperimentalOption.gen`, `genAdapter`, `asyncGen`, `asyncGenAdapter`
+
+Experimental generator-based methods for chaining Option operations with imperative-style syntax.
+
+```typescript
+import { ExperimentalOption as Option } from "@carbonteq/fp";
+
+// Option.gen - simple sync chains (no adapter needed)
+const syncResult = Option.gen(function* () {
+  const a = yield* Option.Some(1);
+  const b = yield* Option.Some(2);
+  return a + b;
+});
+console.log(syncResult); // Some(3)
+
+// Option.asyncGen - async chains with explicit await
+const asyncResult = await Option.asyncGen(async function* () {
+  const id = yield* Option.Some(1);
+  const data = yield* await fetchUserData(id); // await Promise<Option> first
+  const validated = yield* validate(data);
+  return validated;
+});
+
+// Option.genAdapter - better type inference for complex sync chains
+const complexSync = Option.genAdapter(function* ($) {
+  const user = yield* $(fetchUser(123)); // sync Option
+  const profile = yield* $(user.profile); // sync Option
+  const valid = yield* $(validate(profile)); // sync Option
+  return valid;
+});
+
+// Option.asyncGenAdapter - cleaner async with auto-await handling
+const complexAsync = await Option.asyncGenAdapter(async function* ($) {
+  const user = yield* $(fetchUser(123)); // sync or async Option
+  const orders = yield* $(fetchOrders(user)); // Promise<Option> - auto-awaited
+  const total = yield* $(calculateTotal(orders));
+  return total;
+});
+```
+
+**Key differences:**
+
+- `gen` / `asyncGen`: Simple, direct `yield*` with Option values
+- `genAdapter` / `asyncGenAdapter`: Uses `$()` adapter for better type inference and cleaner syntax
+
 #### `Result.any`
 
 Returns the first `Ok` from a list of `Result`s, or collects all errors if all are `Err`.
@@ -1029,6 +1198,53 @@ const allErrors = Result.any(
 );
 console.log(allErrors); // Err(["Error 1", "Error 2", "Error 3"])
 ```
+
+#### `ExperimentalResult.gen`, `genAdapter`, `asyncGen`, `asyncGenAdapter`
+
+Experimental generator-based methods for chaining Result operations with imperative-style syntax.
+
+```typescript
+import { ExperimentalResult as Result } from "@carbonteq/fp";
+
+// Result.gen - simple sync chains (no adapter needed)
+const syncResult = Result.gen(function* () {
+  const a = yield* Result.Ok(1);
+  const b = yield* Result.Ok(2);
+  return a + b;
+});
+console.log(syncResult); // Ok(3)
+
+// Result.asyncGen - async chains with explicit await
+const asyncResult = await Result.asyncGen(async function* () {
+  const id = yield* Result.Ok(1);
+  const data = yield* await fetchUserData(id); // await Promise<Result> first
+  const validated = yield* validate(data);
+  return validated;
+});
+
+// Result.genAdapter - better type inference for complex sync chains
+const complexSync = Result.genAdapter(function* ($) {
+  const user = yield* $(fetchUser(123)); // sync Result
+  const profile = yield* $(user.profile); // sync Result
+  const valid = yield* $(validate(profile)); // sync Result
+  return valid;
+});
+
+// Result.asyncGenAdapter - cleaner async with auto-await handling
+const complexAsync = await Result.asyncGenAdapter(async function* ($) {
+  const user = yield* $(fetchUser(123)); // sync or async Result
+  const orders = yield* $(fetchOrders(user)); // Promise<Result> - auto-awaited
+  const total = yield* $(calculateTotal(orders));
+  return total;
+});
+```
+
+**Key differences:**
+
+- `gen` / `asyncGen`: Simple, direct `yield*` with Result values
+- `genAdapter` / `asyncGenAdapter`: Uses `$()` adapter for better type inference and cleaner syntax
+
+---
 
 ## Build Your First Pipeline
 
@@ -1108,7 +1324,7 @@ matchRes(result, {
   },
 });
 
-// Output:
+// Example output:
 // Order confirmed! Order ID: ORD-1716888600000
 // Total: $59.98
 // Order: {"productId":"PROD-123","quantity":2,"userId":"USER-456"}
@@ -1119,8 +1335,7 @@ matchRes(result, {
 Let's build an asynchronous pipeline for a user registration system that includes credentials verification and profile setup.
 
 ```typescript
-import { matchRes } from "@/match.js";
-import { Result } from "@/result.js";
+import { matchRes, Result } from "@carbonteq/fp";
 
 interface UserInput {
   email: string;
@@ -1185,13 +1400,12 @@ async function sendVerificationEmail(
   return Result.Ok(profile);
 }
 
-// Main registration pipeline
+// Main registration pipeline using validate + flatMap
 async function registerUser(
   input: UserInput,
 ): Promise<Result<UserProfile, string | string[]>> {
   const res = await Result.Ok(input)
     .validate([
-      // handles both sync and async functions
       ({ email }) => guardEmail(email),
       ({ email }) => guardEmailAvailability(email),
       ({ password }) => guardPassword(password),
@@ -1227,7 +1441,7 @@ async function main() {
 }
 
 main();
-// Output:
+// Example output:
 // Verification email sent to newuser@example.com
 // Email: newuser@example.com
 // Registration successful!
