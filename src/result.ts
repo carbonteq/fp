@@ -1127,17 +1127,48 @@ export class Result<T, E> {
   ): In | Promise<In> {
     if (isPromiseLike(r)) {
       return r.then((newResult) => {
-        if (newResult._tag === "Err") {
-          newCtx.asyncErr = newResult.getErr() as E
+        const maybeAwaited = Result.captureZipErr(newResult, newCtx)
+        if (isPromiseLike(maybeAwaited)) {
+          return maybeAwaited.then(() => v)
         }
         return v
       })
     }
 
-    if (r._tag === "Err") {
-      newCtx.asyncErr = r.getErr() as E
+    const maybeAwaited = Result.captureZipErr(r, newCtx)
+    if (isPromiseLike(maybeAwaited)) {
+      return maybeAwaited.then(() => v)
     }
     return v
+  }
+
+  private static captureZipErr<E>(
+    result: Result<unknown, E>,
+    newCtx: ResultCtx<E>,
+  ): void | Promise<void> {
+    if (result._tag === "Err") {
+      newCtx.asyncErr = result.getErr() as E
+      return
+    }
+
+    const innerVal = result.#val
+    if (isPromiseLike(innerVal)) {
+      return innerVal.then((resolved) => {
+        if (resolved === ERR_VAL || result.#ctx.asyncErr !== NO_ERR) {
+          newCtx.asyncErr =
+            result.#ctx.asyncErr !== NO_ERR
+              ? (result.#ctx.asyncErr as E)
+              : (result.#err as E)
+        }
+      })
+    }
+
+    if (innerVal === ERR_VAL || result.#ctx.asyncErr !== NO_ERR) {
+      newCtx.asyncErr =
+        result.#ctx.asyncErr !== NO_ERR
+          ? (result.#ctx.asyncErr as E)
+          : (result.#err as E)
+    }
   }
 
   // ==========================================================================
