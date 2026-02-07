@@ -364,6 +364,8 @@ export class ExperimentalFlow {
           return value as unknown as Result<T, ExtractXFlowError<Eff>>
         }
         nextArg = value.unwrap()
+      } else {
+        throw new Error("ExperimentalFlow.asyncGen yielded unknown type")
       }
     }
   }

@@ -358,6 +358,8 @@ export class Flow {
           return value as unknown as Result<T, ExtractFlowError<Eff>>
         }
         nextArg = value.unwrap()
+      } else {
+        throw new Error("Flow.asyncGen yielded unknown type")
       }
     }
   }
