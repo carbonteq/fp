@@ -598,6 +598,14 @@ describe("Option type inference", () => {
       ).toEqualTypeOf<string>()
     })
 
+    it("should correctly type mapOr with async mapper", () => {
+      const opt = Option.Some(42)
+
+      expectTypeOf(opt.mapOr("default", async (n) => n.toString())).toEqualTypeOf<
+        Promise<string>
+      >()
+    })
+
     it("should correctly type mapOr on async Option", () => {
       const opt = Option.Some(Promise.resolve(42))
 

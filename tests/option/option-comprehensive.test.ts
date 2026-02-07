@@ -353,10 +353,24 @@ describe("Transformation Methods", () => {
       expect(result).toBe(10)
     })
 
+    it("should support async mapper for Some", async () => {
+      const result = await Option.Some(5).mapOr(0, async (x) => x * 2)
+      expect(result).toBe(10)
+    })
+
     it("should return default for None", () => {
       const opt: Option<number> = Option.None
       const result = opt.mapOr(0, (x) => x * 2)
       expect(result).toBe(0)
+    })
+
+    it("should return default for None with async mapper", async () => {
+      const opt: Option<number> = Option.None
+      const mapper = mock(async (x: number) => x * 2)
+      const result = await opt.mapOr(0, mapper)
+
+      expect(result).toBe(0)
+      expect(mapper).not.toHaveBeenCalled()
     })
   })
 })

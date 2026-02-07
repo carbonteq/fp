@@ -400,6 +400,7 @@ export class Option<T> {
     defaultVal: U,
     fn: AsyncMapper<Curr, U>,
   ): Promise<U>
+  mapOr<U>(this: Option<T>, defaultVal: U, fn: AsyncMapper<T, U>): Promise<U>
   mapOr<U>(this: Option<T>, defaultVal: U, fn: Mapper<T, U>): U
   mapOr<U, Curr = Awaited<T>>(
     defaultVal: U,
