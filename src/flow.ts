@@ -245,6 +245,8 @@ export class Flow {
           return value as unknown as Result<T, ExtractWrapError<Eff>>
         }
         nextArg = value.unwrap()
+      } else {
+        throw new Error("Flow.genAdapter yielded unknown type")
       }
     }
   }
@@ -383,6 +385,8 @@ export class Flow {
           return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>
         }
         nextArg = value.unwrap()
+      } else {
+        throw new Error("Flow.asyncGenAdapter yielded unknown type")
       }
     }
   }
