@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { Option } from "@/option.js"
+import { Option, UnwrappedNone } from "@/option.js"
 
 describe("README Examples - Option Type", () => {
   describe("Basic Option Type", () => {
@@ -312,7 +312,7 @@ describe("README Examples - Option Type", () => {
       // fromPromise wraps the promise - the Option is Some containing the Promise
       expect(userOpt.isSome()).toBe(true)
 
-      await expect(userOpt.unwrap()).rejects.toThrow()
+      await expect(userOpt.unwrap()).rejects.toThrow(UnwrappedNone)
       const resolved = await userOpt.toPromise()
       expect(resolved.isNone()).toBe(true)
     })
