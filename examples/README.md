@@ -11,6 +11,7 @@ Runnable stable examples live here:
 - `examples/result/` uses `Result`.
 - `examples/option/` uses `Option`.
 - `examples/flow/` uses stable `Flow` with stable `Result` and `Option`.
+- `examples/match/` uses `match()` with stable `Option`/`Result`.
 
 ## Experimental APIs (ExperimentalResult / ExperimentalOption / Flow)
 
@@ -19,6 +20,7 @@ These examples use experimental types and may change between releases.
 - `examples/result-experimental/` uses `ExperimentalResult`.
 - `examples/option-experimental/` uses `ExperimentalOption`.
 - `examples/flow-experimental/` uses `ExperimentalFlow` with `ExperimentalResult` and `ExperimentalOption`.
+- `examples/match-experimental/` uses `match()` with experimental variants.
 
 Run individual examples with Bun, for example:
 
@@ -29,12 +31,16 @@ bun run examples/flow-experimental/01-basics.ts
 bun run examples/flow/01-basics.ts
 bun run examples/result/01-basics.ts
 bun run examples/option/01-basics.ts
+bun run examples/match/01-stable-match.ts
+bun run examples/match-experimental/01-experimental-match.ts
 ```
 
 For a full list of Result/Option examples, see:
 
 - `examples/result/index.ts`
 - `examples/option/index.ts`
+- `examples/match/index.ts`
 
 - `examples/result-experimental/index.ts`
 - `examples/option-experimental/index.ts`
+- `examples/match-experimental/index.ts`

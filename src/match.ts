@@ -46,19 +46,19 @@ type GetInnerType<T, Tag extends string> = Tag extends "Some"
     ? V
     : T extends OldOption<infer V>
       ? V
-    : unknown
+      : unknown
   : Tag extends "Ok"
     ? T extends Result<infer V, unknown>
       ? V
       : T extends OldResult<infer V, unknown>
         ? V
-      : unknown
+        : unknown
     : Tag extends "Err"
       ? T extends Result<unknown, infer E>
         ? E
         : T extends OldResult<unknown, infer E>
           ? E
-        : unknown
+          : unknown
       : ExtractByTag<T, Tag> extends { unwrap(): infer V }
         ? V
         : unknown
