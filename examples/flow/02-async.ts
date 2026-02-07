@@ -2,7 +2,7 @@
  * Async Flow - Unified Async Generator
  *
  * Handles Promise<Option>, Promise<Result>, and async operations.
- * Uses ExperimentalOption and ExperimentalResult.
+ * Uses stable Option and Result.
  */
 
 import { Flow, Option, Result } from "../../dist/index.mjs"

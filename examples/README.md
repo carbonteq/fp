@@ -2,12 +2,15 @@
 
 This directory contains runnable examples split between stable and experimental APIs.
 
-## Stable APIs (Result / Option)
+`examples/flow/` is stable, while `examples/flow-experimental/` is experimental.
+
+## Stable APIs (Result / Option / Flow)
 
 Runnable stable examples live here:
 
 - `examples/result/` uses `Result`.
 - `examples/option/` uses `Option`.
+- `examples/flow/` uses stable `Flow` with stable `Result` and `Option`.
 
 ## Experimental APIs (ExperimentalResult / ExperimentalOption / Flow)
 
@@ -15,13 +18,14 @@ These examples use experimental types and may change between releases.
 
 - `examples/result-experimental/` uses `ExperimentalResult`.
 - `examples/option-experimental/` uses `ExperimentalOption`.
-- `examples/flow/` uses `Flow` with `ExperimentalResult` and `ExperimentalOption`.
+- `examples/flow-experimental/` uses `ExperimentalFlow` with `ExperimentalResult` and `ExperimentalOption`.
 
 Run individual examples with Bun, for example:
 
 ```sh
 bun run examples/result-experimental/01-map.ts
 bun run examples/option-experimental/01-map.ts
+bun run examples/flow-experimental/01-basics.ts
 bun run examples/flow/01-basics.ts
 bun run examples/result/01-basics.ts
 bun run examples/option/01-basics.ts

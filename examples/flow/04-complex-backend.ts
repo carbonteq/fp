@@ -6,7 +6,7 @@
  * - Error handling with custom typed errors
  * - Mixing Result (fallible) and Option (nullable) types
  * - Using Flow.asyncGenAdapter for clean, declarative control flow
- * - Uses ExperimentalOption and ExperimentalResult
+ * - Uses stable Option and Result
  */
 
 import { Flow, Option, Result } from "../../dist/index.mjs"

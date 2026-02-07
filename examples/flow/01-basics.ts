@@ -6,7 +6,7 @@
  * - If Option.None is yielded -> returns Result.Err(UnwrappedNone)
  * - If Result.Err(e) is yielded -> returns Result.Err(e)
  *
- * Uses ExperimentalOption and ExperimentalResult.
+ * Uses stable Option and Result.
  */
 
 import { Flow, Option, Result } from "../../dist/index.mjs"

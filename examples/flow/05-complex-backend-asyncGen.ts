@@ -6,7 +6,7 @@
  * - Error handling with custom typed errors using FlowError
  * - Mixing Result (fallible) and Option (nullable) types
  * - Using Flow.asyncGen with direct error yielding via FlowError
- * - Uses ExperimentalOption and ExperimentalResult
+ * - Uses stable Option and Result
  */
 
 import { Flow, FlowError, Option, Result } from "../../src/index.js"

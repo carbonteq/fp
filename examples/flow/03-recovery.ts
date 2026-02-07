@@ -2,7 +2,7 @@
  * Flow - Error Recovery Patterns
  *
  * Examples of how to handle errors and perform recovery (orElse) within Flow generators.
- * Uses ExperimentalResult.
+ * Uses stable Result.
  */
 
 import { Flow, Result } from "../../dist/index.mjs"

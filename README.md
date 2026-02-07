@@ -35,13 +35,13 @@ function getUserByEmail(user: { email?: string }): string | null {
   return user.email ? user.email : null;
 }
 
-function getUserAdress(user: { email?: string }): string | null {
-  return user.email ? "Some Address" : null;
+function getUserAddress(email: string): string | null {
+  return email ? "Some Address" : null;
 }
 
 const email = getUserByEmail({ email: "test@test.com" });
 if (email) {
-  const address = getUserAdress(email);
+  const address = getUserAddress(email);
   if (address) {
     console.log(`User ${email} has address: ${address}`);
   } else {
@@ -113,8 +113,8 @@ matchOpt(res, {
 
 Examples are split between stable and experimental APIs.
 
-- Stable `Result` and `Option` runnable examples live under `examples/result/` and `examples/option/`.
-- Experimental `ExperimentalResult`, `ExperimentalOption`, and `Flow` examples live under `examples/` and are clearly marked as experimental.
+- Stable runnable examples live under `examples/result/`, `examples/option/`, and `examples/flow/`.
+- Experimental runnable examples live under `examples/result-experimental/`, `examples/option-experimental/`, and `examples/flow-experimental/`.
 
 See `examples/README.md` for the runnable index and file paths.
 
@@ -505,6 +505,7 @@ type Like = {
 type Reply = {
   replyId: string;
   postId: Post["postId"];
+  data: string;
   createdAt: Date | string;
   author: User["userId"];
 };
