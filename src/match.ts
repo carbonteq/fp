@@ -31,7 +31,8 @@ type ExtractByTag<T, Tag> = T extends { readonly _tag: Tag } ? T : never
  * For Option<T> with Tag="Some": Extracts T
  * For Result<T, E> with Tag="Ok": Extracts T
  * For Result<T, E> with Tag="Err": Extracts E
- * For other discriminated unions: Extracts from the narrowed variant
+ * For other discriminated unions: only extracts when the narrowed variant
+ * exposes an `unwrap()` method; otherwise resolves to `unknown`.
  */
 type GetInnerType<T, Tag extends string> = Tag extends "Some"
   ? T extends Option<infer V>
@@ -468,7 +469,7 @@ class MatchBuilderImpl<
   }
 
   #extractInnerValue(value: T): unknown {
-    // For Option: extract the value for Some, return undefined for None
+    // For Option: extract the value for Some; for None, return the original object
     // For Result: extract the value for Ok, extract the error for Err
     if ("unwrap" in value && typeof value.unwrap === "function") {
       if (value._tag === "Some" || value._tag === "Ok") {
