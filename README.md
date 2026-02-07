@@ -92,7 +92,7 @@ matchOpt(res, {
   - [Fluent `match()` builder](#fluent-match-builder)
   - [The `ExperimentalResult` type (Experimental)](#the-experimentalresult-type-experimental)
   - [The `ExperimentalOption` type (Experimental)](#the-experimentaloption-type-experimental)
-  - [The `Flow` namespace (Experimental)](#the-flow-namespace-experimental)
+  - [The `Flow` namespaces](#the-flow-namespaces)
   - [Cheatsheet](#cheatsheet)
     - [map](#map)
     - [flatMap](#flatmap)
@@ -234,64 +234,40 @@ import { ExperimentalOption } from "@carbonteq/fp";
 
 ---
 
-## The `Flow` namespace (Experimental)
+## The `Flow` namespaces
 
-`Flow` is experimental and works with `ExperimentalOption` and `ExperimentalResult`. It provides a unified generator interface for working with both types simultaneously. It allows you to yield both types in the same generator, automatically short-circuiting on `Option.None` or `Result.Err`.
-
-The return type of a `Flow` generator is always an `ExperimentalResult<T, E | UnwrappedNone>`, where:
-
-- `T` is the return value of the generator function.
-- `E` is the union of all error types yielded from `Result`s.
-- `UnwrappedNone` is included if any `Option`s were yielded (representing the case where `None` caused a short-circuit).
+`Flow` is the stable generator namespace and works with stable `Option` + `Result`, returning stable `Result`.
 
 ```typescript
-import {
-  Flow,
-  ExperimentalOption as Option,
-  ExperimentalResult as Result,
-  UnwrappedNone,
-} from "@carbonteq/fp";
+import { Flow, Option, Result, UnwrappedNone } from "@carbonteq/fp";
 
-// Basic usage mixing Option and Result
 const result = Flow.gen(function* () {
-  const a = yield* Option.Some(5); // Unwraps Option<number> -> number
-  const b = yield* Result.Ok(10); // Unwraps Result<number, never> -> number
-
-  // If this was None, the flow would stop and return Result.Err(new UnwrappedNone())
+  const a = yield* Option.Some(5);
+  const b = yield* Result.Ok(10);
   const c = yield* Option.fromNullable(20);
-
   return a + b + c;
 });
 
-console.log(result.unwrap()); // 35
+// Result<number, UnwrappedNone>
 ```
 
-### Async Flow
-
-`Flow.asyncGen` works similarly but allows awaiting promises and yielding async operations.
+`ExperimentalFlow` is the experimental counterpart and works with `ExperimentalOption` + `ExperimentalResult`, returning `ExperimentalResult`.
 
 ```typescript
-const result = await Flow.asyncGen(async function* () {
-  const user = yield* Option.Some({ id: 1 });
+import {
+  ExperimentalFlow,
+  ExperimentalOption,
+  ExperimentalResult,
+} from "@carbonteq/fp";
 
-  // You can await async functions returning Result/Option before yielding
-  const profile = yield* await fetchProfile(user.id);
-
-  return profile;
+const result = ExperimentalFlow.gen(function* () {
+  const a = yield* ExperimentalOption.Some(5);
+  const b = yield* ExperimentalResult.Ok(10);
+  return a + b;
 });
 ```
 
-### Adapter Variant (`genAdapter`)
-
-For better type inference in complex chains, use `genAdapter` (or `asyncGenAdapter`). It provides an adapter function (`$`) to wrap yielded values.
-
-```typescript
-const result = Flow.genAdapter(function* ($) {
-  const val1 = yield* $(Option.Some(10));
-  const val2 = yield* $(Result.Ok(20));
-  return val1 + val2;
-});
-```
+Both namespaces provide `gen`, `genAdapter`, `asyncGen`, and `asyncGenAdapter`.
 
 ---
 
@@ -723,7 +699,7 @@ const validatedErrs = await Result.Ok("password123!")
 console.log(validatedErrs.unwrapErr()); // [Error: New password cannot be the same as previous password]
 ```
 
-#### `unwrap`, `safeUnwrapErr`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
+#### `unwrap`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
 
 These functions are used to extract the value from a `Result`. Note that **only `unwrap` and `safeUnwrap` are available for `Option`**.
 

@@ -23,7 +23,9 @@ const UNWRAPPED_NONE_ERR = new UnwrappedNone()
 
 const NONE_VAL = Symbol("Option::None")
 
+/** Option alias for presence-without-payload values. */
 export type UnitOption = Option<UNIT>
+/** Extracts the contained value type from an Option type. */
 export type UnwrapOption<T> = T extends Option<infer R> ? R : never
 
 type CombinedOptions<T extends Option<unknown>[]> = {
@@ -73,6 +75,10 @@ class AsyncOptionYieldWrap<T> {
   }
 }
 
+/**
+ * Represents an optional value: `Some<T>` or `None`.
+ * Provides composable, null-safe transformation and chaining methods.
+ */
 export class Option<T> {
   /** Discriminant tag for type-level identification */
   readonly _tag: "Some" | "None"
@@ -154,7 +160,9 @@ export class Option<T> {
   /**
    * Wraps a Promise<Option<T>> as Option<Promise<T>>.
    *
-   * Preserves None by tracking a sentinel in the async context.
+   * NOTE: the returned value starts as `Some(Promise<T>)`; final `None` is known
+   * only after settlement. Use `toPromise()` (or await `unwrap`/`safeUnwrap`) to
+   * observe settled absence.
    *
    * @template U - Inner value type
    * @param o - Promise resolving to an Option
@@ -198,6 +206,8 @@ export class Option<T> {
 
   /**
    * Returns the first Some in the list, or None if all are None.
+   *
+   * For async Some values, settlement is awaited and selection follows input order.
    *
    * @template T - Value type
    * @param options - Options to search
@@ -742,6 +752,9 @@ export class Option<T> {
 
   /**
    * Executes a side effect for Some values and returns self.
+   *
+   * For `Option<Promise<T>>`, `tap` receives the wrapped promise object,
+   * not the settled inner value.
    *
    * @param fn - Side effect function
    * @returns The same Option (chainable)

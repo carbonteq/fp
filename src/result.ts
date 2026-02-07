@@ -16,8 +16,10 @@ type FlatZipInput<_T, U, E> =
   | Promise<Result<U, E>>
   | Promise<Result<Promise<U>, E>>
 
+/** Result alias for success-without-payload operations. */
 export type UnitResult<E = never> = Result<UNIT, E>
 
+/** Extracts `{ ok, err }` branch types from a Result type. */
 export type UnwrapResult<T extends Result<unknown, unknown>> =
   T extends Result<infer U, infer E> ? { ok: U; err: E } : never
 
@@ -28,6 +30,7 @@ type CombinedResultErr<T extends Result<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["err"]
 }[number]
 
+/** Combines a tuple of Results into one Result of tuple values. */
 export type CombineResults<T extends Result<unknown, unknown>[]> = Result<
   CombinedResultOk<T>,
   CombinedResultErr<T>
@@ -116,6 +119,10 @@ type ExtractAsyncResultError<T> =
 // biome-ignore lint/suspicious/noExplicitAny: inference
 type ExtractError<T> = T extends Result<any, infer E> ? E : never
 
+/**
+ * Represents a computation that can succeed (`Ok<T>`) or fail (`Err<E>`).
+ * Provides composable transformations with explicit error propagation.
+ */
 export class Result<T, E> {
   /** Discriminant tag for type-level identification */
   readonly _tag: "Ok" | "Err"
@@ -1459,6 +1466,9 @@ export class Result<T, E> {
    * - First Ok → Returns that Ok immediately
    * - All Err → `Err([...all errors])`
    *
+   * For async Ok values, this waits for settlement and selects the first
+   * successful candidate in input order (not fastest-to-resolve order).
+   *
    * @param results - Variable number of Results to check
    * @returns First Ok found, or Err with array of all errors
    *
@@ -1788,7 +1798,9 @@ export class Result<T, E> {
   /**
    * Wraps a Promise<Result<T, E>> as Result<Promise<T>, E>.
    *
-   * Preserves Err by tracking async error context.
+   * Returns an optimistic `Ok(Promise<T>)`. If the inner promise fails later,
+   * the failure is tracked internally and surfaces when you settle/unwrap
+   * (`toPromise`, `unwrap`, `unwrapErr`, etc.).
    *
    * @template U - Success value type
    * @template F - Error type
@@ -1844,6 +1856,10 @@ export class Result<T, E> {
 
   /**
    * Catches async exceptions and converts them to Err.
+   *
+   * Returns an optimistic `Ok(Promise<T>)`. If the async work fails later,
+   * the failure is tracked internally and surfaces when you settle/unwrap
+   * (`toPromise`, `unwrap`, `unwrapErr`, etc.).
    *
    * @template T - Success value type
    * @template E - Error type

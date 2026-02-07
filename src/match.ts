@@ -469,7 +469,9 @@ interface MatchBuilder<T, Matched extends string, Returns> {
 
   /**
    * Add a predicate-based match case.
-   * The predicate is tested against the value regardless of its tag.
+   *
+   * NOTE: `when()` predicates are evaluated before tag/pattern `.with(...)`
+   * cases, regardless of declaration order.
    *
    * @example
    * ```ts
@@ -740,6 +742,11 @@ function hasPromiseLikeInnerValue(value: MatchableValue): boolean {
  * Create a fluent pattern matcher for discriminated unions.
  *
  * Supports `Option`, `Result`, and any type with a `_tag` discriminant.
+ *
+ * `match()` is synchronous. It rejects Promise-like inner payloads
+ * (for example `Result<Promise<T>, E>` and `Option<Promise<T>>`).
+ * Settle first (for stable types) via `toPromise()` and then match
+ * the settled value.
  *
  * @template T - The discriminated union type to match
  * @param value - The value to pattern match on

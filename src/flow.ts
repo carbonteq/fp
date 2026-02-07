@@ -151,8 +151,15 @@ type ExtractAsyncWrapError<Y> =
     : never
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
+/**
+ * Static namespace for composing stable Option/Result workflows via generators.
+ * Short-circuits on yielded failures and returns a Result.
+ */
 export class Flow {
-  // Direct generator (no adapter)
+  /**
+   * Runs a synchronous generator and short-circuits on yielded `Option.None`,
+   * `Result.Err`, or `FlowError`.
+   */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static gen<Eff extends Option<any> | Result<any, any> | FlowError, T>(
     genFn: () => Generator<Eff, T, unknown>,
@@ -223,7 +230,9 @@ export class Flow {
     }
   }
 
-  // Adapter generator
+  /**
+   * Adapter variant of `gen` with improved type inference for yielded effects.
+   */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static genAdapter<Eff extends FlowYieldWrap<any, any>, T>(
     genFn: (adapter: {
@@ -293,7 +302,10 @@ export class Flow {
     }
   }
 
-  // Async variants...
+  /**
+   * Async generator variant that awaits yielded effects and short-circuits on
+   * failure.
+   */
   static async asyncGen<
     // biome-ignore lint/suspicious/noExplicitAny: inference
     Eff extends Option<any> | Result<any, any> | FlowError,
@@ -364,6 +376,9 @@ export class Flow {
     }
   }
 
+  /**
+   * Adapter variant of `asyncGen` for ergonomic mixed sync/async yielding.
+   */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGenAdapter<Eff extends AsyncFlowYieldWrap<any, any>, T>(
     genFn: (adapter: {

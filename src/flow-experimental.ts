@@ -154,8 +154,12 @@ type ExtractAsyncWrapError<Y> =
     : never
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Namespace-like class
+/**
+ * Experimental flow namespace for composing ExperimentalOption/ExperimentalResult
+ * workflows with generator syntax.
+ */
 export class ExperimentalFlow {
-  // Direct generator (no adapter)
+  /** Runs a synchronous experimental flow generator and short-circuits on failure. */
   static gen<
     // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
     Eff extends Option<any> | Result<any, any> | ExperimentalFlowError,
@@ -229,7 +233,7 @@ export class ExperimentalFlow {
     }
   }
 
-  // Adapter generator
+  /** Adapter variant of `gen` for improved type inference. */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static genAdapter<Eff extends XFlowYieldWrap<any, any>, T>(
     genFn: (adapter: {
@@ -299,7 +303,7 @@ export class ExperimentalFlow {
     }
   }
 
-  // Async variants...
+  /** Runs an async experimental flow generator and short-circuits on failure. */
   static async asyncGen<
     // biome-ignore lint/suspicious/noExplicitAny: inference
     Eff extends Option<any> | Result<any, any> | ExperimentalFlowError,
@@ -370,6 +374,7 @@ export class ExperimentalFlow {
     }
   }
 
+  /** Adapter variant of `asyncGen` for ergonomic mixed sync/async yielding. */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGenAdapter<Eff extends AsyncXFlowYieldWrap<any, any>, T>(
     genFn: (adapter: {

@@ -1,3 +1,4 @@
+/** Type guard that checks whether a value is Promise-like (`thenable`). */
 export function isPromiseLike<T>(value: unknown): value is Promise<T> {
   return (
     !!value &&
@@ -7,6 +8,7 @@ export function isPromiseLike<T>(value: unknown): value is Promise<T> {
   )
 }
 
+/** Wrapper used to preserve callsite stack traces across yielded values. */
 export class CapturedTrace<T> {
   constructor(
     readonly value: T,
@@ -14,6 +16,7 @@ export class CapturedTrace<T> {
   ) {}
 }
 
+/** Type guard for `CapturedTrace` wrappers. */
 export function isCapturedTrace(
   value: unknown,
 ): value is CapturedTrace<unknown> {

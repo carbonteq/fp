@@ -3,8 +3,10 @@ import { ExperimentalOption as Option } from "./option-experimental.js"
 import { UNIT } from "./unit.js"
 import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
 
+/** ExperimentalResult alias for success-without-payload operations. */
 export type UnitResult<E = never> = ExperimentalResult<UNIT, E>
 
+/** Extracts `{ ok, err }` branch types from an ExperimentalResult type. */
 export type UnwrapResult<T extends ExperimentalResult<unknown, unknown>> =
   T extends ExperimentalResult<infer U, infer E> ? { ok: U; err: E } : never
 
@@ -15,6 +17,7 @@ type CombinedResultErr<T extends ExperimentalResult<unknown, unknown>[]> = {
   [K in keyof T]: UnwrapResult<T[K]>["err"]
 }[number]
 
+/** Combines a tuple of ExperimentalResults into one result of tuple values. */
 export type CombineResults<T extends ExperimentalResult<unknown, unknown>[]> =
   ExperimentalResult<CombinedResultOk<T>, CombinedResultErr<T>>
 
@@ -80,6 +83,9 @@ type ExtractAsyncResultError<T> =
 // biome-ignore lint/suspicious/noExplicitAny: inference
 type ExtractError<T> = T extends ExperimentalResult<any, infer E> ? E : never
 
+/**
+ * Experimental Result variant with explicit async companion methods.
+ */
 export class ExperimentalResult<T, E> {
   /** Discriminant tag for type-level identification */
   readonly _tag: "Ok" | "Err"
@@ -269,7 +275,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).unwrapOr(0);        // 42
-   * Result.Err("fail").unwrapOr(0);   // 0
+   * ExperimentalResult.Err("fail").unwrapOr(0);   // 0
    * ```
    *
    * @see unwrapOrElse
@@ -291,7 +297,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const result = Result.Err("Not found");
+   * const result = ExperimentalResult.Err("Not found");
    * result.unwrapOrElse((err) => `Default: ${err}`); // "Default: Not found"
    *
    * ExperimentalResult.Ok(42).unwrapOrElse((err) => 0); // 42
@@ -316,7 +322,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).safeUnwrap();       // 42
-   * Result.Err("fail").safeUnwrap();  // null
+   * ExperimentalResult.Err("fail").safeUnwrap();  // null
    *
    * // Useful for null coalescing
    * const value = result.safeUnwrap() ?? "default";
@@ -381,7 +387,7 @@ export class ExperimentalResult<T, E> {
    * );
    * // "Success: 42"
    *
-   * const errResult = Result.Err("network error").fold(
+   * const errResult = ExperimentalResult.Err("network error").fold(
    *   (value) => `Success: ${value}`,
    *   (error) => `Failed: ${error}`
    * );
@@ -532,7 +538,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).map((x) => x * 2);           // Ok(84)
-   * Result.Err("fail").map((x) => x * 2);       // Err("fail")
+   * ExperimentalResult.Err("fail").map((x) => x * 2);       // Err("fail")
    * ```
    *
    * @see mapAsync
@@ -559,7 +565,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * await ExperimentalResult.Ok(42).mapAsync(async (x) => x * 2); // Promise<Ok(84)>
-   * await Result.Err("fail").mapAsync(async (x) => x * 2); // Promise<Err("fail")>
+   * await ExperimentalResult.Err("fail").mapAsync(async (x) => x * 2); // Promise<Err("fail")>
    * ```
    *
    * @see map
@@ -595,10 +601,10 @@ export class ExperimentalResult<T, E> {
    * // Success chain
    * ExperimentalResult.Ok(42)
    *   .flatMap((x) => ExperimentalResult.Ok(x + 1))        // Ok(43)
-   *   .flatMap((x) => Result.Err("too big"));  // Err("too big")
+   *   .flatMap((x) => ExperimentalResult.Err("too big"));  // Err("too big")
    *
    * // Error propagation
-   * Result.Err("initial").flatMap((x) => ExperimentalResult.Ok(x + 1)); // Err("initial")
+   * ExperimentalResult.Err("initial").flatMap((x) => ExperimentalResult.Ok(x + 1)); // Err("initial")
    * ```
    *
    * @see flatMapAsync
@@ -667,7 +673,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).zip((x) => x * 10);        // Ok([42, 420])
-   * Result.Err("fail").zip((x) => x * 10);   // Err("fail")
+   * ExperimentalResult.Err("fail").zip((x) => x * 10);   // Err("fail")
    *
    * // Keep original while computing related value
    * ExperimentalResult.Ok(user).zip((u) => u.permissions.length); // Ok([user, 5])
@@ -730,10 +736,10 @@ export class ExperimentalResult<T, E> {
    * ```ts
    * ExperimentalResult.Ok(42)
    *   .flatZip((x) => ExperimentalResult.Ok(x + 5))       // Ok([42, 47])
-   *   .flatZip(([a, b]) => Result.Err("x"));  // Err("x")
+   *   .flatZip(([a, b]) => ExperimentalResult.Err("x"));  // Err("x")
    *
-   * ExperimentalResult.Ok(42).flatZip((x) => Result.Err("fail")); // Err("fail")
-   * Result.Err("init").flatZip((x) => ExperimentalResult.Ok(5)); // Err("init")
+   * ExperimentalResult.Ok(42).flatZip((x) => ExperimentalResult.Err("fail")); // Err("fail")
+   * ExperimentalResult.Err("init").flatZip((x) => ExperimentalResult.Ok(5)); // Err("init")
    * ```
    *
    * @see flatZipAsync
@@ -806,7 +812,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * Result.Err("network error").mapErr((e) => `Network: ${e}`); // Err("Network: network error")
+   * ExperimentalResult.Err("network error").mapErr((e) => `Network: ${e}`); // Err("Network: network error")
    * ExperimentalResult.Ok(42).mapErr((e) => `Error: ${e}`);                  // Ok(42)
    *
    * // Add context to errors
@@ -838,7 +844,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * await Result.Err("timeout").mapErrAsync(async (e) => await formatError(e));
+   * await ExperimentalResult.Err("timeout").mapErrAsync(async (e) => await formatError(e));
    * // Promise<Err("Timeout occurred: timeout")>
    * ```
    *
@@ -873,7 +879,7 @@ export class ExperimentalResult<T, E> {
    *   (err) => `Failure: ${err}`
    * );  // Ok("Success: 42")
    *
-   * Result.Err("timeout").mapBoth(
+   * ExperimentalResult.Err("timeout").mapBoth(
    *   (val) => `Success: ${val}`,
    *   (err) => `Failure: ${err}`
    * );  // Err("Failure: timeout")
@@ -953,8 +959,8 @@ export class ExperimentalResult<T, E> {
    * ExperimentalResult.Ok(42).orElse((e) => ExperimentalResult.Ok(0)); // Ok(42)
    *
    * // Err triggers recovery
-   * Result.Err("not found").orElse((e) => ExperimentalResult.Ok(0)); // Ok(0)
-   * Result.Err("fail").orElse((e) => Result.Err("critical")); // Err("critical")
+   * ExperimentalResult.Err("not found").orElse((e) => ExperimentalResult.Ok(0)); // Ok(0)
+   * ExperimentalResult.Err("fail").orElse((e) => ExperimentalResult.Err("critical")); // Err("critical")
    * ```
    *
    * @see orElseAsync
@@ -1012,15 +1018,15 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * const validators = [
-   *   (x: number) => x > 0 ? ExperimentalResult.Ok(true) : Result.Err("must be positive"),
-   *   (x: number) => x < 100 ? ExperimentalResult.Ok(true) : Result.Err("must be < 100"),
-   *   (x: number) => x % 2 === 0 ? ExperimentalResult.Ok(true) : Result.Err("must be even"),
+   *   (x: number) => x > 0 ? ExperimentalResult.Ok(true) : ExperimentalResult.Err("must be positive"),
+   *   (x: number) => x < 100 ? ExperimentalResult.Ok(true) : ExperimentalResult.Err("must be < 100"),
+   *   (x: number) => x % 2 === 0 ? ExperimentalResult.Ok(true) : ExperimentalResult.Err("must be even"),
    * ];
    *
    * ExperimentalResult.Ok(42).validate(validators);                // Ok(42)
    * ExperimentalResult.Ok(101).validate(validators);               // Err(["must be < 100"])
    * ExperimentalResult.Ok(-5).validate(validators);                // Err(["must be positive", "must be even"])
-   * Result.Err("init").validate(validators);           // Err("init") - validators not run
+   * ExperimentalResult.Err("init").validate(validators);           // Err("init") - validators not run
    *
    * // With async validators (returns Promise<Result<...>>)
    * await ExperimentalResult.Ok(data).validate([
@@ -1144,9 +1150,9 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * Result.all(ExperimentalResult.Ok(1), ExperimentalResult.Ok(2), ExperimentalResult.Ok(3));     // Ok([1, 2, 3])
-   * Result.all(ExperimentalResult.Ok(1), Result.Err("a"), Result.Err("b")); // Err(["a", "b"])
-   * Result.all();                                            // Ok([])
+   * ExperimentalResult.all(ExperimentalResult.Ok(1), ExperimentalResult.Ok(2), ExperimentalResult.Ok(3));     // Ok([1, 2, 3])
+   * ExperimentalResult.all(ExperimentalResult.Ok(1), ExperimentalResult.Err("a"), ExperimentalResult.Err("b")); // Err(["a", "b"])
+   * ExperimentalResult.all();                                            // Ok([])
    *
    * // Real-world: Parallel validation
    * const [user, posts, likes] = await Promise.all([
@@ -1155,7 +1161,7 @@ export class ExperimentalResult<T, E> {
    *   fetchLikes(id),
    * ]);
    *
-   * const combined = Result.all(user, posts, likes);
+   * const combined = ExperimentalResult.all(user, posts, likes);
    * // Ok([User, Post[], Like[]]) or Err([...errors])
    * ```
    *
@@ -1201,20 +1207,20 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * Result.any(
-   *   Result.Err("Error 1"),
+   * ExperimentalResult.any(
+   *   ExperimentalResult.Err("Error 1"),
    *   ExperimentalResult.Ok("First success"),
    *   ExperimentalResult.Ok("Second success"),
    * ); // Ok("First success")
    *
-   * Result.any(
-   *   Result.Err("Error 1"),
-   *   Result.Err("Error 2"),
-   *   Result.Err("Error 3"),
+   * ExperimentalResult.any(
+   *   ExperimentalResult.Err("Error 1"),
+   *   ExperimentalResult.Err("Error 2"),
+   *   ExperimentalResult.Err("Error 3"),
    * ); // Err(["Error 1", "Error 2", "Error 3"])
    *
    * // Fallback chain
-   * Result.any(
+   * ExperimentalResult.any(
    *   fetchFromCache(key),
    *   fetchFromDb(key),
    *   fetchFromRemote(key),
@@ -1253,7 +1259,7 @@ export class ExperimentalResult<T, E> {
    * // Returns: Ok(84)
    *
    * // Err - tap does nothing
-   * Result.Err("fail").tap((x) => console.log(x)); // Err("fail")
+   * ExperimentalResult.Err("fail").tap((x) => console.log(x)); // Err("fail")
    * ```
    *
    * @see tapAsync
@@ -1310,7 +1316,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * Result.Err("Connection failed")
+   * ExperimentalResult.Err("Connection failed")
    *   .tapErr((err) => console.error(`[Error Log] ${new Date().toISOString()}: ${err}`))
    *   .orElse((e) => ExperimentalResult.Ok(defaultValue));
    * // Logs error timestamp
@@ -1342,7 +1348,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * await Result.Err("API error")
+   * await ExperimentalResult.Err("API error")
    *   .tapErrAsync(async (e) => await reportToSentry(e))
    *   .orElse((e) => ExperimentalResult.Ok(backupData));
    * ```
@@ -1370,12 +1376,12 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok("Success value").flip(); // Err("Success value")
-   * Result.Err("Error value").flip();  // Ok("Error value")
+   * ExperimentalResult.Err("Error value").flip();  // Ok("Error value")
    *
    * // Invert validation (fail if value is in blacklist)
    * const blacklist = ["admin", "root"];
    * const isBlacklisted = (name: string) =>
-   *   Result.fromPredicate(name, (n) => !blacklist.includes(n), "blacklisted")
+   *   ExperimentalResult.fromPredicate(name, (n) => !blacklist.includes(n), "blacklisted")
    *     .flip(); // Ok if blacklisted, Err if not
    * ```
    */
@@ -1400,7 +1406,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok(42).toOption();   // Some(42)
-   * Result.Err("fail").toOption(); // None
+   * ExperimentalResult.Err("fail").toOption(); // None
    *
    * // Safe user lookup
    * const userOpt = fetchUser(id).toOption();
@@ -1428,7 +1434,7 @@ export class ExperimentalResult<T, E> {
    * @example
    * ```ts
    * ExperimentalResult.Ok([1, 2, 3]).innerMap((x) => x * 2); // Ok([2, 4, 6])
-   * Result.Err("fail").innerMap((x) => x * 2);    // Err("fail")
+   * ExperimentalResult.Err("fail").innerMap((x) => x * 2);    // Err("fail")
    * ```
    */
   innerMap<In, E, Out>(
@@ -1450,7 +1456,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const result = Result.gen(function* () {
+   * const result = ExperimentalResult.gen(function* () {
    *   const value = yield* ExperimentalResult.Ok(42);
    *   return value * 2;
    * });
@@ -1490,6 +1496,10 @@ export class ExperimentalResult<T, E> {
 
   // Static constructors
 
+  /**
+   * Creates an ExperimentalResult from a nullable value.
+   * Returns Err(error) for null/undefined, otherwise Ok(non-null value).
+   */
   static fromNullable<T, E>(
     val: T | null | undefined,
     error: E,
@@ -1553,7 +1563,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const result = Result.gen(function* () {
+   * const result = ExperimentalResult.gen(function* () {
    *   const a = yield* ExperimentalResult.Ok(1);
    *   const b = yield* ExperimentalResult.Ok(2);
    *   return a + b;
@@ -1622,7 +1632,7 @@ export class ExperimentalResult<T, E> {
    *
    * @example
    * ```ts
-   * const result = Result.genAdapter(function* ($) {
+   * const result = ExperimentalResult.genAdapter(function* ($) {
    *   const a = yield* $(ExperimentalResult.Ok(1));
    *   const b = yield* $(ExperimentalResult.Ok(2));
    *   return a + b;

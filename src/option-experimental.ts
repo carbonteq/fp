@@ -35,7 +35,9 @@ const UNWRAPPED_NONE_ERR = new UnwrappedNone()
 
 const NONE_VAL = Symbol("ExperimentalOption::None")
 
+/** ExperimentalOption alias for presence-without-payload values. */
 export type UnitOption = ExperimentalOption<UNIT>
+/** Extracts the contained value type from an ExperimentalOption type. */
 export type UnwrapOption<T> = T extends ExperimentalOption<infer R> ? R : never
 
 type CombinedOptions<T extends ExperimentalOption<unknown>[]> = {
