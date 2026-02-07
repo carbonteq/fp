@@ -411,6 +411,21 @@ describe("Combining Options", () => {
       const result = Option.any()
       expect(result.isNone()).toBe(true)
     })
+
+    it("should prefer immediate Some over pending Promise<None>", async () => {
+      const pendingNone = Option.fromPromise(
+        new Promise<Option<number>>((resolve) => {
+          setTimeout(() => resolve(Option.None), 10)
+        }),
+      )
+      const immediateSome = Option.Some(Promise.resolve(7))
+
+      const result = Option.any(pendingNone, immediateSome)
+      const resolved = await result.toPromise()
+
+      expect(resolved.isSome()).toBe(true)
+      expect(resolved.unwrap()).toBe(7)
+    })
   })
 })
 

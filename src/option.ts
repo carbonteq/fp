@@ -204,10 +204,40 @@ export class Option<T> {
    * @returns The first Some found, otherwise None
    */
   static any<T>(...options: Option<T>[]): Option<T> {
+    const pending: Option<T>[] = []
+
     for (const opt of options) {
-      if (opt.isSome()) return opt
+      if (opt.isSome()) {
+        if (isPromiseLike(opt.#val)) {
+          pending.push(opt)
+          continue
+        }
+        return opt
+      }
     }
-    return Option.None
+
+    if (pending.length === 0) {
+      return Option.None
+    }
+
+    const ctx: OptionCtx = { promiseNoneSlot: false }
+    const p = Promise.all(
+      pending.map(async (opt) => {
+        const val = await (opt.#val as Promise<unknown>)
+        const isNone = opt.#ctx.promiseNoneSlot || val === NONE_VAL
+        return { isNone, val }
+      }),
+    ).then((settled) => {
+      for (const item of settled) {
+        if (!item.isNone) {
+          return item.val
+        }
+      }
+      ctx.promiseNoneSlot = true
+      return NONE_VAL
+    })
+
+    return new Option(p as T, ctx, "Some")
   }
 
   /**
