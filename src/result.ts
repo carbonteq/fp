@@ -563,10 +563,9 @@ export class Result<T, E> {
    * @param fnErr - Mapper for Err values
    * @returns Result with both branches transformed
    */
-  mapBoth<T2, E2>(fnOk: (val: T) => T2, fnErr: (val: E) => E2): Result<T2, E2>
   mapBoth<T2, E2, In = Awaited<T>>(
     this: Result<Promise<In>, E>,
-    fnOk: (val: In) => T2,
+    fnOk: (val: In) => T2 | Promise<T2>,
     fnErr: (val: E) => E2,
   ): Result<Promise<T2>, E2>
   mapBoth<T2, E2>(
@@ -574,6 +573,11 @@ export class Result<T, E> {
     fnOk: (val: T) => Promise<T2>,
     fnErr: (val: E) => E2,
   ): Result<Promise<T2>, E2>
+  mapBoth<T2, E2>(
+    this: Result<T, E>,
+    fnOk: (val: T) => T2,
+    fnErr: (val: E) => E2,
+  ): Result<T2, E2>
   mapBoth<T2, E2, In = Awaited<T>>(
     fnOk: (val: In) => T2 | Promise<T2>,
     fnErr: (val: E) => E2,

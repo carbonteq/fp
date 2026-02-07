@@ -278,12 +278,23 @@ describe("Result type inference", () => {
     it("should correctly type mapBoth on async Result", () => {
       const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42))
 
-      const mapped: Result<string, string> = r.mapBoth(
+      const mapped: Result<Promise<string>, string> = r.mapBoth(
         (n) => n.toString(),
         (e) => e.message,
       )
 
-      expectTypeOf(mapped).toEqualTypeOf<Result<string, string>>()
+      expectTypeOf(mapped).toEqualTypeOf<Result<Promise<string>, string>>()
+    })
+
+    it("should correctly type mapBoth with async mapper on async Result", () => {
+      const r = Result.Ok<Promise<number>, Error>(Promise.resolve(42))
+
+      const mapped: Result<Promise<string>, string> = r.mapBoth(
+        async (n) => n.toString(),
+        (e) => e.message,
+      )
+
+      expectTypeOf(mapped).toEqualTypeOf<Result<Promise<string>, string>>()
     })
   })
 
