@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test"
-import { matchOpt, matchOption, matchRes, matchResult } from "@/index.js"
+import { match, matchOpt, matchOption, matchRes, matchResult } from "@/index.js"
 import { Option as OldOption } from "@/option.js"
 import { Result as OldResult } from "@/result.js"
 
@@ -44,5 +44,15 @@ describe("match legacy wrappers (old Option/Result)", () => {
   it("matchOption alias works with OldOption", () => {
     const o = OldOption.Some(3)
     expect(matchOption(o, { Some: (v) => v + 1, None: () => 0 })).toBe(4)
+  })
+
+  it("match() rejects Promise-like inner values at runtime", () => {
+    const asyncSome = OldOption.Some(Promise.resolve(1)) as unknown as {
+      readonly _tag: string
+    }
+
+    expect(() => match(asyncSome)).toThrow(
+      "match() does not support Promise-like inner values",
+    )
   })
 })

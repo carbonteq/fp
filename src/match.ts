@@ -9,6 +9,8 @@ type Option<T> = ExperimentalOption<T>
 type LegacyResult<T, E> = OldResult<T, E> | ExperimentalResult<T, E>
 type LegacyOption<T> = OldOption<T> | ExperimentalOption<T>
 
+type MatchableValue = { readonly _tag: string }
+
 // =============================================================================
 // Type Utilities
 // =============================================================================
@@ -31,6 +33,8 @@ type IsExactlyUnknown<T> = unknown extends T
     : false
   : false
 
+type IsPromiseLike<T> = T extends PromiseLike<unknown> ? true : false
+
 /**
  * Extract the inner type from a discriminated union based on tag.
  *
@@ -40,14 +44,20 @@ type IsExactlyUnknown<T> = unknown extends T
 type GetInnerType<T, Tag extends string> = Tag extends "Some"
   ? T extends Option<infer V>
     ? V
+    : T extends OldOption<infer V>
+      ? V
     : unknown
   : Tag extends "Ok"
     ? T extends Result<infer V, unknown>
       ? V
+      : T extends OldResult<infer V, unknown>
+        ? V
       : unknown
     : Tag extends "Err"
       ? T extends Result<unknown, infer E>
         ? E
+        : T extends OldResult<unknown, infer E>
+          ? E
         : unknown
       : ExtractByTag<T, Tag> extends { unwrap(): infer V }
         ? V
@@ -58,6 +68,23 @@ type MatchInput<T, Tag extends string> = Tag extends "Some" | "Ok" | "Err"
     ? ExtractByTag<T, Tag>
     : GetInnerType<T, Tag>
   : ExtractByTag<T, Tag>
+
+type HasPromiseLikePayloadForTag<T, Tag extends string> =
+  Tag extends GetTags<T>
+    ? IsExactlyUnknown<GetInnerType<T, Tag>> extends true
+      ? false
+      : IsPromiseLike<GetInnerType<T, Tag>>
+    : false
+
+type HasPromiseLikePayload<T> = true extends
+  | HasPromiseLikePayloadForTag<T, "Some">
+  | HasPromiseLikePayloadForTag<T, "Ok">
+  | HasPromiseLikePayloadForTag<T, "Err">
+  ? true
+  : false
+
+type SyncMatchable<T extends MatchableValue> =
+  HasPromiseLikePayload<T> extends true ? never : T
 
 /**
  * Represents a compile-time exhaustiveness error.
@@ -387,7 +414,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
  * Uses looser internal types with explicit assertions for public API compliance.
  */
 class MatchBuilderImpl<
-  T extends { readonly _tag: string },
+  T extends MatchableValue,
   _Matched extends string,
   _Returns,
 > {
@@ -440,7 +467,7 @@ class MatchBuilderImpl<
 
   #execute(fallback?: MatchHandler<unknown, unknown>): unknown {
     const value = this.#value
-    const tag = value._tag
+    const tag = getEffectiveTag(value)
 
     // First, try predicate-based cases (when)
     for (const c of this.#cases) {
@@ -523,6 +550,75 @@ export class UnmatchedCaseError extends Error {
   }
 }
 
+function isPromiseLikeValue(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof (value as { then: unknown }).then === "function"
+  )
+}
+
+function getEffectiveTag(value: MatchableValue): string {
+  if (
+    "isNone" in value &&
+    typeof value.isNone === "function" &&
+    value.isNone()
+  ) {
+    return "None"
+  }
+
+  if (
+    "isSome" in value &&
+    typeof value.isSome === "function" &&
+    value.isSome()
+  ) {
+    return "Some"
+  }
+
+  if ("isErr" in value && typeof value.isErr === "function" && value.isErr()) {
+    return "Err"
+  }
+
+  if ("isOk" in value && typeof value.isOk === "function" && value.isOk()) {
+    return "Ok"
+  }
+
+  return value._tag
+}
+
+function hasPromiseLikeInnerValue(value: MatchableValue): boolean {
+  const tag = getEffectiveTag(value)
+
+  if (
+    (tag === "Some" || tag === "Ok") &&
+    "unwrap" in value &&
+    typeof value.unwrap === "function"
+  ) {
+    try {
+      return isPromiseLikeValue((value as { unwrap: () => unknown }).unwrap())
+    } catch {
+      return false
+    }
+  }
+
+  if (
+    tag === "Err" &&
+    "unwrapErr" in value &&
+    typeof value.unwrapErr === "function"
+  ) {
+    try {
+      return isPromiseLikeValue(
+        (value as { unwrapErr: () => unknown }).unwrapErr(),
+      )
+    } catch {
+      return false
+    }
+  }
+
+  return false
+}
+
 // =============================================================================
 // Main Entry Point
 // =============================================================================
@@ -580,9 +676,15 @@ export class UnmatchedCaseError extends Error {
  *   .exhaustive();
  * ```
  */
-export function match<T extends { readonly _tag: string }>(
-  value: T,
+export function match<T extends MatchableValue>(
+  value: SyncMatchable<T>,
 ): MatchBuilder<T, never, never> {
+  if (hasPromiseLikeInnerValue(value)) {
+    throw new TypeError(
+      "match() does not support Promise-like inner values. Await via toPromise() first, then match the settled Option/Result.",
+    )
+  }
+
   return new MatchBuilderImpl(value, []) as MatchBuilder<T, never, never>
 }
 
