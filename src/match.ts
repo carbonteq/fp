@@ -26,7 +26,9 @@ type GetTags<T> = T extends { readonly _tag: infer Tag extends string }
 type ExtractByTag<T, Tag> = T extends { readonly _tag: Tag } ? T : never
 
 type IsExactlyUnknown<T> = unknown extends T
-  ? ([T] extends [unknown] ? true : false)
+  ? [T] extends [unknown]
+    ? true
+    : false
   : false
 
 /**

@@ -582,9 +582,9 @@ export class Result<T, E> {
     fnOk: (val: In) => T2 | Promise<T2>,
     fnErr: (val: E) => E2,
   ): Result<T2, E2> | Result<Promise<T2>, E2> {
-    const mappedOk = (this as { map: (fn: unknown) => unknown }).map(
-      fnOk,
-    ) as Result<T2, E> | Result<Promise<T2>, E>
+    const mappedOk = (this as { map: (fn: unknown) => unknown }).map(fnOk) as
+      | Result<T2, E>
+      | Result<Promise<T2>, E>
     return mappedOk.mapErr(fnErr)
   }
 
