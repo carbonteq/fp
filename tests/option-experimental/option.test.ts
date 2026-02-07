@@ -41,6 +41,34 @@ describe("option unwrapping", () => {
   })
 })
 
+describe("async matching behavior", () => {
+  it("foldAsync propagates Some handler rejection", async () => {
+    const opt = Option.Some(42)
+
+    await expect(
+      opt.foldAsync(
+        async () => {
+          throw new Error("boom")
+        },
+        async () => 0,
+      ),
+    ).rejects.toThrow("boom")
+  })
+
+  it("matchAsync propagates Some handler rejection", async () => {
+    const opt = Option.Some(42)
+
+    await expect(
+      opt.matchAsync({
+        Some: async () => {
+          throw new Error("boom")
+        },
+        None: async () => 0,
+      }),
+    ).rejects.toThrow("boom")
+  })
+})
+
 describe("map behavior", () => {
   it("should double if some", () => {
     const opt = Option.Some(2)

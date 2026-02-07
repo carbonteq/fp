@@ -686,7 +686,7 @@ export class ExperimentalOption<T> {
       return onNone()
     }
 
-    return onSome(this.#val).catch((_) => onNone())
+    return onSome(this.#val)
   }
 
   /**
@@ -722,7 +722,7 @@ export class ExperimentalOption<T> {
     if (this.isNone()) {
       return cases.None()
     }
-    return cases.Some(this.#val).catch((_) => cases.None())
+    return cases.Some(this.#val)
   }
 
   /**

@@ -66,16 +66,17 @@ describe("Option.foldAsync() - advanced", () => {
     expect(spyFn).toHaveBeenCalledWith(42)
   })
 
-  it("should handle async errors in onSome with fallback", async () => {
-    const result = await Option.Some(42).foldAsync(
-      async (_val) => {
-        throw new Error("Async error")
-      },
-      async () => {
-        return 0
-      },
-    )
-    expect(result).toBe(0)
+  it("should propagate async errors in onSome", async () => {
+    await expect(
+      Option.Some(42).foldAsync(
+        async (_val) => {
+          throw new Error("Async error")
+        },
+        async () => {
+          return 0
+        },
+      ),
+    ).rejects.toThrow("Async error")
   })
 
   it("should preserve return types from async branches", async () => {
@@ -116,16 +117,17 @@ describe("Option.matchAsync() - advanced", () => {
     expect(sideEffect).toHaveBeenCalledTimes(1)
   })
 
-  it("should handle async errors in Some handler with fallback", async () => {
-    const result = await Option.Some(42).matchAsync({
-      Some: async (_val) => {
-        throw new Error("Handler error")
-      },
-      None: async () => {
-        return "fallback"
-      },
-    })
-    expect(result).toBe("fallback")
+  it("should propagate async errors in Some handler", async () => {
+    await expect(
+      Option.Some(42).matchAsync({
+        Some: async (_val) => {
+          throw new Error("Handler error")
+        },
+        None: async () => {
+          return "fallback"
+        },
+      }),
+    ).rejects.toThrow("Handler error")
   })
 
   it("should work with async database operations", async () => {
@@ -293,17 +295,17 @@ describe("Result.foldAsync() - advanced", () => {
     expect(spyErr).toHaveBeenCalledWith("fail")
   })
 
-  it("should handle async errors in onOk with fallback", async () => {
-    const result = await Result.Ok(42).foldAsync(
-      async (_val) => {
-        throw new Error("Handler failed")
-      },
-      async (err) => {
-        expect(err).toBeInstanceOf(Error)
-        return 0
-      },
-    )
-    expect(result).toBe(0)
+  it("should propagate async errors in onOk", async () => {
+    await expect(
+      Result.Ok(42).foldAsync(
+        async (_val) => {
+          throw new Error("Handler failed")
+        },
+        async (_err) => {
+          return 0
+        },
+      ),
+    ).rejects.toThrow("Handler failed")
   })
 
   it("should handle complex async workflows", async () => {
@@ -355,16 +357,17 @@ describe("Result.matchAsync() - advanced", () => {
     expect(sideEffect).toHaveBeenCalledTimes(1)
   })
 
-  it("should handle async errors in Ok handler with fallback", async () => {
-    const result = await Result.Ok(42).matchAsync({
-      Ok: async (_val) => {
-        throw new Error("Handler error")
-      },
-      Err: async () => {
-        return "fallback"
-      },
-    })
-    expect(result).toBe("fallback")
+  it("should propagate async errors in Ok handler", async () => {
+    await expect(
+      Result.Ok(42).matchAsync({
+        Ok: async (_val) => {
+          throw new Error("Handler error")
+        },
+        Err: async () => {
+          return "fallback"
+        },
+      }),
+    ).rejects.toThrow("Handler error")
   })
 
   it("should work with async database operations", async () => {

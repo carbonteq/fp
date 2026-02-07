@@ -58,6 +58,34 @@ describe("unwrapping error from result", () => {
   })
 })
 
+describe("async matching behavior", () => {
+  it("foldAsync propagates Ok handler rejection", async () => {
+    const r = Result.Ok<number, string>(42)
+
+    await expect(
+      r.foldAsync(
+        async () => {
+          throw new Error("boom")
+        },
+        async () => "fallback",
+      ),
+    ).rejects.toThrow("boom")
+  })
+
+  it("matchAsync propagates Ok handler rejection", async () => {
+    const r = Result.Ok<number, string>(42)
+
+    await expect(
+      r.matchAsync({
+        Ok: async () => {
+          throw new Error("boom")
+        },
+        Err: async () => "fallback",
+      }),
+    ).rejects.toThrow("boom")
+  })
+})
+
 describe("unwrapping value from result safetly", () => {
   it("on Ok should return a non null value", () => {
     const r = Result.Ok(42)

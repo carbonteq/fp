@@ -439,7 +439,7 @@ export class ExperimentalResult<T, E> {
     if (this.isErr()) {
       return onErr(this.#err)
     }
-    return onOk(this.#val).catch((e) => onErr(e as E))
+    return onOk(this.#val)
   }
 
   /**
@@ -478,7 +478,7 @@ export class ExperimentalResult<T, E> {
     if (this.isErr()) {
       return cases.Err(this.#err)
     }
-    return cases.Ok(this.#val).catch((_) => cases.Err(this.#err))
+    return cases.Ok(this.#val)
   }
 
   /**
