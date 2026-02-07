@@ -251,6 +251,8 @@ export class ExperimentalFlow {
           return value as unknown as Result<T, ExtractWrapError<Eff>>
         }
         nextArg = value.unwrap()
+      } else {
+        throw new Error("ExperimentalFlow.genAdapter yielded unknown type")
       }
     }
   }
@@ -389,6 +391,8 @@ export class ExperimentalFlow {
           return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>
         }
         nextArg = value.unwrap()
+      } else {
+        throw new Error("ExperimentalFlow.asyncGenAdapter yielded unknown type")
       }
     }
   }
