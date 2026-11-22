@@ -22,3 +22,45 @@ export function isCapturedTrace(
 ): value is CapturedTrace<unknown> {
   return value instanceof CapturedTrace
 }
+
+/** Drain suspended cleanup without replacing the runner's primary failure. */
+export function closeGenerator(
+  iterator: Generator<unknown, unknown, unknown>,
+  resolveYield: (yielded: unknown) => unknown,
+): void {
+  try {
+    let state = iterator.return(undefined)
+    while (!state.done) {
+      let value: unknown
+      try {
+        value = resolveYield(state.value)
+      } catch {
+        value = undefined
+      }
+      state = iterator.next(value)
+    }
+  } catch {
+    // Cleanup exceptions must not replace the primary failure.
+  }
+}
+
+/** Await suspended cleanup without replacing the runner's primary failure. */
+export async function closeAsyncGenerator(
+  iterator: AsyncGenerator<unknown, unknown, unknown>,
+  resolveYield: (yielded: unknown) => unknown | PromiseLike<unknown>,
+): Promise<void> {
+  try {
+    let state = await iterator.return(undefined)
+    while (!state.done) {
+      let value: unknown
+      try {
+        value = await resolveYield(state.value)
+      } catch {
+        value = undefined
+      }
+      state = await iterator.next(value)
+    }
+  } catch {
+    // Cleanup exceptions must not replace the primary failure.
+  }
+}

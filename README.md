@@ -245,6 +245,8 @@ import { ExperimentalOption } from "@carbonteq/fp";
 
 `Flow` is the stable generator namespace and works with stable `Option` + `Result`, returning stable `Result`.
 
+Generator composition in all six namespaces (`Option`, `Result`, `Flow`, and their experimental counterparts) runs suspended `finally` cleanup when a yielded effect fails. Cleanup may yield further effects and use their resumed values; async generators wait for cleanup to settle before returning. Once a runner has observed a primary failure or exception, subsequent cleanup failures do not replace it. JavaScript's ordinary `finally` control-flow rules still apply before the runner observes a failure.
+
 ```typescript
 import { Flow, Option, Result, UnwrappedNone } from "@carbonteq/fp";
 

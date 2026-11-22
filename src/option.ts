@@ -1,6 +1,12 @@
 import { Result } from "./result.js"
 import { UNIT } from "./unit.js"
-import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
+import {
+  CapturedTrace,
+  closeAsyncGenerator,
+  closeGenerator,
+  isCapturedTrace,
+  isPromiseLike,
+} from "./utils.js"
 
 type Mapper<T, U> = (val: T) => U
 type AsyncMapper<T, U> = (val: T) => Promise<U>
@@ -951,30 +957,42 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is the Option that was yielded
+        let yielded = next.value as Option<unknown>
+
+        if (isCapturedTrace(yielded)) {
+          yielded = yielded.value as Option<unknown>
+        }
+
+        if (yielded.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value and pass it back to the generator
+        nextArg = yielded.unwrap()
       }
-
-      // next.value is the Option that was yielded
-      let yielded = next.value as Option<unknown>
-
-      if (isCapturedTrace(yielded)) {
-        yielded = yielded.value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          const effect = yielded as Option<unknown>
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      if (yielded.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value and pass it back to the generator
-      nextArg = yielded.unwrap()
     }
 
     return currentResult
@@ -1041,32 +1059,47 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is the OptionYieldWrap that was yielded
+        const wrapped = next.value as OptionYieldWrap<unknown>
+        let option = wrapped.option
+
+        if (isCapturedTrace(option)) {
+          option = (option as CapturedTrace<Option<unknown>>)
+            .value as Option<unknown>
+        }
+
+        if (option.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value and pass it back to the generator
+        nextArg = option.unwrap()
       }
-
-      // next.value is the OptionYieldWrap that was yielded
-      const wrapped = next.value as OptionYieldWrap<unknown>
-      let option = wrapped.option
-
-      if (isCapturedTrace(option)) {
-        option = (option as CapturedTrace<Option<unknown>>)
-          .value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = (yielded as OptionYieldWrap<unknown>).option
+          if (isCapturedTrace(effect)) {
+            effect = effect.value as Option<unknown>
+          }
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      if (option.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value and pass it back to the generator
-      nextArg = option.unwrap()
     }
 
     return currentResult
@@ -1140,32 +1173,45 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is an Option (user awaits promises before yielding)
+        let option = next.value as Option<unknown>
+
+        if (isCapturedTrace(option)) {
+          option = option.value as Option<unknown>
+        }
+
+        option = await option.toPromise()
+
+        if (option.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value
+        nextArg = await option.unwrap()
       }
-
-      // next.value is an Option (user awaits promises before yielding)
-      let option = next.value as Option<unknown>
-
-      if (isCapturedTrace(option)) {
-        option = option.value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = yielded as Option<unknown>
+          effect = await effect.toPromise()
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      option = await option.toPromise()
-
-      if (option.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value
-      nextArg = await option.unwrap()
     }
 
     return currentResult
@@ -1243,34 +1289,50 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is the AsyncOptionYieldWrap that was yielded
+        const wrapped = next.value as AsyncOptionYieldWrap<unknown>
+        let option = await wrapped.option
+
+        if (isCapturedTrace(option)) {
+          option = (option as CapturedTrace<Option<unknown>>)
+            .value as Option<unknown>
+        }
+
+        option = await option.toPromise()
+
+        if (option.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value
+        nextArg = await option.unwrap()
       }
-
-      // next.value is the AsyncOptionYieldWrap that was yielded
-      const wrapped = next.value as AsyncOptionYieldWrap<unknown>
-      let option = await wrapped.option
-
-      if (isCapturedTrace(option)) {
-        option = (option as CapturedTrace<Option<unknown>>)
-          .value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = await (yielded as AsyncOptionYieldWrap<unknown>).option
+          if (isCapturedTrace(effect)) {
+            effect = effect.value as Option<unknown>
+          }
+          effect = await effect.toPromise()
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      option = await option.toPromise()
-
-      if (option.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value
-      nextArg = await option.unwrap()
     }
 
     return currentResult
