@@ -213,45 +213,41 @@ export class Option<T> {
   /**
    * Returns the first Some in the list, or None if all are None.
    *
-   * For async Some values, settlement is awaited and selection follows input order.
+   * Awaits candidates in input order, without waiting for the suffix after success.
    *
    * @template T - Value type
    * @param options - Options to search
    * @returns The first Some found, otherwise None
    */
   static any<T>(...options: Option<T>[]): Option<T> {
-    const pending: Option<T>[] = []
-
+    let hasPending = false
     for (const opt of options) {
-      if (opt.isSome()) {
-        if (isPromiseLike(opt.#val)) {
-          pending.push(opt)
-          continue
-        }
-        return opt
+      if (!opt.isSome()) continue
+      if (isPromiseLike(opt.#val)) {
+        hasPending = true
+        break
       }
+      return opt
     }
+    if (!hasPending) return Option.None
 
-    if (pending.length === 0) {
-      return Option.None
+    // Observe already-created payloads without changing ordered selection.
+    for (const opt of options) {
+      if (isPromiseLike(opt.#val)) {
+        Promise.resolve(opt.#val).then(undefined, () => {})
+      }
     }
 
     const ctx: OptionCtx = { promiseNoneSlot: false }
-    const p = Promise.all(
-      pending.map(async (opt) => {
-        const val = await (opt.#val as Promise<unknown>)
-        const isNone = opt.#ctx.promiseNoneSlot || val === NONE_VAL
-        return { isNone, val }
-      }),
-    ).then((settled) => {
-      for (const item of settled) {
-        if (!item.isNone) {
-          return item.val
-        }
+    const p = (async () => {
+      for (const opt of options) {
+        if (!opt.isSome()) continue
+        const val = await opt.#val
+        if (!opt.#ctx.promiseNoneSlot && val !== NONE_VAL) return val
       }
       ctx.promiseNoneSlot = true
       return NONE_VAL
-    })
+    })()
 
     return new Option(p as T, ctx, "Some")
   }

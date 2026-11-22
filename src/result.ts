@@ -1468,11 +1468,11 @@ export class Result<T, E> {
    * Useful for fallback chains where you want the first success, but want
    * to collect all errors if everything fails.
    *
-   * - First Ok → Returns that Ok immediately
+   * - First settled Ok in input order → Returns that Ok
    * - All Err → `Err([...all errors])`
    *
    * For async Ok values, this waits for settlement and selects the first
-   * successful candidate in input order (not fastest-to-resolve order).
+   * successful candidate in input order, without waiting for the suffix after success.
    *
    * @param results - Variable number of Results to check
    * @returns First Ok found, or Err with array of all errors
@@ -1503,42 +1503,41 @@ export class Result<T, E> {
    */
   static any<U, F>(...results: Result<U, F>[]): Result<U, F[]> {
     const errs: F[] = []
-    const pending: Result<U, F>[] = []
+    let hasPending = false
 
     for (const r of results) {
       if (r.isOk()) {
         if (isPromiseLike(r.#val)) {
-          pending.push(r)
-          continue
+          hasPending = true
+          break
         }
         return r as Result<U, F[]>
       }
-
       errs.push(r.getErr())
     }
 
-    if (pending.length === 0) {
-      return Result.Err(errs)
+    if (!hasPending) return Result.Err(errs)
+
+    // Observe already-created payloads without changing ordered selection.
+    for (const r of results) {
+      if (isPromiseLike(r.#val)) {
+        Promise.resolve(r.#val).then(undefined, () => {})
+      }
     }
 
+    errs.length = 0
     const ctx: ResultCtx<F[]> = { asyncErr: NO_ERR }
-    const p = Promise.all(
-      pending.map(async (r) => {
-        const val = await (r.#val as Promise<unknown>)
-        const failed = r.#ctx.asyncErr !== NO_ERR || val === ERR_VAL
-        return { failed, val, err: r.getErr() }
-      }),
-    ).then((settled) => {
-      for (const item of settled) {
-        if (!item.failed) {
-          return item.val
+    const p = (async () => {
+      for (const r of results) {
+        if (r.isOk()) {
+          const val = await r.#val
+          if (r.#ctx.asyncErr === NO_ERR && val !== ERR_VAL) return val
         }
-        errs.push(item.err)
+        errs.push(r.getErr())
       }
-
       ctx.asyncErr = errs
       return ERR_VAL
-    })
+    })()
 
     return new Result(p as U, undefined as unknown as F[], ctx, "Ok")
   }

@@ -816,6 +816,42 @@ describe("Option type inference", () => {
       // any returns first Some
       expectTypeOf(Option.any(o1, o2)).toEqualTypeOf<Option<number>>()
     })
+
+    it("selects pending successes before later synchronous candidates without waiting for suffixes", async () => {
+      const { promise: first, resolve } = Promise.withResolvers<number>()
+      const selected = Option.any<number | Promise<number>>(
+        Option.Some(first),
+        Option.Some(2),
+        Option.Some(new Promise<number>(() => {})),
+      )
+      resolve(1)
+      expect(await selected.unwrap()).toBe(1)
+    })
+
+    it("selects a later synchronous candidate after pending absence", async () => {
+      const { promise, resolve } = Promise.withResolvers<Option<number>>()
+      const first = Option.fromPromise(promise)
+      const selected = Option.any<number | Promise<number>>(first, Option.Some(2))
+      resolve(Option.None)
+      expect(await selected.unwrap()).toBe(2)
+    })
+
+    it("preserves an encountered raw rejection and observes suffix rejections", async () => {
+      const reason = new Error("raw")
+      const { promise: first, reject } = Promise.withResolvers<number>()
+      const selected = Option.any(Option.Some(first), Option.Some(Promise.reject(new Error("suffix"))))
+      const outcome = Promise.resolve(selected.unwrap()).then(
+        () => undefined,
+        (error) => error,
+      )
+      reject(reason)
+      expect(await outcome).toBe(reason)
+    })
+
+    it("keeps the synchronous fast path", () => {
+      const first = Option.Some(1)
+      expect(Option.any(first, Option.Some(2))).toBe(first)
+    })
   })
 
   describe("complex chains", () => {

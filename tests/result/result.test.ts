@@ -501,6 +501,55 @@ describe("Result type inference", () => {
       expectTypeOf(Result.any(r1, r2)).toEqualTypeOf<Result<number, Error[]>>()
     })
 
+    it("selects pending successes before later synchronous candidates without waiting for suffixes", async () => {
+      const { promise: first, resolve } = Promise.withResolvers<number>()
+      const selected = Result.any<number | Promise<number>, string>(
+        Result.Ok(first),
+        Result.Ok(2),
+        Result.Ok(new Promise<number>(() => {})),
+      )
+      resolve(1)
+      expect(await selected.unwrap()).toBe(1)
+    })
+
+    it("selects a later synchronous candidate after pending failure", async () => {
+      const { promise, resolve } = Promise.withResolvers<Result<number, string>>()
+      const first = Result.fromPromise(promise)
+      const selected = Result.any<number | Promise<number>, string>(first, Result.Ok(2))
+      resolve(Result.Err("first"))
+      expect(await selected.unwrap()).toBe(2)
+    })
+
+    it("collects synchronous and pending failures in original input order", async () => {
+      const { promise, resolve } = Promise.withResolvers<Result<number, string>>()
+      const first = Result.fromPromise(promise)
+      const selected = Result.any(first, Result.Err("second"), Result.fromPromise(Promise.resolve(Result.Err<string, number>("third"))))
+      const settled = selected.unwrap().then(
+        () => undefined,
+        () => undefined,
+      )
+      resolve(Result.Err("first"))
+      await settled
+      expect(await selected.unwrapErr()).toEqual(["first", "second", "third"])
+    })
+
+    it("preserves an encountered raw rejection and observes suffix rejections", async () => {
+      const reason = new Error("raw")
+      const { promise: first, reject } = Promise.withResolvers<number>()
+      const selected = Result.any(Result.Ok(first), Result.Ok(Promise.reject(new Error("suffix"))))
+      const outcome = Promise.resolve(selected.unwrap()).then(
+        () => undefined,
+        (error) => error,
+      )
+      reject(reason)
+      expect(await outcome).toBe(reason)
+    })
+
+    it("keeps the synchronous fast path", () => {
+      const first = Result.Ok(1)
+      expect(Result.any(first, Result.Ok(2))).toBe(first)
+    })
+
     it("should correctly type fromPromise", () => {
       const promiseResult = Promise.resolve(Result.Ok<number, Error>(42))
       expectTypeOf(Result.fromPromise(promiseResult)).toEqualTypeOf<
