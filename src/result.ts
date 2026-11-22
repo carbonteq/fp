@@ -606,6 +606,8 @@ export class Result<T, E> {
    * returns that Result directly. If Err, propagates the error unchanged.
    *
    * Error types are unified: `Result<U, E | E2>`.
+   * Mapper throws propagate synchronously for sync inputs and reject the
+   * returned promise chain for promise inputs; they do not become Err.
    *
    * @param fn - Function that returns a Result
    * @returns Result<U, E | E2> from the function or propagated error
@@ -682,20 +684,17 @@ export class Result<T, E> {
     const newCtx: ResultCtx<E | E2> = { asyncErr: NO_ERR }
 
     if (isPromiseLike(curr)) {
-      const newP = new Promise<U>((resolve, reject) => {
-        curr.then((v) => {
-          if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
-            newCtx.asyncErr =
-              parentCtx.asyncErr !== NO_ERR
-                ? (parentCtx.asyncErr as E | E2)
-                : (parentErr as E | E2)
-            return resolve(ERR_VAL as U)
-          }
+      const newP = curr.then((v) => {
+        if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+          newCtx.asyncErr =
+            parentCtx.asyncErr !== NO_ERR
+              ? (parentCtx.asyncErr as E | E2)
+              : (parentErr as E | E2)
+          return ERR_VAL as U
+        }
 
-          const mapped = fn(v as In)
-          const p = Result.flatMapHelper<U, E, E2, T>(newCtx, mapped)
-          resolve(p)
-        }, reject)
+        const mapped = fn(v as In)
+        return Result.flatMapHelper<U, E, E2, T>(newCtx, mapped)
       })
 
       return new Result(newP, parentErr as E | E2, newCtx, "Ok")

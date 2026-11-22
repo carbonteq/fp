@@ -499,6 +499,8 @@ export class Option<T> {
    *
    * If None, returns None without calling the mapper. Supports async values
    * and async mappers; returns Option<Promise<U>> when async is involved.
+   * Mapper throws propagate synchronously for sync inputs and reject the
+   * returned promise chain for promise inputs; they do not become None.
    *
    * @template U - Result value type
    * @param mapper - Function returning an Option
@@ -509,11 +511,11 @@ export class Option<T> {
   flatMap<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     mapper: AsyncFlatMapper<Curr, U>,
-  ): Option<Promise<U>>
+  ): Option<Promise<Awaited<U>>>
   flatMap<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     mapper: FlatMapper<Curr, U>,
-  ): Option<Promise<U>>
+  ): Option<Promise<Awaited<U>>>
   flatMap<U>(this: Option<T>, mapper: AsyncFlatMapper<T, U>): Option<Promise<U>>
   flatMap<U>(this: Option<T>, mapper: FlatMapper<T, U>): Option<U>
   flatMap<U, Curr = Awaited<T>>(
@@ -527,32 +529,19 @@ export class Option<T> {
       const p = curr as Promise<Curr>
       // Create a NEW context for this branch to avoid cross-branch mutation
       const newCtx: OptionCtx = { promiseNoneSlot: false }
-      const castedNone = NONE_VAL as unknown as Promise<U>
-      const newP = new Promise<U>((resolve, reject) => {
-        p.then((innerVal) => {
-          if (innerVal === NONE_VAL) {
-            newCtx.promiseNoneSlot = true
-            resolve(castedNone)
-          } else {
-            const r = mapper(innerVal)
-            if (isPromiseLike(r)) {
-              r.then((innerOpt) => {
-                if (innerOpt.isNone()) {
-                  newCtx.promiseNoneSlot = true
-                }
-                resolve(innerOpt.#val)
-              }, reject)
-            } else {
-              if (r.isNone()) {
-                newCtx.promiseNoneSlot = true
-                resolve(NONE_VAL as U)
-              } else {
-                resolve(r.#val)
-              }
-            }
-          }
-        }, reject)
-      })
+      const newP = p.then(async (innerVal) => {
+        if (innerVal === NONE_VAL) {
+          newCtx.promiseNoneSlot = true
+          return NONE_VAL as U
+        }
+        const mapped = await mapper(innerVal)
+        const value = await mapped.#val
+        if (mapped.isNone() || value === NONE_VAL) {
+          newCtx.promiseNoneSlot = true
+          return NONE_VAL as U
+        }
+        return value
+      }) as Promise<U>
       return new Option(newP, newCtx, "Some")
     }
 

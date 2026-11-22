@@ -33,6 +33,28 @@ const asyncErrResPromiseIt = async (
   Result.Err(Promise.resolve(new DummyError()))
 
 describe("Result.flatMap behavior", () => {
+  it("rejects when a promise-input mapper throws", async () => {
+    const error = new Error("mapper failed")
+    const result = Result.Ok(Promise.resolve(1)).flatMap(() => {
+      throw error
+    })
+
+    await expect(result.toPromise()).rejects.toBe(error)
+  }, 1000)
+
+  it("preserves input and async mapper rejection identity", async () => {
+    const error = new Error("rejected")
+    const mapper = mock(() => Result.Ok(2))
+    const rejectedInput = Result.Ok(Promise.reject<number>(error)).flatMap(mapper)
+    await expect(rejectedInput.toPromise()).rejects.toBe(error)
+    expect(mapper).not.toHaveBeenCalled()
+
+    const rejectedMapper = Result.Ok(Promise.resolve(1)).flatMap(async () => {
+      throw error
+    })
+    await expect(rejectedMapper.toPromise()).rejects.toBe(error)
+  })
+
   it("should apply Promise<Result<Promise<T>, E>> on Result<Promise<T>, E> correctly", async () => {
     const r = Result.Ok(Promise.resolve(2))
     const mockedDouble = mock(asyncDoubleResPromiseIt)

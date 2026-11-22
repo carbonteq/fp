@@ -1,5 +1,9 @@
 # @carbonteq/fp
 
+## Unreleased
+
+- Fix promise-backed Option and Result `flatMap` chains hanging when a mapper throws, preserving rejection identity and pending mapped absence. Option's promise-input return types now reflect promise flattening.
+
 ## 0.10.0
 
 ### Minor Changes
