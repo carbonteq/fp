@@ -1813,6 +1813,7 @@ export class Result<T, E> {
    * Returns an optimistic `Ok(Promise<T>)`. If the inner promise fails later,
    * the failure is tracked internally and surfaces when you settle/unwrap
    * (`toPromise`, `unwrap`, `unwrapErr`, etc.).
+   * Promise-backed inner Results are settled before their failure is propagated.
    *
    * @template U - Success value type
    * @template F - Error type
@@ -1824,18 +1825,9 @@ export class Result<T, E> {
     promise: Promise<Result<U, F>>,
   ): Result<Promise<U>, F> {
     const ctx: ResultCtx<F> = { asyncErr: NO_ERR }
-    const p = promise.then((innerResult) => {
-      if (innerResult.isErr()) {
-        // Access error via unwrapErr since getErr is private
-        try {
-          ctx.asyncErr = innerResult.unwrapErr()
-        } catch {
-          // Should not happen for Err result
-        }
-        return ERR_VAL as U
-      }
-      return innerResult.unwrap()
-    })
+    const p = promise.then((innerResult) =>
+      Result.flatMapInnerHelper(ctx, innerResult),
+    )
 
     return Result[RESULT_INTERNAL].create<Promise<U>, F>(
       p,
