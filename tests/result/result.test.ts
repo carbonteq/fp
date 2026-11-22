@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test"
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "@/errors"
-import type { Option } from "@/option.js"
+import { type Option, UnwrappedNone } from "@/option.js"
 import { Result } from "@/result.js"
 
 class DummyError extends Error {
@@ -9,6 +9,54 @@ class DummyError extends Error {
     this.name = "DummyError"
   }
 }
+
+describe("Result.toOption", () => {
+  it("preserves pending Err and skips success mappers before and after settlement", async () => {
+    const { promise, resolve } = Promise.withResolvers<Result<number, Error>>()
+    const source = Result.fromPromise(promise)
+    const converted = source.toOption()
+    const mapper = mock((value: number) => value * 2)
+    const mapped = converted.map(mapper)
+    expectTypeOf(converted).toEqualTypeOf<Option<Promise<number>>>()
+    const unwrapRejection = converted.unwrap().catch((reason: unknown) => reason)
+
+    resolve(Result.Err(new Error("failed")))
+    expect((await converted.toPromise()).isNone()).toBe(true)
+    expect(await unwrapRejection).toBeInstanceOf(UnwrappedNone)
+    expect(await converted.safeUnwrap()).toBeNull()
+    expect((await mapped.toPromise()).isNone()).toBe(true)
+    expect(mapper).not.toHaveBeenCalled()
+    expect((await source.toOption().toPromise()).isNone()).toBe(true)
+  })
+
+  it("preserves pending successes, including null and undefined", async () => {
+    for (const value of [42, null, undefined]) {
+      const { promise, resolve } =
+        Promise.withResolvers<Result<typeof value, string>>()
+      const source = Result.fromPromise(promise)
+      const converted = source.toOption()
+      resolve(Result.Ok(value))
+      const settled = await converted.toPromise()
+      expect(settled.isSome()).toBe(true)
+      expect(settled.unwrap()).toBe(value)
+      expect(await converted.unwrap()).toBe(value)
+      expect((await source.toOption().toPromise()).unwrap()).toBe(value)
+    }
+  })
+
+  it("propagates rejected payloads unchanged", async () => {
+    const error = new Error("rejected")
+    const converted = Result.Ok(Promise.reject(error)).toOption()
+    await expect(converted.toPromise()).rejects.toBe(error)
+    await expect(converted.unwrap()).rejects.toBe(error)
+  })
+
+  it("keeps synchronous conversions synchronous", () => {
+    expect(Result.Ok(undefined).toOption().unwrap()).toBeUndefined()
+    expect(Result.Ok(null).toOption().unwrap()).toBeNull()
+    expect(Result.Err("failed").toOption().isNone()).toBe(true)
+  })
+})
 
 describe("Result construction", () => {
   it("ok result", () => {

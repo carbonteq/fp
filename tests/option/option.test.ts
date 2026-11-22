@@ -11,6 +11,55 @@ const asyncDoubleIt = async (n: number) => n * 2
 const asyncDoubleOptIt = async (n: number) => Option.Some(n * 2)
 const asyncOptNone = async (_n: number): Promise<Option<number>> => Option.None
 
+describe("Option.toResult", () => {
+  it("preserves pending None and skips success mappers before and after settlement", async () => {
+    const { promise, resolve } = Promise.withResolvers<Option<number>>()
+    const source = Option.fromPromise(promise)
+    const error = new Error("absent")
+    const converted = source.toResult(error)
+    const mapper = mock((value: number) => value * 2)
+    const mapped = converted.map(mapper)
+    expectTypeOf(converted).toEqualTypeOf<Result<Promise<number>, Error>>()
+    const unwrapRejection = converted.unwrap().catch((reason: unknown) => reason)
+
+    resolve(Option.None)
+    expect((await converted.toPromise()).unwrapErr()).toBe(error)
+    expect(await unwrapRejection).toBe(error)
+    expect(await converted.safeUnwrap()).toBeNull()
+    expect((await mapped.toPromise()).unwrapErr()).toBe(error)
+    expect(mapper).not.toHaveBeenCalled()
+    expect((await source.toResult(error).toPromise()).unwrapErr()).toBe(error)
+  })
+
+  it("preserves pending successes, including null and undefined", async () => {
+    for (const value of [42, null, undefined]) {
+      const { promise, resolve } = Promise.withResolvers<Option<typeof value>>()
+      const source = Option.fromPromise(promise)
+      const converted = source.toResult("absent")
+      resolve(Option.Some(value))
+      const settled = await converted.toPromise()
+      expect(settled.isOk()).toBe(true)
+      expect(settled.unwrap()).toBe(value)
+      expect(await converted.unwrap()).toBe(value)
+      expect((await source.toResult("absent").toPromise()).unwrap()).toBe(value)
+    }
+  })
+
+  it("propagates rejected payloads unchanged", async () => {
+    const error = new Error("rejected")
+    const converted = Option.Some(Promise.reject(error)).toResult("absent")
+    await expect(converted.toPromise()).rejects.toBe(error)
+    await expect(converted.unwrap()).rejects.toBe(error)
+  })
+
+  it("keeps synchronous conversions synchronous", () => {
+    expect(Option.Some(undefined).toResult("absent").unwrap()).toBeUndefined()
+    expect(Option.Some(null).toResult("absent").unwrap()).toBeNull()
+    const error = new Error("absent")
+    expect(Option.None.toResult(error).unwrapErr()).toBe(error)
+  })
+})
+
 describe("option construction", () => {
   it("should construct Some opt", () => {
     const opt = Option.Some(123456)

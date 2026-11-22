@@ -1664,6 +1664,7 @@ export class Result<T, E> {
    * - Err(error) → None
    *
    * Use when you only care about presence/absence of a value, not the error.
+   * Promise-backed Results preserve settled failure and propagate rejections.
    *
    * @returns Option<T> - Some if Ok, None if Err
    *
@@ -1680,6 +1681,13 @@ export class Result<T, E> {
    * @see Option.toResult
    */
   toOption(): Option<T> {
+    if (isPromiseLike(this.#val)) {
+      return Option.fromPromise(
+        this.toPromise().then((result) =>
+          result.isErr() ? Option.None : Option.Some(result.unwrap()),
+        ),
+      ) as unknown as Option<T>
+    }
     if (this.isErr()) return Option.None
     return Option.Some(this.#val)
   }

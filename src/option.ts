@@ -757,12 +757,22 @@ export class Option<T> {
 
   /**
    * Converts this Option to a Result, using the provided error for None.
+   * Promise-backed Options preserve settled absence and propagate rejections.
    *
    * @template E - Error type
    * @param error - Error value for None
    * @returns Ok with value when Some, otherwise Err with error
    */
   toResult<E>(error: E): Result<T, E> {
+    if (isPromiseLike(this.#val)) {
+      return Result.fromPromise(
+        this.toPromise<Awaited<T>>().then((option) =>
+          option.isNone()
+            ? Result.Err<E, Awaited<T>>(error)
+            : Result.Ok<Awaited<T>, E>(option.unwrap()),
+        ),
+      ) as unknown as Result<T, E>
+    }
     if (this.isNone()) {
       return Result.Err(error)
     }
