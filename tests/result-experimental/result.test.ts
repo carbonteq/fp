@@ -555,10 +555,10 @@ describe("Result type inference", () => {
       >()
     })
 
-    it("should correctly type validate with async validators", () => {
+    it("should correctly type validateAsync with async validators", () => {
       const r = Result.Ok<number, Error>(42)
 
-      const validated = r.validate([
+      const validated = r.validateAsync([
         async (n) => Result.Ok<boolean, ErrorA>(n > 0),
         async (n) => Result.Ok<boolean, ErrorB>(n < 100),
       ])
@@ -566,6 +566,13 @@ describe("Result type inference", () => {
       expectTypeOf(validated).toEqualTypeOf<
         Promise<Result<number, Error | (ErrorA | ErrorB)[]>>
       >()
+    })
+
+    it("should reject async validators in validate at compile time", () => {
+      if (false) {
+        // @ts-expect-error Async validators must use validateAsync.
+        Result.Ok(42).validate([async (n) => Result.Ok(n > 0)])
+      }
     })
   })
 })

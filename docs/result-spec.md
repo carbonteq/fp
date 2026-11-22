@@ -574,7 +574,7 @@ validateAsync<VE>(
 ```
 
 // Form validation
-Ok(formData).validate([
+Ok(formData).validateAsync([
   validateEmail,
   validatePassword,
   validateUsername,

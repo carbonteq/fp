@@ -6,7 +6,6 @@ import {
   closeAsyncGenerator,
   closeGenerator,
   isCapturedTrace,
-  isPromiseLike,
 } from "./utils.js"
 
 /** ExperimentalResult alias for success-without-payload operations. */
@@ -1015,8 +1014,7 @@ export class ExperimentalResult<T, E> {
    *
    * If the Result is Err, returns it unchanged without running validators.
    *
-   * Supports both sync and async validators. If any validator is async,
-   * returns `Promise<Result<T, E | VE[]>>`.
+   * Accepts synchronous validators only. Use `validateAsync` for async validators.
    *
    * @param validators - Array of validator functions that return Result
    * @returns Result<T, E | VE[]> with original value or array of all errors
@@ -1035,7 +1033,7 @@ export class ExperimentalResult<T, E> {
    * ExperimentalResult.Err("init").validate(validators);           // Err("init") - validators not run
    *
    * // With async validators (returns Promise<Result<...>>)
-   * await ExperimentalResult.Ok(data).validate([
+   * await ExperimentalResult.Ok(data).validateAsync([
    *   async (d) => await validateEmail(d),
    *   async (d) => await validatePhone(d),
    * ]);
@@ -1046,41 +1044,12 @@ export class ExperimentalResult<T, E> {
    */
   validate<VE extends unknown[]>(validators: {
     [K in keyof VE]: (val: T) => ExperimentalResult<unknown, VE[K]>
-  }): ExperimentalResult<T, E | VE[number][]>
-  validate<VE extends unknown[]>(validators: {
-    [K in keyof VE]: (val: T) => Promise<ExperimentalResult<unknown, VE[K]>>
-  }): Promise<ExperimentalResult<T, E | VE[number][]>>
-  validate<VE extends unknown[]>(validators: {
-    [K in keyof VE]:
-      | ((val: T) => ExperimentalResult<unknown, VE[K]>)
-      | ((val: T) => Promise<ExperimentalResult<unknown, VE[K]>>)
-  }):
-    | ExperimentalResult<T, E | VE[number][]>
-    | Promise<ExperimentalResult<T, E | VE[number][]>> {
+  }): ExperimentalResult<T, E | VE[number][]> {
     if (this.isErr()) return this as ExperimentalResult<T, VE[number][]>
 
-    const baseVal = this.#val as T
-    const results = validators.map((v) => v(baseVal))
-
-    // Check if any result is promise-like (includes thenables)
-    if (results.some((r) => isPromiseLike(r))) {
-      return Promise.all(results).then((resolved) => {
-        const errs: unknown[] = []
-        for (const r of resolved as ExperimentalResult<unknown, unknown>[]) {
-          if (r.isErr()) errs.push(r.unwrapErr())
-        }
-        if (errs.length > 0) {
-          return ExperimentalResult.Err(
-            errs as VE[number][],
-          ) as ExperimentalResult<T, VE[number][]>
-        }
-        return this as ExperimentalResult<T, VE[number][]>
-      })
-    }
-
-    const syncResults = results as ExperimentalResult<unknown, unknown>[]
-    const errs: unknown[] = []
-    for (const r of syncResults) {
+    const errs: VE[number][] = []
+    for (const validator of validators) {
+      const r = validator(this.#val)
       if (r.isErr()) errs.push(r.#err)
     }
     if (errs.length > 0) {

@@ -227,6 +227,8 @@ const label = match(settled)
 
 `ExperimentalResult` differs from the stable `Result` by providing explicit async methods like `mapAsync` and `flatMapAsync` that return `Promise<ExperimentalResult<T, E>>` directly, rather than returning `Result<Promise<T>, E>` and requiring `toPromise()`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) used by `Flow`.
 
+`ExperimentalResult.validate` now accepts synchronous validators only. Migrate `await result.validate([asyncValidator])` to `await result.validateAsync([asyncValidator])`. `validateAsync` always returns a Promise, including when the input is already Err. Stable `Result.validate` is unchanged.
+
 ```typescript
 import { ExperimentalResult } from "@carbonteq/fp";
 ```
