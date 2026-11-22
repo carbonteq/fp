@@ -4,6 +4,7 @@
 
 - Fix promise-backed Option and Result `flatMap` chains hanging when a mapper throws, preserving rejection identity and pending mapped absence. Option's promise-input return types now reflect promise flattening.
 - Preserve pending absence and failure in stable `Option.toResult` and `Result.toOption` conversions without exposing internal sentinels as successes.
+- Settle promise-backed Options and Results before async generator short-circuit checks, preserving pending failures and raw rejections.
 
 ## 0.10.0
 

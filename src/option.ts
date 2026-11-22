@@ -1126,6 +1126,7 @@ export class Option<T> {
    * }
    * ```
    *
+   * Settles promise-backed Options before checking for None; raw rejections propagate.
    * @see {@link asyncGenAdapter} for better type inference and cleaner syntax
    * @see {@link gen} for synchronous operations
    */
@@ -1155,6 +1156,8 @@ export class Option<T> {
         option = option.value as Option<unknown>
       }
 
+      option = await option.toPromise()
+
       if (option.isNone()) {
         // Early termination on None - return singleton None
         currentResult = Option.None
@@ -1173,6 +1176,7 @@ export class Option<T> {
    *
    * The `$` adapter handles both sync `Option<T>` and async `Promise<Option<T>>`,
    * automatically awaiting promises. This provides cleaner syntax for mixed sync/async workflows.
+   * Settles promise-backed Options before checking for None; raw rejections propagate.
    *
    * Short-circuits on first `None`, returning singleton `None`. Uses async iteration
    * instead of recursion to avoid stack overflow on deep chains.
@@ -1256,6 +1260,8 @@ export class Option<T> {
         option = (option as CapturedTrace<Option<unknown>>)
           .value as Option<unknown>
       }
+
+      option = await option.toPromise()
 
       if (option.isNone()) {
         // Early termination on None - return singleton None

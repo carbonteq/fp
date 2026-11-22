@@ -2082,6 +2082,7 @@ export class Result<T, E> {
   /**
    * Async generator-based syntax for chaining Result operations (simplified, no adapter).
    * Use yield* with Result values directly. For Promise<Result<T, E>>, await first then yield*.
+   * Settles promise-backed Results before checking for Err; raw rejections propagate.
    *
    * Short-circuits on first Err, returning that error. Uses async iteration instead of
    * recursion to avoid stack overflow on deep chains.
@@ -2128,6 +2129,8 @@ export class Result<T, E> {
         result = result.value as Result<unknown, unknown>
       }
 
+      result = await result.toPromise()
+
       if (result.isErr()) {
         const err = result.unwrapErr()
         if (stack && err instanceof Error) {
@@ -2153,6 +2156,7 @@ export class Result<T, E> {
    * Async generator-based syntax for chaining Result operations (with adapter).
    * Uses an adapter function ($) for improved type inference.
    * Supports both Result<T, E> and Promise<Result<T, E>> for flexibility.
+   * Settles promise-backed Results before checking for Err; raw rejections propagate.
    *
    * Short-circuits on first Err, returning that error. Uses async iteration instead of
    * recursion to avoid stack overflow on deep chains.
@@ -2214,6 +2218,8 @@ export class Result<T, E> {
       } else {
         result = await wrapped.result
       }
+
+      result = await result.toPromise()
 
       if (result.isErr()) {
         const err = result.unwrapErr()
