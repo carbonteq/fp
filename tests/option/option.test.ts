@@ -11,6 +11,166 @@ const asyncDoubleIt = async (n: number) => n * 2
 const asyncDoubleOptIt = async (n: number) => Option.Some(n * 2)
 const asyncOptNone = async (_n: number): Promise<Option<number>> => Option.None
 
+describe("Option fallbacks", () => {
+  it("waits for pending None and preserves promised shape after settlement", async () => {
+    const { promise, resolve } = Promise.withResolvers<Option<number>>()
+    const pendingNone = Option.fromPromise(promise)
+    const plainFactory = mock(() => 3)
+    const promisedFactory = mock(() => Promise.resolve(4))
+    const plain = pendingNone.unwrapOr(1)
+    const promised = pendingNone.unwrapOr(Promise.resolve(2))
+    const lazyPlain = pendingNone.unwrapOrElse(plainFactory)
+    const lazyPromised = pendingNone.unwrapOrElse(promisedFactory)
+    expectTypeOf(plain).toEqualTypeOf<number | Promise<number>>()
+    expectTypeOf(promised).toEqualTypeOf<Promise<number>>()
+    expectTypeOf(lazyPlain).toEqualTypeOf<number | Promise<number>>()
+    expectTypeOf(lazyPromised).toEqualTypeOf<Promise<number>>()
+    expect(plain).toBeInstanceOf(Promise)
+    expect(promised).toBeInstanceOf(Promise)
+    expect(plainFactory).not.toHaveBeenCalled()
+    expect(promisedFactory).not.toHaveBeenCalled()
+    resolve(Option.None)
+    expect(await Promise.all([plain, promised, lazyPlain, lazyPromised])).toEqual([
+      1, 2, 3, 4,
+    ])
+    expect(plainFactory).toHaveBeenCalledTimes(1)
+    expect(promisedFactory).toHaveBeenCalledTimes(1)
+
+    const settledFactory = mock(() => 7)
+    const settledPromisedFactory = mock(() => Promise.resolve(8))
+    const settled = [
+      pendingNone.unwrapOr(5),
+      pendingNone.unwrapOr(Promise.resolve(6)),
+      pendingNone.unwrapOrElse(settledFactory),
+      pendingNone.unwrapOrElse(settledPromisedFactory),
+    ]
+    for (const value of settled) expect(value).toBeInstanceOf(Promise)
+    expect(await Promise.all(settled)).toEqual([5, 6, 7, 8])
+    expect(settledFactory).toHaveBeenCalledTimes(1)
+    expect(settledPromisedFactory).toHaveBeenCalledTimes(1)
+  })
+
+  it("skips factories for Some and keeps synchronous receivers synchronous", async () => {
+    const factory = mock(() => 9)
+    const promisedFactory = mock(() => Promise.resolve(9))
+    const some = Option.Some(Promise.resolve(42))
+    expect(await some.unwrapOr(0)).toBe(42)
+    expect(await some.unwrapOrElse(factory)).toBe(42)
+    expect(await some.unwrapOrElse(promisedFactory)).toBe(42)
+    const syncSome = Option.Some(42)
+    const syncNone: Option<number> = Option.None
+    expect(syncSome.unwrapOr(0)).toBe(42)
+    expect(syncSome.unwrapOrElse(factory)).toBe(42)
+    expect(factory).not.toHaveBeenCalled()
+    expect(promisedFactory).not.toHaveBeenCalled()
+    expect(syncNone.unwrapOr(0)).toBe(0)
+    expect(syncNone.unwrapOrElse(factory)).toBe(9)
+    expect(factory).toHaveBeenCalledTimes(1)
+    expectTypeOf(syncSome.unwrapOr(0)).toEqualTypeOf<number>()
+    expectTypeOf(syncNone.unwrapOrElse(() => 0)).toEqualTypeOf<number>()
+  })
+
+  it("retains the promise payload type after narrowing settled absence", async () => {
+    const source = Option.fromPromise(Promise.resolve<Option<number>>(Option.None))
+    await source.toPromise()
+    expect(source.isNone()).toBe(true)
+    if (source.isNone()) {
+      const fallback = source.unwrapOr(0)
+      const lazyFallback = source.unwrapOrElse(() => 1)
+      expectTypeOf(fallback).toEqualTypeOf<number | Promise<number>>()
+      expectTypeOf(lazyFallback).toEqualTypeOf<number | Promise<number>>()
+      expectTypeOf(source.unwrapOr(Promise.resolve(2))).toEqualTypeOf<Promise<number>>()
+      expectTypeOf(source.unwrapOrElse(() => Promise.resolve(3))).toEqualTypeOf<Promise<number>>()
+      expect(fallback).toBeInstanceOf(Promise)
+      expect(lazyFallback).toBeInstanceOf(Promise)
+      expect(await fallback).toBe(0)
+      expect(await lazyFallback).toBe(1)
+      const invalidNarrowedUsage = () => {
+        // @ts-expect-error Settled absence does not remove the stored promise.
+        source.unwrapOr(0).toFixed()
+        // @ts-expect-error A lazy fallback also retains the possible promise.
+        source.unwrapOrElse(() => 0).toFixed()
+      }
+      void invalidNarrowedUsage
+    }
+    const none = Option.None
+    if (none.isNone()) {
+      expectTypeOf(none.unwrapOr(0)).toEqualTypeOf<number>()
+      expectTypeOf(none.unwrapOrElse(() => 1)).toEqualTypeOf<number>()
+      expect(none.unwrapOr(0)).toBe(0)
+      expect(none.unwrapOrElse(() => 1)).toBe(1)
+    }
+  })
+
+  it("types direct and widened None without promising a synchronous fallback", async () => {
+    const widenedNone: Option<Promise<number>> = Option.None
+    const plain = widenedNone.unwrapOr(1)
+    const lazy = widenedNone.unwrapOrElse(() => 2)
+    const promised = widenedNone.unwrapOr(Promise.resolve(3))
+    const lazyPromised = widenedNone.unwrapOrElse(() => Promise.resolve(4))
+    expectTypeOf(plain).toEqualTypeOf<number | Promise<number>>()
+    expectTypeOf(lazy).toEqualTypeOf<number | Promise<number>>()
+    expectTypeOf(promised).toEqualTypeOf<Promise<number>>()
+    expectTypeOf(lazyPromised).toEqualTypeOf<Promise<number>>()
+    expect(plain).toBe(1)
+    expect(lazy).toBe(2)
+    expect(promised).toBeInstanceOf(Promise)
+    expect(lazyPromised).toBeInstanceOf(Promise)
+    expect(await promised).toBe(3)
+    expect(await lazyPromised).toBe(4)
+    const none: Option<never> = Option.None
+    expectTypeOf(none.unwrapOr("missing")).toEqualTypeOf<string>()
+    expectTypeOf(none.unwrapOrElse(() => "missing")).toEqualTypeOf<string>()
+    expectTypeOf(none.unwrapOr(Promise.resolve(0))).toEqualTypeOf<Promise<number>>()
+    expectTypeOf(none.unwrapOrElse(() => Promise.resolve(0))).toEqualTypeOf<
+      Promise<number>
+    >()
+    const union: number | Promise<number> = plain
+    expectTypeOf(widenedNone.unwrapOr(union)).toEqualTypeOf<
+      number | Promise<number>
+    >()
+    expectTypeOf(widenedNone.unwrapOrElse(() => union)).toEqualTypeOf<
+      number | Promise<number>
+    >()
+
+    const invalidFallbacks = (asyncOption: Option<Promise<number>>, syncOption: Option<number>) => {
+      // @ts-expect-error A resolved fallback must match the resolved payload.
+      asyncOption.unwrapOr("wrong")
+      // @ts-expect-error A promised fallback must match the resolved payload.
+      asyncOption.unwrapOr(Promise.resolve("wrong"))
+      // @ts-expect-error A factory must return the resolved payload type.
+      asyncOption.unwrapOrElse(() => "wrong")
+      // @ts-expect-error A promised factory must match the resolved payload.
+      asyncOption.unwrapOrElse(() => Promise.resolve("wrong"))
+      // @ts-expect-error Synchronous options do not accept promised fallbacks.
+      syncOption.unwrapOr(Promise.resolve(0))
+      // @ts-expect-error Synchronous options retain their payload type.
+      syncOption.unwrapOrElse(() => "wrong")
+      const nested: Option<Promise<Promise<number>>> = Option.None
+      expectTypeOf(nested.unwrapOr(0)).toEqualTypeOf<number | Promise<number>>()
+      expectTypeOf(nested.unwrapOr(Promise.resolve(0))).toEqualTypeOf<Promise<number>>()
+      expectTypeOf(nested.unwrapOrElse(() => 0)).toEqualTypeOf<number | Promise<number>>()
+      expectTypeOf(nested.unwrapOrElse(() => Promise.resolve(0))).toEqualTypeOf<Promise<number>>()
+    }
+    void invalidFallbacks
+  })
+
+  it("preserves raw rejection without invoking the fallback factory", async () => {
+    const { promise, reject } = Promise.withResolvers<Option<number>>()
+    const source = Option.fromPromise(promise)
+    const factory = mock(() => 0)
+    const error = new Error("raw rejection")
+    const plain = Promise.resolve(source.unwrapOr(0)).catch((reason: unknown) => reason)
+    const promised = source.unwrapOr(Promise.resolve(0)).catch((reason: unknown) => reason)
+    const lazy = Promise.resolve(source.unwrapOrElse(factory)).catch((reason: unknown) => reason)
+    reject(error)
+    expect(await plain).toBe(error)
+    expect(await promised).toBe(error)
+    expect(await lazy).toBe(error)
+    expect(factory).not.toHaveBeenCalled()
+  })
+})
+
 describe("Option.toResult", () => {
   it("preserves pending None and skips success mappers before and after settlement", async () => {
     const { promise, resolve } = Promise.withResolvers<Option<number>>()

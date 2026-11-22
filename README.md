@@ -710,7 +710,11 @@ console.log(validatedErrs.unwrapErr()); // [Error: New password cannot be the sa
 
 #### `unwrap`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
 
-These functions are used to extract the value from a `Result`. Note that **only `unwrap` and `safeUnwrap` are available for `Option`**.
+These functions extract values from a `Result`. `Option` also supports `unwrap`, `unwrapOr`, `unwrapOrElse`, and `safeUnwrap`.
+
+For stable `Option`, `unwrapOr` supplies a default and `unwrapOrElse` computes it only for absence. Promise-backed options wait for settlement and always return a promise, including after settling to None. Rejected payloads still reject without invoking the factory.
+
+For `Option<Promise<T>>`, a resolved fallback or factory has return type `Awaited<T> | Promise<Awaited<T>>`: `Option.None` can be widened to that receiver type but still returns a resolved fallback synchronously. A promised fallback or promise-returning factory guarantees `Promise<Awaited<T>>`. Fallbacks may also be a union of resolved and promised values. Ordinary synchronous options stay synchronous, and direct `Option.None` calls infer the fallback's type.
 
 ```typescript
 import { Result } from "@carbonteq/fp";

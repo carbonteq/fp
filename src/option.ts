@@ -264,11 +264,11 @@ export class Option<T> {
   /**
    * Type guard that narrows to None.
    *
-   * Includes async None tracking for Option<Promise<T>>.
+   * Includes async None tracking while preserving the stored payload type.
    *
    * @returns true if this Option is None
    */
-  isNone(): this is Option<never> & { readonly _tag: "None" } {
+  isNone(): this is Option<T> & { readonly _tag: "None" } {
     return (
       this._tag === "None" ||
       this.#val === NONE_VAL ||
@@ -315,24 +315,56 @@ export class Option<T> {
 
   /**
    * Returns the contained value or the provided default.
-   *
+   * Promise-backed options wait for settlement before choosing the default.
    * @param defaultValue - Value to use when None
    * @returns The contained value or default
    */
-  unwrapOr(defaultValue: T): T {
-    if (this.isNone()) return defaultValue
-    return this.#val
+  unwrapOr<U>(this: Option<never>, defaultValue: U): U
+  unwrapOr<Curr>(
+    this: Option<Promise<Curr>>,
+    defaultValue: Promise<NoInfer<Awaited<Curr>>>,
+  ): Promise<Awaited<Curr>>
+  unwrapOr<Curr>(
+    this: Option<Promise<Curr>>,
+    defaultValue: NoInfer<Awaited<Curr>> | Promise<NoInfer<Awaited<Curr>>>,
+  ): Awaited<Curr> | Promise<Awaited<Curr>>
+  unwrapOr(this: Option<T>, defaultValue: T): T
+  unwrapOr(defaultValue: unknown): unknown {
+    const curr = this.#val
+    if (isPromiseLike(curr)) {
+      const ctx = this.#ctx
+      return curr.then((value) =>
+        value === NONE_VAL || ctx.promiseNoneSlot ? defaultValue : value,
+      )
+    }
+    return this.isNone() ? defaultValue : curr
   }
 
   /**
    * Returns the contained value or computes a default lazily.
-   *
+   * Promise-backed options invoke the factory only after settled absence.
    * @param fn - Default factory invoked only when None
    * @returns The contained value or computed default
    */
-  unwrapOrElse(fn: () => T): T {
-    if (this.isNone()) return fn()
-    return this.#val
+  unwrapOrElse<U>(this: Option<never>, fn: () => U): U
+  unwrapOrElse<Curr>(
+    this: Option<Promise<Curr>>,
+    fn: () => Promise<NoInfer<Awaited<Curr>>>,
+  ): Promise<Awaited<Curr>>
+  unwrapOrElse<Curr>(
+    this: Option<Promise<Curr>>,
+    fn: () => NoInfer<Awaited<Curr>> | Promise<NoInfer<Awaited<Curr>>>,
+  ): Awaited<Curr> | Promise<Awaited<Curr>>
+  unwrapOrElse(this: Option<T>, fn: () => T): T
+  unwrapOrElse(fn: () => unknown): unknown {
+    const curr = this.#val
+    if (isPromiseLike(curr)) {
+      const ctx = this.#ctx
+      return curr.then((value) =>
+        value === NONE_VAL || ctx.promiseNoneSlot ? fn() : value,
+      )
+    }
+    return this.isNone() ? fn() : curr
   }
 
   /**
