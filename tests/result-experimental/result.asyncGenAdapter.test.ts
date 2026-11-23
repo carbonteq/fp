@@ -6,6 +6,40 @@ import { ExperimentalResult as Result } from "@/result-experimental.js"
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe("ExperimentalResult.asyncGenAdapter", () => {
+  it("should infer awaited promise payloads through the adapter", async () => {
+    const result = await Result.asyncGenAdapter(async function* ($) {
+      const value = yield* $(Result.Ok(Promise.resolve(1)))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not a promise.
+        value.then(() => {})
+      }
+      expect(value).toBe(1)
+      const promisedResultValue = yield* $(
+        Promise.resolve(Result.Ok(Promise.resolve(2))),
+      )
+      expectTypeOf(promisedResultValue).toEqualTypeOf<number>()
+      expect(promisedResultValue).toBe(2)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<number>()
+    expect(result.unwrap()).toBe(1)
+  })
+
+  it("should preserve promise payloads through the synchronous adapter", () => {
+    const promise = Promise.resolve(1)
+    const result = Result.genAdapter(function* ($) {
+      const value = yield* $(Result.Ok(promise))
+      expectTypeOf(value).toEqualTypeOf<Promise<number>>()
+      expect(value).toBe(promise)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<Promise<number>>()
+    expect(result.unwrap()).toBe(promise)
+  })
+
   describe("basic functionality", () => {
     it("should unwrap Ok values", async () => {
       const result = await Result.asyncGenAdapter(async function* ($) {
@@ -218,7 +252,7 @@ describe("ExperimentalResult.asyncGenAdapter", () => {
         return value
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, string>>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(6)
     })
@@ -239,7 +273,7 @@ describe("ExperimentalResult.asyncGenAdapter", () => {
         return value
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, string>>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(10)
     })
@@ -313,14 +347,14 @@ describe("ExperimentalResult.asyncGenAdapter", () => {
       }
 
       const result = await Result.asyncGenAdapter(async function* ($) {
-        // Use mapAsync which returns Promise<Result<number, never>>
+        // mapAsync includes arbitrary promise rejection values in its error type.
         const value = yield* $(await Result.Ok(3).mapAsync(asyncDouble))
 
         expectTypeOf(value).toEqualTypeOf<number>()
         return value + 10
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, never>>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(16) // 3 * 2 + 10
     })
@@ -341,7 +375,7 @@ describe("ExperimentalResult.asyncGenAdapter", () => {
         return a + b
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, "err1" | "err2">>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(25) // 10 + 15
     })

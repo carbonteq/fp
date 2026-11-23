@@ -1,5 +1,20 @@
 # @carbonteq/fp
 
+## Unreleased
+
+- Wait for pending absence in stable Option fallbacks, preserve promise-backed return shapes, and type widened None fallbacks honestly.
+- Normalize promise-backed inner failures in `Result.fromPromise`, preserving error values and raw rejection identity.
+- Select stable `Option.any` and `Result.any` successes in input order without waiting for irrelevant suffixes, and preserve Result error order.
+- Fix promise-backed Option and Result `flatMap` chains hanging when a mapper throws, preserving rejection identity and pending mapped absence. Option's promise-input return types now reflect promise flattening.
+- Preserve pending absence and failure in stable `Option.toResult` and `Result.toOption` conversions without exposing internal sentinels as successes.
+- Settle promise-backed Options and Results before async generator short-circuit checks, preserving pending failures and raw rejections.
+- Run and drain generator `finally` cleanup across stable and experimental Option, Result, and Flow, awaiting async cleanup while preserving the primary failure.
+- Source-breaking: `ExperimentalResult.validate` now accepts only synchronous validators. Replace `await result.validate([asyncValidator])` with `await result.validateAsync([asyncValidator])`; stable `Result.validate` is unchanged.
+- Source-breaking: `ExperimentalResult.mapAsync`, `ExperimentalResult.flatMapAsync`, and stable and experimental `Flow.asyncGenAdapter` now expose caught rejection errors as `unknown`, preserving arbitrary rejection values and requiring callers to narrow them.
+- Correct awaited delegation types for stable and experimental Result async iterators and Result and Flow async generator adapters, while preserving synchronous promise payloads.
+- Check guarded match predicates against the actual handler input, preserving custom Some, Ok, and Err tagged objects.
+- Return false instead of throwing when `isTuple` receives null or undefined.
+
 ## 0.10.0
 
 ### Minor Changes

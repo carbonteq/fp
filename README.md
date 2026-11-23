@@ -225,7 +225,9 @@ const label = match(settled)
 
 ## The `ExperimentalResult` type (Experimental)
 
-`ExperimentalResult` differs from the stable `Result` by providing explicit async methods like `mapAsync` and `flatMapAsync` that return `Promise<ExperimentalResult<T, E>>` directly, rather than returning `Result<Promise<T>, E>` and requiring `toPromise()`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) used by `Flow`.
+`ExperimentalResult` differs from the stable `Result` by providing explicit async methods like `mapAsync` and `flatMapAsync` that return `Promise<ExperimentalResult<T, unknown>>` directly, rather than returning `Result<Promise<T>, E>` and requiring `toPromise()`. Returned-promise rejections become `Err` with the original rejection value, which need not be an `Error`. Narrow errors before accessing properties, for example `error instanceof Error ? error.message : String(error)`. A promise-typed mapper that throws synchronously still rejects the method's promise. Both methods skip the mapper for an existing `Err`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) used by `Flow`.
+
+`ExperimentalResult.validate` now accepts synchronous validators only. Migrate `await result.validate([asyncValidator])` to `await result.validateAsync([asyncValidator])`. `validateAsync` always returns a Promise, including when the input is already Err. Stable `Result.validate` is unchanged.
 
 ```typescript
 import { ExperimentalResult } from "@carbonteq/fp";
@@ -244,6 +246,8 @@ import { ExperimentalOption } from "@carbonteq/fp";
 ## The `Flow` namespaces
 
 `Flow` is the stable generator namespace and works with stable `Option` + `Result`, returning stable `Result`.
+
+Generator composition in all six namespaces (`Option`, `Result`, `Flow`, and their experimental counterparts) runs suspended `finally` cleanup when a yielded effect fails. Cleanup may yield further effects and use their resumed values; async generators wait for cleanup to settle before returning. Once a runner has observed a primary failure or exception, subsequent cleanup failures do not replace it. JavaScript's ordinary `finally` control-flow rules still apply before the runner observes a failure.
 
 ```typescript
 import { Flow, Option, Result, UnwrappedNone } from "@carbonteq/fp";
@@ -708,7 +712,11 @@ console.log(validatedErrs.unwrapErr()); // [Error: New password cannot be the sa
 
 #### `unwrap`, `unwrapOr`, `unwrapOrElse`, `safeUnwrap`, and `unwrapErr`
 
-These functions are used to extract the value from a `Result`. Note that **only `unwrap` and `safeUnwrap` are available for `Option`**.
+These functions extract values from a `Result`. `Option` also supports `unwrap`, `unwrapOr`, `unwrapOrElse`, and `safeUnwrap`.
+
+For stable `Option`, `unwrapOr` supplies a default and `unwrapOrElse` computes it only for absence. Promise-backed options wait for settlement and always return a promise, including after settling to None. Rejected payloads still reject without invoking the factory.
+
+For `Option<Promise<T>>`, a resolved fallback or factory has return type `Awaited<T> | Promise<Awaited<T>>`: `Option.None` can be widened to that receiver type but still returns a resolved fallback synchronously. A promised fallback or promise-returning factory guarantees `Promise<Awaited<T>>`. Fallbacks may also be a union of resolved and promised values. Ordinary synchronous options stay synchronous, and direct `Option.None` calls infer the fallback's type.
 
 ```typescript
 import { Result } from "@carbonteq/fp";

@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, mock } from "bun:test"
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "@/errors"
-import type { Option } from "@/option.js"
+import { type Option, UnwrappedNone } from "@/option.js"
 import { Result } from "@/result.js"
 
 class DummyError extends Error {
@@ -9,6 +9,54 @@ class DummyError extends Error {
     this.name = "DummyError"
   }
 }
+
+describe("Result.toOption", () => {
+  it("preserves pending Err and skips success mappers before and after settlement", async () => {
+    const { promise, resolve } = Promise.withResolvers<Result<number, Error>>()
+    const source = Result.fromPromise(promise)
+    const converted = source.toOption()
+    const mapper = mock((value: number) => value * 2)
+    const mapped = converted.map(mapper)
+    expectTypeOf(converted).toEqualTypeOf<Option<Promise<number>>>()
+    const unwrapRejection = converted.unwrap().catch((reason: unknown) => reason)
+
+    resolve(Result.Err(new Error("failed")))
+    expect((await converted.toPromise()).isNone()).toBe(true)
+    expect(await unwrapRejection).toBeInstanceOf(UnwrappedNone)
+    expect(await converted.safeUnwrap()).toBeNull()
+    expect((await mapped.toPromise()).isNone()).toBe(true)
+    expect(mapper).not.toHaveBeenCalled()
+    expect((await source.toOption().toPromise()).isNone()).toBe(true)
+  })
+
+  it("preserves pending successes, including null and undefined", async () => {
+    for (const value of [42, null, undefined]) {
+      const { promise, resolve } =
+        Promise.withResolvers<Result<typeof value, string>>()
+      const source = Result.fromPromise(promise)
+      const converted = source.toOption()
+      resolve(Result.Ok(value))
+      const settled = await converted.toPromise()
+      expect(settled.isSome()).toBe(true)
+      expect(settled.unwrap()).toBe(value)
+      expect(await converted.unwrap()).toBe(value)
+      expect((await source.toOption().toPromise()).unwrap()).toBe(value)
+    }
+  })
+
+  it("propagates rejected payloads unchanged", async () => {
+    const error = new Error("rejected")
+    const converted = Result.Ok(Promise.reject(error)).toOption()
+    await expect(converted.toPromise()).rejects.toBe(error)
+    await expect(converted.unwrap()).rejects.toBe(error)
+  })
+
+  it("keeps synchronous conversions synchronous", () => {
+    expect(Result.Ok(undefined).toOption().unwrap()).toBeUndefined()
+    expect(Result.Ok(null).toOption().unwrap()).toBeNull()
+    expect(Result.Err("failed").toOption().isNone()).toBe(true)
+  })
+})
 
 describe("Result construction", () => {
   it("ok result", () => {
@@ -451,6 +499,55 @@ describe("Result type inference", () => {
 
       // any returns first Ok type, collects errors into array
       expectTypeOf(Result.any(r1, r2)).toEqualTypeOf<Result<number, Error[]>>()
+    })
+
+    it("selects pending successes before later synchronous candidates without waiting for suffixes", async () => {
+      const { promise: first, resolve } = Promise.withResolvers<number>()
+      const selected = Result.any<number | Promise<number>, string>(
+        Result.Ok(first),
+        Result.Ok(2),
+        Result.Ok(new Promise<number>(() => {})),
+      )
+      resolve(1)
+      expect(await selected.unwrap()).toBe(1)
+    })
+
+    it("selects a later synchronous candidate after pending failure", async () => {
+      const { promise, resolve } = Promise.withResolvers<Result<number, string>>()
+      const first = Result.fromPromise(promise)
+      const selected = Result.any<number | Promise<number>, string>(first, Result.Ok(2))
+      resolve(Result.Err("first"))
+      expect(await selected.unwrap()).toBe(2)
+    })
+
+    it("collects synchronous and pending failures in original input order", async () => {
+      const { promise, resolve } = Promise.withResolvers<Result<number, string>>()
+      const first = Result.fromPromise(promise)
+      const selected = Result.any(first, Result.Err("second"), Result.fromPromise(Promise.resolve(Result.Err<string, number>("third"))))
+      const settled = selected.unwrap().then(
+        () => undefined,
+        () => undefined,
+      )
+      resolve(Result.Err("first"))
+      await settled
+      expect(await selected.unwrapErr()).toEqual(["first", "second", "third"])
+    })
+
+    it("preserves an encountered raw rejection and observes suffix rejections", async () => {
+      const reason = new Error("raw")
+      const { promise: first, reject } = Promise.withResolvers<number>()
+      const selected = Result.any(Result.Ok(first), Result.Ok(Promise.reject(new Error("suffix"))))
+      const outcome = Promise.resolve(selected.unwrap()).then(
+        () => undefined,
+        (error) => error,
+      )
+      reject(reason)
+      expect(await outcome).toBe(reason)
+    })
+
+    it("keeps the synchronous fast path", () => {
+      const first = Result.Ok(1)
+      expect(Result.any(first, Result.Ok(2))).toBe(first)
     })
 
     it("should correctly type fromPromise", () => {

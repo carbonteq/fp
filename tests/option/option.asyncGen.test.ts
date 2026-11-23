@@ -6,6 +6,54 @@ import { Option } from "@/option.js"
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe("Option.asyncGen", () => {
+  it("should stop on pending None without continuing the body", async () => {
+    const { promise, resolve } = Promise.withResolvers<Option<number>>()
+    const pending = Option.fromPromise(promise)
+    const continued = mock()
+    const running = Option.asyncGen(async function* () {
+      yield* pending
+      continued()
+      return 1
+    })
+    void running.catch(() => {})
+    const turn = Promise.withResolvers<void>()
+    setImmediate(turn.resolve)
+    await turn.promise
+
+    resolve(Option.None)
+    expect(await running).toBe(Option.None)
+    expect(continued).not.toHaveBeenCalled()
+  })
+
+  it("should pass a pending Some's resolved value to the body", async () => {
+    const { promise, resolve } = Promise.withResolvers<Option<number>>()
+    const pending = Option.fromPromise(promise)
+    const running = Option.asyncGen(async function* () {
+      const value = yield* pending
+      expect(value).toBe(42)
+      return value
+    })
+
+    resolve(Option.Some(42))
+    expect((await running).unwrap()).toBe(42)
+  })
+
+  it("should preserve raw rejection identity without continuing the body", async () => {
+    const reason = new Error("raw rejection")
+    const { promise, reject } = Promise.withResolvers<number>()
+    const pending = Option.Some(promise)
+    const continued = mock()
+    const running = Option.asyncGen(async function* () {
+      yield* pending
+      continued()
+      return 1
+    }).catch((error: unknown) => error)
+
+    reject(reason)
+    expect(await running).toBe(reason)
+    expect(continued).not.toHaveBeenCalled()
+  })
+
   describe("basic functionality", () => {
     it("should unwrap a single Some value", async () => {
       const result = await Option.asyncGen(async function* () {

@@ -1,7 +1,12 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js"
 import { ExperimentalOption as Option } from "./option-experimental.js"
 import { UNIT } from "./unit.js"
-import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
+import {
+  CapturedTrace,
+  closeAsyncGenerator,
+  closeGenerator,
+  isCapturedTrace,
+} from "./utils.js"
 
 /** ExperimentalResult alias for success-without-payload operations. */
 export type UnitResult<E = never> = ExperimentalResult<UNIT, E>
@@ -50,6 +55,7 @@ class ResultYieldWrap<T, E> {
 /**
  * Wrapper that makes Result yieldable in async generators with proper type tracking.
  * Supports Promise<Result<T, E>> for async result chaining.
+ * Delegation returns the awaited success value, including promise-backed payloads.
  *
  * @internal
  */
@@ -58,14 +64,14 @@ class AsyncResultYieldWrap<T, E> {
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
     AsyncResultYieldWrap<T, E>,
-    T,
+    Awaited<T>,
     unknown
   > {
     const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as AsyncResultYieldWrap<T, E>) as T
+    ) as unknown as AsyncResultYieldWrap<T, E>) as Awaited<T>
   }
 }
 
@@ -557,10 +563,12 @@ export class ExperimentalResult<T, E> {
   /**
    * Transforms the success value using an async function.
    *
-   * Same as `map` but for async mappers. Returns `Promise<Result<U, E>>`.
+   * Same as `map` but for async mappers. Returns `Promise<Result<U, unknown>>`.
+   * Returned-promise rejections become Err unchanged. Synchronous mapper throws
+   * reject this method's promise. An existing Err skips the mapper.
    *
    * @param fn - Async function to transform the success value
-   * @returns Promise resolving to Result<U, E> with transformed value or propagated error
+   * @returns Promise resolving to Result<U, unknown>, preserving arbitrary rejection values
    *
    * @example
    * ```ts
@@ -572,7 +580,7 @@ export class ExperimentalResult<T, E> {
    */
   async mapAsync<U>(
     fn: (val: T) => Promise<U>,
-  ): Promise<ExperimentalResult<U, E>> {
+  ): Promise<ExperimentalResult<U, unknown>> {
     if (this.isErr()) {
       return Promise.resolve(ExperimentalResult.Err<E, U>(this.#err))
     }
@@ -580,7 +588,7 @@ export class ExperimentalResult<T, E> {
     const curr = this.#val
     return fn(curr)
       .then((u) => ExperimentalResult.Ok(u))
-      .catch((e) => ExperimentalResult.Err(e as E))
+      .catch((e: unknown) => ExperimentalResult.Err(e))
   }
 
   /**
@@ -625,10 +633,12 @@ export class ExperimentalResult<T, E> {
    * Chains async operations that return Results.
    *
    * Same as `flatMap` but for async Result-returning functions.
-   * Returns `Promise<Result<U, E | E2>>`.
+   * Returns `Promise<Result<U, unknown>>`, preserving arbitrary rejection values.
+   * Returned-promise rejections become Err unchanged. Synchronous mapper throws
+   * reject this method's promise. An existing Err skips the mapper.
    *
    * @param fn - Async function that returns a Promise resolving to Result
-   * @returns Promise resolving to Result<U, E | E2>
+   * @returns Promise resolving to Result<U, unknown>
    *
    * @example
    * ```ts
@@ -645,7 +655,7 @@ export class ExperimentalResult<T, E> {
    */
   async flatMapAsync<U, E2>(
     fn: (val: T) => Promise<ExperimentalResult<U, E2>>,
-  ): Promise<ExperimentalResult<U, E | E2>> {
+  ): Promise<ExperimentalResult<U, unknown>> {
     if (this.isErr()) {
       return ExperimentalResult.Err<E | E2, U>(this.#err)
     }
@@ -653,10 +663,10 @@ export class ExperimentalResult<T, E> {
     return fn(this.#val as T)
       .then((r) =>
         r.isErr()
-          ? ExperimentalResult.Err<E | E2, U>(r.#err)
-          : (r as ExperimentalResult<U, E | E2>),
+          ? ExperimentalResult.Err<unknown, U>(r.#err)
+          : r,
       )
-      .catch((e) => ExperimentalResult.Err<E | E2, U>(e))
+      .catch((e: unknown) => ExperimentalResult.Err<unknown, U>(e))
   }
 
   /**
@@ -1009,8 +1019,7 @@ export class ExperimentalResult<T, E> {
    *
    * If the Result is Err, returns it unchanged without running validators.
    *
-   * Supports both sync and async validators. If any validator is async,
-   * returns `Promise<Result<T, E | VE[]>>`.
+   * Accepts synchronous validators only. Use `validateAsync` for async validators.
    *
    * @param validators - Array of validator functions that return Result
    * @returns Result<T, E | VE[]> with original value or array of all errors
@@ -1029,7 +1038,7 @@ export class ExperimentalResult<T, E> {
    * ExperimentalResult.Err("init").validate(validators);           // Err("init") - validators not run
    *
    * // With async validators (returns Promise<Result<...>>)
-   * await ExperimentalResult.Ok(data).validate([
+   * await ExperimentalResult.Ok(data).validateAsync([
    *   async (d) => await validateEmail(d),
    *   async (d) => await validatePhone(d),
    * ]);
@@ -1040,41 +1049,12 @@ export class ExperimentalResult<T, E> {
    */
   validate<VE extends unknown[]>(validators: {
     [K in keyof VE]: (val: T) => ExperimentalResult<unknown, VE[K]>
-  }): ExperimentalResult<T, E | VE[number][]>
-  validate<VE extends unknown[]>(validators: {
-    [K in keyof VE]: (val: T) => Promise<ExperimentalResult<unknown, VE[K]>>
-  }): Promise<ExperimentalResult<T, E | VE[number][]>>
-  validate<VE extends unknown[]>(validators: {
-    [K in keyof VE]:
-      | ((val: T) => ExperimentalResult<unknown, VE[K]>)
-      | ((val: T) => Promise<ExperimentalResult<unknown, VE[K]>>)
-  }):
-    | ExperimentalResult<T, E | VE[number][]>
-    | Promise<ExperimentalResult<T, E | VE[number][]>> {
+  }): ExperimentalResult<T, E | VE[number][]> {
     if (this.isErr()) return this as ExperimentalResult<T, VE[number][]>
 
-    const baseVal = this.#val as T
-    const results = validators.map((v) => v(baseVal))
-
-    // Check if any result is promise-like (includes thenables)
-    if (results.some((r) => isPromiseLike(r))) {
-      return Promise.all(results).then((resolved) => {
-        const errs: unknown[] = []
-        for (const r of resolved as ExperimentalResult<unknown, unknown>[]) {
-          if (r.isErr()) errs.push(r.unwrapErr())
-        }
-        if (errs.length > 0) {
-          return ExperimentalResult.Err(
-            errs as VE[number][],
-          ) as ExperimentalResult<T, VE[number][]>
-        }
-        return this as ExperimentalResult<T, VE[number][]>
-      })
-    }
-
-    const syncResults = results as ExperimentalResult<unknown, unknown>[]
-    const errs: unknown[] = []
-    for (const r of syncResults) {
+    const errs: VE[number][] = []
+    for (const validator of validators) {
+      const r = validator(this.#val)
       if (r.isErr()) errs.push(r.#err)
     }
     if (errs.length > 0) {
@@ -1472,7 +1452,7 @@ export class ExperimentalResult<T, E> {
 
   /**
    * Makes Result iterable for use with async generator-based syntax.
-   * Yields self and returns the unwrapped value when resumed.
+   * Yields self and returns the awaited unwrapped value when resumed.
    *
    * @example
    * ```ts
@@ -1484,14 +1464,14 @@ export class ExperimentalResult<T, E> {
    */
   async *[Symbol.asyncIterator](): AsyncGenerator<
     ExperimentalResult<T, E>,
-    T,
+    Awaited<T>,
     unknown
   > {
     const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as ExperimentalResult<T, E>) as T
+    ) as unknown as ExperimentalResult<T, E>) as Awaited<T>
   }
 
   // Static constructors
@@ -1583,41 +1563,55 @@ export class ExperimentalResult<T, E> {
     let nextArg: unknown
     let currentResult: ExperimentalResult<T, ExtractError<Eff>>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value)
-        break
-      }
-
-      // next.value is the Result that was yielded
-      let yielded = next.value as ExperimentalResult<unknown, unknown>
-      let stack: string | undefined
-
-      if (isCapturedTrace(yielded)) {
-        stack = yielded.stack
-        yielded = yielded.value as ExperimentalResult<unknown, unknown>
-      }
-
-      if (yielded.isErr()) {
-        const err = yielded.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+        naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = ExperimentalResult.Ok(next.value)
+          break
         }
-        iterator.return?.(undefined as unknown as T)
-        // Early termination on error - return the Err result
-        currentResult = yielded as ExperimentalResult<T, ExtractError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = yielded.unwrap()
+        // next.value is the Result that was yielded
+        let yielded = next.value as ExperimentalResult<unknown, unknown>
+        let stack: string | undefined
+
+        if (isCapturedTrace(yielded)) {
+          stack = yielded.stack
+          yielded = yielded.value as ExperimentalResult<unknown, unknown>
+        }
+
+        if (yielded.isErr()) {
+          const err = yielded.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = yielded as ExperimentalResult<T, ExtractError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = yielded.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          let effect = yielded
+          if (isCapturedTrace(effect)) {
+            effect = effect.value
+          }
+          const result = effect as ExperimentalResult<unknown, unknown>
+          return result.isErr() ? undefined : result.unwrap()
+        })
+      }
     }
 
     return currentResult
@@ -1660,43 +1654,61 @@ export class ExperimentalResult<T, E> {
     let nextArg: unknown
     let currentResult: ExperimentalResult<T, ExtractResultError<Eff>>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value)
-        break
-      }
-
-      // next.value is the ResultYieldWrap that was yielded
-      const wrapped = next.value as ResultYieldWrap<unknown, unknown>
-      let result = wrapped.result
-      let stack: string | undefined
-
-      if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack
-        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-        result = (wrapped as any).value.result
-      }
-
-      if (result.isErr()) {
-        const err = result.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+        naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = ExperimentalResult.Ok(next.value)
+          break
         }
-        iterator.return?.(undefined as unknown as T)
-        // Early termination on error - return the Err result
-        currentResult = result as ExperimentalResult<T, ExtractResultError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap()
+        // next.value is the ResultYieldWrap that was yielded
+        const wrapped = next.value as ResultYieldWrap<unknown, unknown>
+        let result = wrapped.result
+        let stack: string | undefined
+
+        if (isCapturedTrace(wrapped)) {
+          stack = wrapped.stack
+          // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+          result = (wrapped as any).value.result
+        }
+
+        if (result.isErr()) {
+          const err = result.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = result as ExperimentalResult<T, ExtractResultError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = result.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          let effect = yielded
+          if (isCapturedTrace(effect)) {
+            effect = effect.value
+          }
+          effect = (effect as ResultYieldWrap<unknown, unknown>).result
+          if (isCapturedTrace(effect)) {
+            effect = effect.value
+          }
+          const result = effect as ExperimentalResult<unknown, unknown>
+          return result.isErr() ? undefined : result.unwrap()
+        })
+      }
     }
 
     return currentResult
@@ -1735,41 +1747,55 @@ export class ExperimentalResult<T, E> {
     let nextArg: unknown
     let currentResult: ExperimentalResult<T, ExtractError<Eff>>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value)
-        break
-      }
-
-      // next.value is a Result (user awaits promises before yielding)
-      let result = next.value as ExperimentalResult<unknown, unknown>
-      let stack: string | undefined
-
-      if (isCapturedTrace(result)) {
-        stack = result.stack
-        result = result.value as ExperimentalResult<unknown, unknown>
-      }
-
-      if (result.isErr()) {
-        const err = result.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+        naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = ExperimentalResult.Ok(next.value)
+          break
         }
-        await iterator.return?.(undefined as unknown as T)
-        // Early termination on error - return the Err result
-        currentResult = result as ExperimentalResult<T, ExtractError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap()
+        // next.value is a Result (user awaits promises before yielding)
+        let result = next.value as ExperimentalResult<unknown, unknown>
+        let stack: string | undefined
+
+        if (isCapturedTrace(result)) {
+          stack = result.stack
+          result = result.value as ExperimentalResult<unknown, unknown>
+        }
+
+        if (result.isErr()) {
+          const err = result.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = result as ExperimentalResult<T, ExtractError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = result.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          let effect = await yielded
+          if (isCapturedTrace(effect)) {
+            effect = effect.value
+          }
+          const result = effect as ExperimentalResult<unknown, unknown>
+          return result.isErr() ? undefined : result.unwrap()
+        })
+      }
     }
 
     return currentResult
@@ -1821,48 +1847,66 @@ export class ExperimentalResult<T, E> {
     let nextArg: unknown
     let currentResult: ExperimentalResult<T, ExtractAsyncResultError<Eff>>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = ExperimentalResult.Ok(next.value)
-        break
-      }
-
-      // next.value is the AsyncResultYieldWrap that was yielded
-      const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>
-      let result: ExperimentalResult<unknown, unknown>
-      let stack: string | undefined
-
-      if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack
-        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-        result = await (wrapped as any).value.result
-      } else {
-        result = await wrapped.result
-      }
-
-      if (result.isErr()) {
-        const err = result.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+        naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = ExperimentalResult.Ok(next.value)
+          break
         }
-        await iterator.return?.(undefined as unknown as T)
-        // Early termination on error - return the Err result
-        currentResult = result as ExperimentalResult<
-          T,
-          ExtractAsyncResultError<Eff>
-        >
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap()
+        // next.value is the AsyncResultYieldWrap that was yielded
+        const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>
+        let result: ExperimentalResult<unknown, unknown>
+        let stack: string | undefined
+
+        if (isCapturedTrace(wrapped)) {
+          stack = wrapped.stack
+          // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+          result = await (wrapped as any).value.result
+        } else {
+          result = await wrapped.result
+        }
+
+        if (result.isErr()) {
+          const err = result.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = result as ExperimentalResult<
+            T,
+            ExtractAsyncResultError<Eff>
+          >
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = result.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          let effect = await yielded
+          if (isCapturedTrace(effect)) {
+            effect = effect.value
+          }
+          effect = await (effect as AsyncResultYieldWrap<unknown, unknown>).result
+          if (isCapturedTrace(effect)) {
+            effect = effect.value
+          }
+          const result = effect as ExperimentalResult<unknown, unknown>
+          return result.isErr() ? undefined : result.unwrap()
+        })
+      }
     }
 
     return currentResult

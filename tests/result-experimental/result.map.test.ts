@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test"
+import { describe, expect, expectTypeOf, it, mock } from "bun:test"
 import { ExperimentalResult as Result } from "@/result-experimental.js"
 
 class DummyError extends Error {
@@ -14,6 +14,64 @@ const errResIt = (_n: number) => Result.Err(new DummyError())
 const asyncErrResIt = async (_n: number) => Result.Err(new DummyError())
 
 describe("ExperimentalResult.map behavior", () => {
+  for (const method of ["mapAsync", "flatMapAsync"] as const) {
+    it(`${method} preserves arbitrary returned-promise rejection values`, async () => {
+      const reason = { code: "rejected" }
+      const mapper = (): Promise<never> => Promise.reject(reason)
+      const original = Result.Ok<number, string>(2)
+      const pending = method === "mapAsync"
+        ? original.mapAsync<number>(mapper)
+        : original.flatMapAsync<number, string>(mapper)
+      expectTypeOf(pending).toEqualTypeOf<Promise<Result<number, unknown>>>()
+      const result = await pending
+      expectTypeOf(result.unwrapErr()).toEqualTypeOf<unknown>()
+      expect(result.isErr()).toBe(true)
+      expect(result.unwrapErr()).toBe(reason)
+      if (false) {
+        // @ts-expect-error Arbitrary rejection values need narrowing.
+        result.unwrapErr().message
+      }
+    })
+
+    it(`${method} still rejects when a promise-typed mapper throws synchronously`, async () => {
+      const reason = { code: "thrown" }
+      const mapper = (): Promise<never> => {
+        throw reason
+      }
+      const original = Result.Ok(2)
+      const pending = method === "mapAsync"
+        ? original.mapAsync<number>(mapper)
+        : original.flatMapAsync<number, string>(mapper)
+      const reasonCaught = await pending.then(
+        () => { throw new Error("Expected mapper throw to reject") },
+        (error: unknown) => error,
+      )
+      expect(reasonCaught).toBe(reason)
+    })
+
+    it(`${method} skips its mapper on Err`, async () => {
+      const reason = { code: "original" }
+      const mapper = mock((): Promise<never> => Promise.reject("not called"))
+      const original = Result.Err<typeof reason, number>(reason)
+      const result = await (method === "mapAsync"
+        ? original.mapAsync<number>(mapper)
+        : original.flatMapAsync<number, string>(mapper))
+      expect(result.unwrapErr()).toBe(reason)
+      expect(mapper).not.toHaveBeenCalled()
+    })
+  }
+
+  it("keeps successful async mapper values precise while widening errors", async () => {
+    const mapped = Result.Ok<number, string>(2).mapAsync(async (n) => n.toString())
+    const chained = Result.Ok<number, string>(2).flatMapAsync(async (n) =>
+      Result.Ok<string, RangeError>(n.toString()),
+    )
+    expectTypeOf(mapped).toEqualTypeOf<Promise<Result<string, unknown>>>()
+    expectTypeOf(chained).toEqualTypeOf<Promise<Result<string, unknown>>>()
+    expect((await mapped).unwrap()).toBe("2")
+    expect((await chained).unwrap()).toBe("2")
+  })
+
   it("should transform an Ok value asynchronously with mapAsync", async () => {
     const r = Result.Ok(2)
     const mockerA = mock(asyncDoubleIt)

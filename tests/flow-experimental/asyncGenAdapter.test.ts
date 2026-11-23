@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, expectTypeOf, test } from "bun:test"
 import { ExperimentalFlow as XFlow } from "@/flow-experimental.js"
 import {
   ExperimentalOption as Option,
@@ -23,6 +23,28 @@ class ServiceUnavailableError extends Error {
 }
 
 describe("XFlow.asyncGenAdapter", () => {
+  test("awaits Option and Result payloads with precise delegated types", async () => {
+    const option = await XFlow.asyncGenAdapter(async function* ($) {
+      const value = yield* $(Option.Some(Promise.resolve(21)))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not its stored promise.
+        value.then(() => {})
+      }
+      return value
+    })
+    const result = await XFlow.asyncGenAdapter(async function* ($) {
+      const value = yield* $(Result.Ok(Promise.resolve(42)))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      return value
+    })
+
+    expectTypeOf(option).toEqualTypeOf<Result<number, unknown>>()
+    expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
+    expect(option.unwrap()).toBe(21)
+    expect(result.unwrap()).toBe(42)
+  })
+
   test("handles all successes with adapter async", async () => {
     const result = await XFlow.asyncGenAdapter(async function* ($) {
       const a = yield* $(Option.Some(10))
@@ -66,10 +88,12 @@ describe("XFlow.asyncGenAdapter", () => {
     })
 
     expect(result.isErr()).toBe(true)
-    expect(result.unwrapErr()).toBeInstanceOf(ValidationError)
-    expect((result.unwrapErr() as ValidationError).message).toBe(
-      "Value must be positive",
-    )
+    const error = result.unwrapErr()
+    expect(error).toBeInstanceOf(ValidationError)
+    if (!(error instanceof ValidationError)) {
+      throw new Error("Expected ValidationError")
+    }
+    expect(error.message).toBe("Value must be positive")
   })
 
   test("$.fail() short-circuits execution async", async () => {
@@ -83,8 +107,12 @@ describe("XFlow.asyncGenAdapter", () => {
 
     expect(result.isErr()).toBe(true)
     expect(executedAfterError).toBe(false)
-    expect(result.unwrapErr()).toBeInstanceOf(ServiceUnavailableError)
-    expect(result.unwrapErr().message).toBe("Database unavailable")
+    const error = result.unwrapErr()
+    expect(error).toBeInstanceOf(ServiceUnavailableError)
+    if (!(error instanceof ServiceUnavailableError)) {
+      throw new Error("Expected ServiceUnavailableError")
+    }
+    expect(error.message).toBe("Database unavailable")
   })
 
   test("$.fail() works with async operations", async () => {
@@ -135,5 +163,37 @@ describe("XFlow.asyncGenAdapter", () => {
 
     expect(result.isErr()).toBe(true)
     expect(result.unwrapErr()).toBe(rejection)
+  })
+
+  test("preserves arbitrary outer rejection values and skips the remaining body", async () => {
+    for (const rejection of [
+      "rejected",
+      42,
+      null,
+      undefined,
+      { reason: "rejected" },
+      new Error("rejected"),
+    ]) {
+      let continued = false
+      const result = await XFlow.asyncGenAdapter(async function* ($) {
+        yield* $(Promise.reject<Result<number, never>>(rejection))
+        continued = true
+        return 1
+      })
+
+      expect(result.isErr()).toBe(true)
+      expect(result.unwrapErr()).toBe(rejection)
+      expect(continued).toBe(false)
+    }
+  })
+
+  test("does not catch generator-body exceptions", async () => {
+    const rejection = { reason: "generator failed" }
+    const result = XFlow.asyncGenAdapter(async function* ($) {
+      yield* $(Result.Ok(1))
+      throw rejection
+    })
+
+    await expect(result).rejects.toBe(rejection)
   })
 })

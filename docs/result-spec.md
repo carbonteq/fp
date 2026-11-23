@@ -234,20 +234,26 @@ Ok(42).map((x) => x * 2); // Ok(84)
 Err("error").map((x) => x * 2); // Err("error")
 ```
 
-### `mapAsync<U>(fn): Promise<Result<U, E>>`
+### `mapAsync<U>(fn): Promise<Result<U, unknown>>`
 
-Transforms the success value using an async mapper.
+Transforms the success value using an async mapper. Returned-promise rejections become `Err` with the same rejection value, so the error type is `unknown`. An existing `Err` skips the mapper. A promise-typed mapper that throws synchronously still rejects the method's promise.
 
 **Signature:**
 
 ```typescript
-mapAsync<U>(fn: (val: T) => Promise<U>): Promise<Result<U, E>>;
+mapAsync<U>(fn: (val: T) => Promise<U>): Promise<Result<U, unknown>>;
 ```
 
 **Examples:**
 
 ```typescript
 Ok(42).mapAsync(async (x) => x + 10); // Promise<Ok(52)>
+
+const result = await Ok(42).mapAsync(async (x) => x + 10);
+if (result.isErr()) {
+  const error = result.unwrapErr();
+  console.error(error instanceof Error ? error.message : String(error));
+}
 ```
 
 ### `flatMap<U, E2>(fn): Result<U, E | E2>`
@@ -280,14 +286,14 @@ Err("initial").flatMap((x) => Ok(x + 1)); // Err("initial")
 Ok(42).flatMapAsync(async (x) => Ok(x * 3)); // Promise<Ok(126)>
 ```
 
-### `flatMapAsync<U, E2>(fn): Promise<Result<U, E | E2>>`
+### `flatMapAsync<U, E2>(fn): Promise<Result<U, unknown>>`
 
-Chains operations that return `Promise<Result<...>>`.
+Chains operations that return `Promise<Result<...>>`. Like `mapAsync`, it preserves arbitrary returned-promise rejection values as `Err`, skips the mapper on an existing `Err`, and leaves synchronous mapper throws as promise rejections. Narrow the `unknown` error before accessing properties.
 
 **Signature:**
 
 ```typescript
-flatMapAsync<U, E2>(fn: (val: T) => Promise<Result<U, E2>>): Promise<Result<U, E | E2>>;
+flatMapAsync<U, E2>(fn: (val: T) => Promise<Result<U, E2>>): Promise<Result<U, unknown>>;
 ```
 
 **Examples:**
@@ -574,7 +580,7 @@ validateAsync<VE>(
 ```
 
 // Form validation
-Ok(formData).validate([
+Ok(formData).validateAsync([
   validateEmail,
   validatePassword,
   validateUsername,
@@ -925,9 +931,9 @@ Err("fail").toString(); // "Err(fail)"
 // Once you hit an async operation, use *Async variants
 Ok(5)
   .map((x) => x * 2) // Result<number, never>
-  .mapAsync(async (x) => await fetchData(x)) // Promise<Result<Data, never>>
-  .then((r) => r.map((d) => d.name)) // Promise<Result<string, never>>
-  .then((r) => r.mapErr((e) => new AppError(e))) // Promise<Result<string, AppError>>
+  .mapAsync(async (x) => await fetchData(x)) // Promise<Result<Data, unknown>>
+  .then((r) => r.map((d) => d.name)) // Promise<Result<string, unknown>>
+  .then((r) => r.mapErr((e) => new AppError(e instanceof Error ? e.message : String(e)))) // Promise<Result<string, AppError>>
   .then((r) => {
     if (r.isOk()) {
       console.log(r.unwrap());

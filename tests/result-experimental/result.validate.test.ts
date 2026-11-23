@@ -83,7 +83,7 @@ describe("ExperimentalResult.validate behavior", () => {
     expect(mockerB).toHaveBeenCalledTimes(1)
   })
 
-  it("should handle thenable validators in validate", async () => {
+  it("should handle cross-realm Promise validators in validateAsync", async () => {
     const thenableValidator = ((_n: number) =>
       runInNewContext("Promise.resolve(Result.Err('ThenableFailure'))", {
         Result,
@@ -91,10 +91,43 @@ describe("ExperimentalResult.validate behavior", () => {
       n: number,
     ) => Promise<Result<string, string>>
 
-    const validated = await Result.Ok(2).validate([thenableValidator])
+    const validated = await Result.Ok(2).validateAsync([thenableValidator])
 
     expect(validated.isErr()).toBeTrue()
     expect(validated.unwrapErr()).toEqual(["ThenableFailure"])
+  })
+
+  it("should immediately return a Promise for an initial Err without running validators", async () => {
+    const validator = mock(validatePromiseErr)
+    const initial = Result.Err<string, number>("initial")
+
+    const pending = initial.validateAsync([validator])
+
+    expect(pending).toBeInstanceOf(Promise)
+    expect(validator).not.toHaveBeenCalled()
+    expect(await pending).toBe(initial)
+    expect(validator).not.toHaveBeenCalled()
+  })
+
+  it("should preserve synchronous validator and error order", () => {
+    const calls: number[] = []
+    const validated = Result.Ok(2).validate([
+      () => {
+        calls.push(1)
+        return Result.Err("first")
+      },
+      () => {
+        calls.push(2)
+        return Result.Ok(true)
+      },
+      () => {
+        calls.push(3)
+        return Result.Err(3)
+      },
+    ])
+
+    expect(calls).toEqual([1, 2, 3])
+    expect(validated.unwrapErr()).toEqual(["first", 3])
   })
 
   // it("should return errors if failure validating Result<T, Promise<E>>", async () => {
@@ -103,84 +136,6 @@ describe("ExperimentalResult.validate behavior", () => {
   //
   //   const r = Result.Ok(2);
   //   const validated = await r.validateAsync([mockerA, mockerB])
-  //
-  //   expect(validated.isErr()).toBeTrue();
-  //   expect(validated.safeUnwrap()).toBeNull();
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  // });
-
-  // it("should return original value if success validating Result<T, E> starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validateOk);
-  //   const mockerB = mock(validateOk);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = await r.validate([mockerA, mockerB]).toPromise();
-  //
-  //   expect(validated.isOk()).toBeTrue();
-  //   expect(validated.unwrap()).toBe(2);
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  // });
-  //
-  // it("should return original value if success validating Promise<Result<T, E>> starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validatePromiseOk);
-  //   const mockerB = mock(validatePromiseOk);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = await r.validate([mockerA, mockerB]).toPromise();
-  //
-  //   expect(validated.isOk()).toBeTrue();
-  //   expect(validated.unwrap()).toBe(2);
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  // });
-  //
-  // it("should return original value if success validating Result<Promise<T>, E> starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validateOkPromise);
-  //   const mockerB = mock(validateOkPromise);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = await r.validate([mockerA, mockerB]).toPromise();
-  //
-  //   expect(validated.isOk()).toBeTrue();
-  //   expect(validated.unwrap()).toBe(2);
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  // });
-  //
-  // it("should return errors if failure validating Result<T, E> starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validateErr);
-  //   const mockerB = mock(validateErr);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = await r.validate([mockerA, mockerB]).toPromise();
-  //
-  //   expect(validated.isErr()).toBeTrue();
-  //   expect(validated.unwrapErr()).toEqual(["Failure", "Failure"]);
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  // });
-  //
-  // it("should return errors if failure validating Promise<Result<T, E>> starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validatePromiseErr);
-  //   const mockerB = mock(validatePromiseErr);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = await r.validate([mockerA, mockerB]).toPromise();
-  //
-  //   expect(validated.isErr()).toBeTrue();
-  //   expect(validated.unwrapErr()).toEqual(["Failure", "Failure"]);
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  // });
-  //
-  // it("should return errors if failure validating Result<T, Promise<E>> starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validateErrPromise);
-  //   const mockerB = mock(validateErrPromise);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = await r.validate([mockerA, mockerB]).toPromise();
   //
   //   expect(validated.isErr()).toBeTrue();
   //   expect(validated.safeUnwrap()).toBeNull();
@@ -202,21 +157,6 @@ describe("ExperimentalResult.validate behavior", () => {
     expect(mockerB).toHaveBeenCalledTimes(1)
     expect(mockerC).toHaveBeenCalledTimes(1)
   })
-
-  // it("should return errors if even one failure starting from Result<Promise<T>, E>", async () => {
-  //   const mockerA = mock(validateOk);
-  //   const mockerB = mock(validateErr);
-  //   const mockerC = mock(validateOk);
-  //
-  //   const r = Result.Ok(Promise.resolve(2));
-  //   const validated = r.validate([mockerA, mockerB, mockerC]);
-  //
-  //   expect(validated.isErr()).toBeTrue();
-  //   expect(validated.unwrapErr()).toEqual(["Failure"]);
-  //   expect(mockerA).toHaveBeenCalledTimes(1);
-  //   expect(mockerB).toHaveBeenCalledTimes(1);
-  //   expect(mockerC).toHaveBeenCalledTimes(1);
-  // });
 
   it("should short circuit if input settles into error state", async () => {
     const mockerA = mock(validateOk)

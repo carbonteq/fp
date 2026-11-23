@@ -17,10 +17,9 @@ export const setAsTuple = <Inner, T extends Array<Inner>>(
   return res
 }
 
-/** Type guard that checks whether a value is a branded Tuple. */
+/** Type guard for branded Tuples; null and undefined return false. */
 export const isTuple = <Inner>(t: unknown): t is Tuple<Inner> =>
-  //@ts-expect-error
-  Object.hasOwn(t, TUPLE_KEY)
+  t != null && Object.hasOwn(t, TUPLE_KEY)
 
 /** Appends a type to the end of an existing tuple type. */
 export type AppendToTuple<T, U> = T extends [...infer Rest, infer L]

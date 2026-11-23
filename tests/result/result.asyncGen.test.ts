@@ -6,6 +6,88 @@ import { Result } from "@/result.js"
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe("Result.asyncGen", () => {
+  it("should infer awaited promise payloads during delegation", async () => {
+    const result = await Result.asyncGen(async function* () {
+      const value = yield* Result.Ok(Promise.resolve(1))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not a promise.
+        value.then(() => {})
+      }
+      expect(value).toBe(1)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<number>()
+    expect(result.unwrap()).toBe(1)
+  })
+
+  it("should preserve promise payloads during synchronous delegation", async () => {
+    const promise = Promise.resolve(1)
+    const result = Result.gen(function* () {
+      const value = yield* Result.Ok(promise)
+      expectTypeOf(value).toEqualTypeOf<Promise<number>>()
+      expect(value).toBeInstanceOf(Promise)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<Promise<number>>()
+    expect(result.unwrap()).toBeInstanceOf(Promise)
+    expect(await result.unwrap()).toBe(1)
+  })
+
+  it("should preserve a pending Err's identity without continuing the body", async () => {
+    const error = new Error("pending failure")
+    const { promise, resolve } = Promise.withResolvers<Result<number, Error>>()
+    const pending = Result.fromPromise(promise)
+    const continued = mock()
+    const running = Result.asyncGen(async function* () {
+      yield* pending
+      continued()
+      return 1
+    })
+    void running.catch(() => {})
+    const turn = Promise.withResolvers<void>()
+    setImmediate(turn.resolve)
+    await turn.promise
+
+    resolve(Result.Err(error))
+    const result = await running
+    expect(result.isErr()).toBe(true)
+    expect(result.unwrapErr()).toBe(error)
+    expect(continued).not.toHaveBeenCalled()
+  })
+
+  it("should pass a pending Ok's resolved value to the body", async () => {
+    const { promise, resolve } = Promise.withResolvers<Result<number, string>>()
+    const pending = Result.fromPromise(promise)
+    const running = Result.asyncGen(async function* () {
+      const value = yield* pending
+      expect(value).toBeTypeOf("number")
+      expect(await value).toBe(42)
+      return value
+    })
+
+    resolve(Result.Ok(42))
+    expect((await running).unwrap()).toBe(42)
+  })
+
+  it("should preserve raw rejection identity without continuing the body", async () => {
+    const reason = new Error("raw rejection")
+    const { promise, reject } = Promise.withResolvers<number>()
+    const pending = Result.Ok(promise)
+    const continued = mock()
+    const running = Result.asyncGen(async function* () {
+      yield* pending
+      continued()
+      return 1
+    }).catch((error: unknown) => error)
+
+    reject(reason)
+    expect(await running).toBe(reason)
+    expect(continued).not.toHaveBeenCalled()
+  })
+
   describe("basic functionality", () => {
     it("should unwrap a single Ok value", async () => {
       const result = await Result.asyncGen(async function* () {

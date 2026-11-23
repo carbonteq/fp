@@ -1,6 +1,12 @@
 import { Result } from "./result.js"
 import { UNIT } from "./unit.js"
-import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
+import {
+  CapturedTrace,
+  closeAsyncGenerator,
+  closeGenerator,
+  isCapturedTrace,
+  isPromiseLike,
+} from "./utils.js"
 
 type Mapper<T, U> = (val: T) => U
 type AsyncMapper<T, U> = (val: T) => Promise<U>
@@ -207,45 +213,41 @@ export class Option<T> {
   /**
    * Returns the first Some in the list, or None if all are None.
    *
-   * For async Some values, settlement is awaited and selection follows input order.
+   * Awaits candidates in input order, without waiting for the suffix after success.
    *
    * @template T - Value type
    * @param options - Options to search
    * @returns The first Some found, otherwise None
    */
   static any<T>(...options: Option<T>[]): Option<T> {
-    const pending: Option<T>[] = []
-
+    let hasPending = false
     for (const opt of options) {
-      if (opt.isSome()) {
-        if (isPromiseLike(opt.#val)) {
-          pending.push(opt)
-          continue
-        }
-        return opt
+      if (!opt.isSome()) continue
+      if (isPromiseLike(opt.#val)) {
+        hasPending = true
+        break
       }
+      return opt
     }
+    if (!hasPending) return Option.None
 
-    if (pending.length === 0) {
-      return Option.None
+    // Observe already-created payloads without changing ordered selection.
+    for (const opt of options) {
+      if (isPromiseLike(opt.#val)) {
+        Promise.resolve(opt.#val).then(undefined, () => {})
+      }
     }
 
     const ctx: OptionCtx = { promiseNoneSlot: false }
-    const p = Promise.all(
-      pending.map(async (opt) => {
-        const val = await (opt.#val as Promise<unknown>)
-        const isNone = opt.#ctx.promiseNoneSlot || val === NONE_VAL
-        return { isNone, val }
-      }),
-    ).then((settled) => {
-      for (const item of settled) {
-        if (!item.isNone) {
-          return item.val
-        }
+    const p = (async () => {
+      for (const opt of options) {
+        if (!opt.isSome()) continue
+        const val = await opt.#val
+        if (!opt.#ctx.promiseNoneSlot && val !== NONE_VAL) return val
       }
       ctx.promiseNoneSlot = true
       return NONE_VAL
-    })
+    })()
 
     return new Option(p as T, ctx, "Some")
   }
@@ -262,11 +264,11 @@ export class Option<T> {
   /**
    * Type guard that narrows to None.
    *
-   * Includes async None tracking for Option<Promise<T>>.
+   * Includes async None tracking while preserving the stored payload type.
    *
    * @returns true if this Option is None
    */
-  isNone(): this is Option<never> & { readonly _tag: "None" } {
+  isNone(): this is Option<T> & { readonly _tag: "None" } {
     return (
       this._tag === "None" ||
       this.#val === NONE_VAL ||
@@ -313,24 +315,56 @@ export class Option<T> {
 
   /**
    * Returns the contained value or the provided default.
-   *
+   * Promise-backed options wait for settlement before choosing the default.
    * @param defaultValue - Value to use when None
    * @returns The contained value or default
    */
-  unwrapOr(defaultValue: T): T {
-    if (this.isNone()) return defaultValue
-    return this.#val
+  unwrapOr<U>(this: Option<never>, defaultValue: U): U
+  unwrapOr<Curr>(
+    this: Option<Promise<Curr>>,
+    defaultValue: Promise<NoInfer<Awaited<Curr>>>,
+  ): Promise<Awaited<Curr>>
+  unwrapOr<Curr>(
+    this: Option<Promise<Curr>>,
+    defaultValue: NoInfer<Awaited<Curr>> | Promise<NoInfer<Awaited<Curr>>>,
+  ): Awaited<Curr> | Promise<Awaited<Curr>>
+  unwrapOr(this: Option<T>, defaultValue: T): T
+  unwrapOr(defaultValue: unknown): unknown {
+    const curr = this.#val
+    if (isPromiseLike(curr)) {
+      const ctx = this.#ctx
+      return curr.then((value) =>
+        value === NONE_VAL || ctx.promiseNoneSlot ? defaultValue : value,
+      )
+    }
+    return this.isNone() ? defaultValue : curr
   }
 
   /**
    * Returns the contained value or computes a default lazily.
-   *
+   * Promise-backed options invoke the factory only after settled absence.
    * @param fn - Default factory invoked only when None
    * @returns The contained value or computed default
    */
-  unwrapOrElse(fn: () => T): T {
-    if (this.isNone()) return fn()
-    return this.#val
+  unwrapOrElse<U>(this: Option<never>, fn: () => U): U
+  unwrapOrElse<Curr>(
+    this: Option<Promise<Curr>>,
+    fn: () => Promise<NoInfer<Awaited<Curr>>>,
+  ): Promise<Awaited<Curr>>
+  unwrapOrElse<Curr>(
+    this: Option<Promise<Curr>>,
+    fn: () => NoInfer<Awaited<Curr>> | Promise<NoInfer<Awaited<Curr>>>,
+  ): Awaited<Curr> | Promise<Awaited<Curr>>
+  unwrapOrElse(this: Option<T>, fn: () => T): T
+  unwrapOrElse(fn: () => unknown): unknown {
+    const curr = this.#val
+    if (isPromiseLike(curr)) {
+      const ctx = this.#ctx
+      return curr.then((value) =>
+        value === NONE_VAL || ctx.promiseNoneSlot ? fn() : value,
+      )
+    }
+    return this.isNone() ? fn() : curr
   }
 
   /**
@@ -499,6 +533,8 @@ export class Option<T> {
    *
    * If None, returns None without calling the mapper. Supports async values
    * and async mappers; returns Option<Promise<U>> when async is involved.
+   * Mapper throws propagate synchronously for sync inputs and reject the
+   * returned promise chain for promise inputs; they do not become None.
    *
    * @template U - Result value type
    * @param mapper - Function returning an Option
@@ -509,11 +545,11 @@ export class Option<T> {
   flatMap<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     mapper: AsyncFlatMapper<Curr, U>,
-  ): Option<Promise<U>>
+  ): Option<Promise<Awaited<U>>>
   flatMap<U, Curr = Awaited<T>>(
     this: Option<Promise<Curr>>,
     mapper: FlatMapper<Curr, U>,
-  ): Option<Promise<U>>
+  ): Option<Promise<Awaited<U>>>
   flatMap<U>(this: Option<T>, mapper: AsyncFlatMapper<T, U>): Option<Promise<U>>
   flatMap<U>(this: Option<T>, mapper: FlatMapper<T, U>): Option<U>
   flatMap<U, Curr = Awaited<T>>(
@@ -527,32 +563,19 @@ export class Option<T> {
       const p = curr as Promise<Curr>
       // Create a NEW context for this branch to avoid cross-branch mutation
       const newCtx: OptionCtx = { promiseNoneSlot: false }
-      const castedNone = NONE_VAL as unknown as Promise<U>
-      const newP = new Promise<U>((resolve, reject) => {
-        p.then((innerVal) => {
-          if (innerVal === NONE_VAL) {
-            newCtx.promiseNoneSlot = true
-            resolve(castedNone)
-          } else {
-            const r = mapper(innerVal)
-            if (isPromiseLike(r)) {
-              r.then((innerOpt) => {
-                if (innerOpt.isNone()) {
-                  newCtx.promiseNoneSlot = true
-                }
-                resolve(innerOpt.#val)
-              }, reject)
-            } else {
-              if (r.isNone()) {
-                newCtx.promiseNoneSlot = true
-                resolve(NONE_VAL as U)
-              } else {
-                resolve(r.#val)
-              }
-            }
-          }
-        }, reject)
-      })
+      const newP = p.then(async (innerVal) => {
+        if (innerVal === NONE_VAL) {
+          newCtx.promiseNoneSlot = true
+          return NONE_VAL as U
+        }
+        const mapped = await mapper(innerVal)
+        const value = await mapped.#val
+        if (mapped.isNone() || value === NONE_VAL) {
+          newCtx.promiseNoneSlot = true
+          return NONE_VAL as U
+        }
+        return value
+      }) as Promise<U>
       return new Option(newP, newCtx, "Some")
     }
 
@@ -768,12 +791,22 @@ export class Option<T> {
 
   /**
    * Converts this Option to a Result, using the provided error for None.
+   * Promise-backed Options preserve settled absence and propagate rejections.
    *
    * @template E - Error type
    * @param error - Error value for None
    * @returns Ok with value when Some, otherwise Err with error
    */
   toResult<E>(error: E): Result<T, E> {
+    if (isPromiseLike(this.#val)) {
+      return Result.fromPromise(
+        this.toPromise<Awaited<T>>().then((option) =>
+          option.isNone()
+            ? Result.Err<E, Awaited<T>>(error)
+            : Result.Ok<Awaited<T>, E>(option.unwrap()),
+        ),
+      ) as unknown as Result<T, E>
+    }
     if (this.isNone()) {
       return Result.Err(error)
     }
@@ -952,30 +985,42 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is the Option that was yielded
+        let yielded = next.value as Option<unknown>
+
+        if (isCapturedTrace(yielded)) {
+          yielded = yielded.value as Option<unknown>
+        }
+
+        if (yielded.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value and pass it back to the generator
+        nextArg = yielded.unwrap()
       }
-
-      // next.value is the Option that was yielded
-      let yielded = next.value as Option<unknown>
-
-      if (isCapturedTrace(yielded)) {
-        yielded = yielded.value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          const effect = yielded as Option<unknown>
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      if (yielded.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value and pass it back to the generator
-      nextArg = yielded.unwrap()
     }
 
     return currentResult
@@ -1042,32 +1087,47 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is the OptionYieldWrap that was yielded
+        const wrapped = next.value as OptionYieldWrap<unknown>
+        let option = wrapped.option
+
+        if (isCapturedTrace(option)) {
+          option = (option as CapturedTrace<Option<unknown>>)
+            .value as Option<unknown>
+        }
+
+        if (option.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value and pass it back to the generator
+        nextArg = option.unwrap()
       }
-
-      // next.value is the OptionYieldWrap that was yielded
-      const wrapped = next.value as OptionYieldWrap<unknown>
-      let option = wrapped.option
-
-      if (isCapturedTrace(option)) {
-        option = (option as CapturedTrace<Option<unknown>>)
-          .value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = (yielded as OptionYieldWrap<unknown>).option
+          if (isCapturedTrace(effect)) {
+            effect = effect.value as Option<unknown>
+          }
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      if (option.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value and pass it back to the generator
-      nextArg = option.unwrap()
     }
 
     return currentResult
@@ -1127,6 +1187,7 @@ export class Option<T> {
    * }
    * ```
    *
+   * Settles promise-backed Options before checking for None; raw rejections propagate.
    * @see {@link asyncGenAdapter} for better type inference and cleaner syntax
    * @see {@link gen} for synchronous operations
    */
@@ -1140,30 +1201,45 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is an Option (user awaits promises before yielding)
+        let option = next.value as Option<unknown>
+
+        if (isCapturedTrace(option)) {
+          option = option.value as Option<unknown>
+        }
+
+        option = await option.toPromise()
+
+        if (option.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value
+        nextArg = await option.unwrap()
       }
-
-      // next.value is an Option (user awaits promises before yielding)
-      let option = next.value as Option<unknown>
-
-      if (isCapturedTrace(option)) {
-        option = option.value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = yielded as Option<unknown>
+          effect = await effect.toPromise()
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      if (option.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value
-      nextArg = await option.unwrap()
     }
 
     return currentResult
@@ -1174,6 +1250,7 @@ export class Option<T> {
    *
    * The `$` adapter handles both sync `Option<T>` and async `Promise<Option<T>>`,
    * automatically awaiting promises. This provides cleaner syntax for mixed sync/async workflows.
+   * Settles promise-backed Options before checking for None; raw rejections propagate.
    *
    * Short-circuits on first `None`, returning singleton `None`. Uses async iteration
    * instead of recursion to avoid stack overflow on deep chains.
@@ -1240,32 +1317,50 @@ export class Option<T> {
     let nextArg: unknown
     let currentResult: Option<T>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Some
-        currentResult = Option.Some(next.value)
-        break
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Some
+          currentResult = Option.Some(next.value)
+          break
+        }
+
+        // next.value is the AsyncOptionYieldWrap that was yielded
+        const wrapped = next.value as AsyncOptionYieldWrap<unknown>
+        let option = await wrapped.option
+
+        if (isCapturedTrace(option)) {
+          option = (option as CapturedTrace<Option<unknown>>)
+            .value as Option<unknown>
+        }
+
+        option = await option.toPromise()
+
+        if (option.isNone()) {
+          // Early termination on None - return singleton None
+          currentResult = Option.None
+          break
+        }
+
+        // Unwrap the Some value
+        nextArg = await option.unwrap()
       }
-
-      // next.value is the AsyncOptionYieldWrap that was yielded
-      const wrapped = next.value as AsyncOptionYieldWrap<unknown>
-      let option = await wrapped.option
-
-      if (isCapturedTrace(option)) {
-        option = (option as CapturedTrace<Option<unknown>>)
-          .value as Option<unknown>
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = await (yielded as AsyncOptionYieldWrap<unknown>).option
+          if (isCapturedTrace(effect)) {
+            effect = effect.value as Option<unknown>
+          }
+          effect = await effect.toPromise()
+          return effect.isNone() ? undefined : effect.unwrap()
+        })
       }
-
-      if (option.isNone()) {
-        // Early termination on None - return singleton None
-        currentResult = Option.None
-        break
-      }
-
-      // Unwrap the Some value
-      nextArg = await option.unwrap()
     }
 
     return currentResult

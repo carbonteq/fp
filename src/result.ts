@@ -1,7 +1,13 @@
 import { UnwrappedErrWithOk, UnwrappedOkWithErr } from "./errors.js"
 import { Option } from "./option.js"
 import { UNIT } from "./unit.js"
-import { CapturedTrace, isCapturedTrace, isPromiseLike } from "./utils.js"
+import {
+  CapturedTrace,
+  closeAsyncGenerator,
+  closeGenerator,
+  isCapturedTrace,
+  isPromiseLike,
+} from "./utils.js"
 
 type Mapper<T, U> = (val: T) => U
 type AsyncMapper<T, U> = (val: T) => Promise<U>
@@ -86,6 +92,7 @@ class ResultYieldWrap<T, E> {
 /**
  * Wrapper that makes Result yieldable in async generators with proper type tracking.
  * Supports Promise<Result<T, E>> for async result chaining.
+ * Delegation returns the awaited success value, including promise-backed payloads.
  *
  * @internal
  */
@@ -94,14 +101,14 @@ class AsyncResultYieldWrap<T, E> {
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
     AsyncResultYieldWrap<T, E>,
-    T,
+    Awaited<T>,
     unknown
   > {
     const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as AsyncResultYieldWrap<T, E>) as T
+    ) as unknown as AsyncResultYieldWrap<T, E>) as Awaited<T>
   }
 }
 
@@ -606,6 +613,8 @@ export class Result<T, E> {
    * returns that Result directly. If Err, propagates the error unchanged.
    *
    * Error types are unified: `Result<U, E | E2>`.
+   * Mapper throws propagate synchronously for sync inputs and reject the
+   * returned promise chain for promise inputs; they do not become Err.
    *
    * @param fn - Function that returns a Result
    * @returns Result<U, E | E2> from the function or propagated error
@@ -682,20 +691,17 @@ export class Result<T, E> {
     const newCtx: ResultCtx<E | E2> = { asyncErr: NO_ERR }
 
     if (isPromiseLike(curr)) {
-      const newP = new Promise<U>((resolve, reject) => {
-        curr.then((v) => {
-          if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
-            newCtx.asyncErr =
-              parentCtx.asyncErr !== NO_ERR
-                ? (parentCtx.asyncErr as E | E2)
-                : (parentErr as E | E2)
-            return resolve(ERR_VAL as U)
-          }
+      const newP = curr.then((v) => {
+        if (v === ERR_VAL || parentCtx.asyncErr !== NO_ERR) {
+          newCtx.asyncErr =
+            parentCtx.asyncErr !== NO_ERR
+              ? (parentCtx.asyncErr as E | E2)
+              : (parentErr as E | E2)
+          return ERR_VAL as U
+        }
 
-          const mapped = fn(v as In)
-          const p = Result.flatMapHelper<U, E, E2, T>(newCtx, mapped)
-          resolve(p)
-        }, reject)
+        const mapped = fn(v as In)
+        return Result.flatMapHelper<U, E, E2, T>(newCtx, mapped)
       })
 
       return new Result(newP, parentErr as E | E2, newCtx, "Ok")
@@ -1463,11 +1469,11 @@ export class Result<T, E> {
    * Useful for fallback chains where you want the first success, but want
    * to collect all errors if everything fails.
    *
-   * - First Ok → Returns that Ok immediately
+   * - First settled Ok in input order → Returns that Ok
    * - All Err → `Err([...all errors])`
    *
    * For async Ok values, this waits for settlement and selects the first
-   * successful candidate in input order (not fastest-to-resolve order).
+   * successful candidate in input order, without waiting for the suffix after success.
    *
    * @param results - Variable number of Results to check
    * @returns First Ok found, or Err with array of all errors
@@ -1498,42 +1504,41 @@ export class Result<T, E> {
    */
   static any<U, F>(...results: Result<U, F>[]): Result<U, F[]> {
     const errs: F[] = []
-    const pending: Result<U, F>[] = []
+    let hasPending = false
 
     for (const r of results) {
       if (r.isOk()) {
         if (isPromiseLike(r.#val)) {
-          pending.push(r)
-          continue
+          hasPending = true
+          break
         }
         return r as Result<U, F[]>
       }
-
       errs.push(r.getErr())
     }
 
-    if (pending.length === 0) {
-      return Result.Err(errs)
+    if (!hasPending) return Result.Err(errs)
+
+    // Observe already-created payloads without changing ordered selection.
+    for (const r of results) {
+      if (isPromiseLike(r.#val)) {
+        Promise.resolve(r.#val).then(undefined, () => {})
+      }
     }
 
+    errs.length = 0
     const ctx: ResultCtx<F[]> = { asyncErr: NO_ERR }
-    const p = Promise.all(
-      pending.map(async (r) => {
-        const val = await (r.#val as Promise<unknown>)
-        const failed = r.#ctx.asyncErr !== NO_ERR || val === ERR_VAL
-        return { failed, val, err: r.getErr() }
-      }),
-    ).then((settled) => {
-      for (const item of settled) {
-        if (!item.failed) {
-          return item.val
+    const p = (async () => {
+      for (const r of results) {
+        if (r.isOk()) {
+          const val = await r.#val
+          if (r.#ctx.asyncErr === NO_ERR && val !== ERR_VAL) return val
         }
-        errs.push(item.err)
+        errs.push(r.getErr())
       }
-
       ctx.asyncErr = errs
       return ERR_VAL
-    })
+    })()
 
     return new Result(p as U, undefined as unknown as F[], ctx, "Ok")
   }
@@ -1665,6 +1670,7 @@ export class Result<T, E> {
    * - Err(error) → None
    *
    * Use when you only care about presence/absence of a value, not the error.
+   * Promise-backed Results preserve settled failure and propagate rejections.
    *
    * @returns Option<T> - Some if Ok, None if Err
    *
@@ -1681,6 +1687,13 @@ export class Result<T, E> {
    * @see Option.toResult
    */
   toOption(): Option<T> {
+    if (isPromiseLike(this.#val)) {
+      return Option.fromPromise(
+        this.toPromise().then((result) =>
+          result.isErr() ? Option.None : Option.Some(result.unwrap()),
+        ),
+      ) as unknown as Option<T>
+    }
     if (this.isErr()) return Option.None
     return Option.Some(this.#val)
   }
@@ -1801,6 +1814,7 @@ export class Result<T, E> {
    * Returns an optimistic `Ok(Promise<T>)`. If the inner promise fails later,
    * the failure is tracked internally and surfaces when you settle/unwrap
    * (`toPromise`, `unwrap`, `unwrapErr`, etc.).
+   * Promise-backed inner Results are settled before their failure is propagated.
    *
    * @template U - Success value type
    * @template F - Error type
@@ -1812,18 +1826,9 @@ export class Result<T, E> {
     promise: Promise<Result<U, F>>,
   ): Result<Promise<U>, F> {
     const ctx: ResultCtx<F> = { asyncErr: NO_ERR }
-    const p = promise.then((innerResult) => {
-      if (innerResult.isErr()) {
-        // Access error via unwrapErr since getErr is private
-        try {
-          ctx.asyncErr = innerResult.unwrapErr()
-        } catch {
-          // Should not happen for Err result
-        }
-        return ERR_VAL as U
-      }
-      return innerResult.unwrap()
-    })
+    const p = promise.then((innerResult) =>
+      Result.flatMapInnerHelper(ctx, innerResult),
+    )
 
     return Result[RESULT_INTERNAL].create<Promise<U>, F>(
       p,
@@ -1911,7 +1916,7 @@ export class Result<T, E> {
 
   /**
    * Makes Result iterable for use with async generator-based syntax.
-   * Yields self and returns the unwrapped value when resumed.
+   * Yields self and returns the awaited unwrapped value when resumed.
    *
    * @example
    * ```ts
@@ -1921,12 +1926,12 @@ export class Result<T, E> {
    * });
    * ```
    */
-  async *[Symbol.asyncIterator](): AsyncGenerator<Result<T, E>, T, unknown> {
+  async *[Symbol.asyncIterator](): AsyncGenerator<Result<T, E>, Awaited<T>, unknown> {
     const trace = new Error().stack
     return (yield new CapturedTrace(this, trace) as unknown as Result<
       T,
       E
-    >) as T
+    >) as Awaited<T>
   }
 
   /**
@@ -1958,40 +1963,52 @@ export class Result<T, E> {
     let nextArg: unknown
     let currentResult: Result<T, ExtractError<Eff>>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = Result.Ok(next.value)
-        break
-      }
-
-      // next.value is the Result that was yielded
-      let yielded = next.value as Result<unknown, unknown>
-      let stack: string | undefined
-
-      if (isCapturedTrace(yielded)) {
-        stack = yielded.stack
-        yielded = yielded.value as Result<unknown, unknown>
-      }
-
-      if (yielded.isErr()) {
-        const err = yielded.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = Result.Ok(next.value)
+          break
         }
-        // Early termination on error - return the Err result
-        currentResult = yielded as Result<T, ExtractError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = yielded.unwrap()
+        // next.value is the Result that was yielded
+        let yielded = next.value as Result<unknown, unknown>
+        let stack: string | undefined
+
+        if (isCapturedTrace(yielded)) {
+          stack = yielded.stack
+          yielded = yielded.value as Result<unknown, unknown>
+        }
+
+        if (yielded.isErr()) {
+          const err = yielded.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = yielded as Result<T, ExtractError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = yielded.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          const effect = yielded as Result<unknown, unknown>
+          return effect.isErr() ? undefined : effect.unwrap()
+        })
+      }
     }
 
     return currentResult
@@ -2031,42 +2048,57 @@ export class Result<T, E> {
     let nextArg: unknown
     let currentResult: Result<T, ExtractResultError<Eff>>
 
-    while (true) {
-      const next = iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = Result.Ok(next.value)
-        break
-      }
-
-      // next.value is the ResultYieldWrap that was yielded
-      const wrapped = next.value as ResultYieldWrap<unknown, unknown>
-      let result = wrapped.result
-      let stack: string | undefined
-
-      if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack
-        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-        result = (wrapped as any).value.result
-      }
-
-      if (result.isErr()) {
-        const err = result.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = Result.Ok(next.value)
+          break
         }
-        // Early termination on error - return the Err result
-        currentResult = result as unknown as Result<T, ExtractResultError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap()
+        // next.value is the ResultYieldWrap that was yielded
+        const wrapped = next.value as ResultYieldWrap<unknown, unknown>
+        let result = wrapped.result
+        let stack: string | undefined
+
+        if (isCapturedTrace(wrapped)) {
+          stack = wrapped.stack
+          // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+          result = (wrapped as any).value.result
+        }
+
+        if (result.isErr()) {
+          const err = result.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = result as unknown as Result<T, ExtractResultError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = result.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        closeGenerator(iterator, (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = (yielded as ResultYieldWrap<unknown, unknown>).result
+          if (isCapturedTrace(effect)) {
+            effect = effect.value as Result<unknown, unknown>
+          }
+          return effect.isErr() ? undefined : effect.unwrap()
+        })
+      }
     }
 
     return currentResult
@@ -2075,6 +2107,7 @@ export class Result<T, E> {
   /**
    * Async generator-based syntax for chaining Result operations (simplified, no adapter).
    * Use yield* with Result values directly. For Promise<Result<T, E>>, await first then yield*.
+   * Settles promise-backed Results before checking for Err; raw rejections propagate.
    *
    * Short-circuits on first Err, returning that error. Uses async iteration instead of
    * recursion to avoid stack overflow on deep chains.
@@ -2103,40 +2136,55 @@ export class Result<T, E> {
     let nextArg: unknown
     let currentResult: Result<T, ExtractError<Eff>>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = Result.Ok(next.value)
-        break
-      }
-
-      // next.value is a Result (user awaits promises before yielding)
-      let result = next.value as Result<unknown, unknown>
-      let stack: string | undefined
-
-      if (isCapturedTrace(result)) {
-        stack = result.stack
-        result = result.value as Result<unknown, unknown>
-      }
-
-      if (result.isErr()) {
-        const err = result.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = Result.Ok(next.value)
+          break
         }
-        // Early termination on error - return the Err result
-        currentResult = result as Result<T, ExtractError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap()
+        // next.value is a Result (user awaits promises before yielding)
+        let result = next.value as Result<unknown, unknown>
+        let stack: string | undefined
+
+        if (isCapturedTrace(result)) {
+          stack = result.stack
+          result = result.value as Result<unknown, unknown>
+        }
+
+        result = await result.toPromise()
+
+        if (result.isErr()) {
+          const err = result.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = result as Result<T, ExtractError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = result.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = yielded as Result<unknown, unknown>
+          effect = await effect.toPromise()
+          return effect.isErr() ? undefined : effect.unwrap()
+        })
+      }
     }
 
     return currentResult
@@ -2146,6 +2194,7 @@ export class Result<T, E> {
    * Async generator-based syntax for chaining Result operations (with adapter).
    * Uses an adapter function ($) for improved type inference.
    * Supports both Result<T, E> and Promise<Result<T, E>> for flexibility.
+   * Settles promise-backed Results before checking for Err; raw rejections propagate.
    *
    * Short-circuits on first Err, returning that error. Uses async iteration instead of
    * recursion to avoid stack overflow on deep chains.
@@ -2186,44 +2235,62 @@ export class Result<T, E> {
     let nextArg: unknown
     let currentResult: Result<T, ExtractAsyncResultError<Eff>>
 
-    while (true) {
-      const next = await iterator.next(nextArg)
+    let naturalCompleted = false
+    try {
+      while (true) {
+        const next = await iterator.next(nextArg)
 
-      if (next.done) {
-        // Generator completed successfully - wrap return value in Ok
-        currentResult = Result.Ok(next.value)
-        break
-      }
-
-      // next.value is the AsyncResultYieldWrap that was yielded
-      const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>
-      let result: Result<unknown, unknown>
-      let stack: string | undefined
-
-      if (isCapturedTrace(wrapped)) {
-        stack = wrapped.stack
-        // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
-        result = await (wrapped as any).value.result
-      } else {
-        result = await wrapped.result
-      }
-
-      if (result.isErr()) {
-        const err = result.unwrapErr()
-        if (stack && err instanceof Error) {
-          const stackLines = stack.split("\n")
-          if (stackLines.length > 2) {
-            const userStack = stackLines.slice(2).join("\n")
-            err.stack = `${err.name}: ${err.message}\n${userStack}`
-          }
+        if (next.done) {
+          naturalCompleted = true
+          // Generator completed successfully - wrap return value in Ok
+          currentResult = Result.Ok(next.value)
+          break
         }
-        // Early termination on error - return the Err result
-        currentResult = result as Result<T, ExtractAsyncResultError<Eff>>
-        break
-      }
 
-      // Unwrap the Ok value and pass it back to the generator
-      nextArg = result.unwrap()
+        // next.value is the AsyncResultYieldWrap that was yielded
+        const wrapped = next.value as AsyncResultYieldWrap<unknown, unknown>
+        let result: Result<unknown, unknown>
+        let stack: string | undefined
+
+        if (isCapturedTrace(wrapped)) {
+          stack = wrapped.stack
+          // biome-ignore lint/suspicious/noExplicitAny: generic unwrap
+          result = await (wrapped as any).value.result
+        } else {
+          result = await wrapped.result
+        }
+
+        result = await result.toPromise()
+
+        if (result.isErr()) {
+          const err = result.unwrapErr()
+          if (stack && err instanceof Error) {
+            const stackLines = stack.split("\n")
+            if (stackLines.length > 2) {
+              const userStack = stackLines.slice(2).join("\n")
+              err.stack = `${err.name}: ${err.message}\n${userStack}`
+            }
+          }
+          // Early termination on error - return the Err result
+          currentResult = result as Result<T, ExtractAsyncResultError<Eff>>
+          break
+        }
+
+        // Unwrap the Ok value and pass it back to the generator
+        nextArg = result.unwrap()
+      }
+    } finally {
+      if (!naturalCompleted) {
+        await closeAsyncGenerator(iterator, async (yielded) => {
+          if (isCapturedTrace(yielded)) yielded = yielded.value
+          let effect = await (yielded as AsyncResultYieldWrap<unknown, unknown>).result
+          if (isCapturedTrace(effect)) {
+            effect = effect.value as Result<unknown, unknown>
+          }
+          effect = await effect.toPromise()
+          return effect.isErr() ? undefined : effect.unwrap()
+        })
+      }
     }
 
     return currentResult
