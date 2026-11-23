@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test"
+import { describe, expect, expectTypeOf, it, mock } from "bun:test"
 import {
   match,
   matchOpt,
@@ -8,6 +8,8 @@ import {
   ExperimentalOption as Option,
   P,
   ExperimentalResult as Result,
+  Option as StableOption,
+  Result as StableResult,
   UnmatchedCaseError,
 } from "@/index.js"
 
@@ -412,6 +414,189 @@ describe("match() builder - with P patterns", () => {
 // =============================================================================
 
 describe("match() builder - predicate guards", () => {
+  it("should reject incompatible predicates without widening the pattern tag", () => {
+    if (false) {
+      // @ts-expect-error Some predicates must accept the numeric payload.
+      match(Option.Some(1)).with(P.Some((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Stable Some predicates must accept the numeric payload.
+      match(StableOption.Some(1)).with(P.Some((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Ok predicates cannot use the Err payload type.
+      match<Result<number, string>>(Result.Ok(1)).with(P.Ok((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Err predicates cannot use the Ok payload type.
+      match<Result<number, string>>(Result.Err("error")).with(P.Err((value: number) => value > 0), () => 0)
+      // @ts-expect-error Stable Ok predicates cannot use the Err payload type.
+      match<StableResult<number, string>>(StableResult.Ok(1)).with(P.Ok((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Stable Err predicates cannot use the Ok payload type.
+      match<StableResult<number, string>>(StableResult.Err("error")).with(P.Err((value: number) => value > 0), () => 0)
+      // @ts-expect-error Guarded patterns must include a predicate function.
+      match(Option.Some(1)).with({ _patternTag: "Some", _hasPredicate: true }, () => 0)
+    }
+  })
+
+  it("should reject narrow predicates and handlers for unknown payloads", () => {
+    if (false) {
+      // @ts-expect-error Unknown Some payloads cannot require strings.
+      match(Option.Some<unknown>("text")).with(P.Some((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Unknown Some payloads cannot require numeric handlers.
+      match(Option.Some<unknown>("text")).with(P.Some((_: unknown) => true), (value: number) => value.toFixed())
+      // @ts-expect-error Unknown stable Some payloads cannot require strings.
+      match(StableOption.Some<unknown>("text")).with(P.Some((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Unknown stable Some payloads cannot require numeric handlers.
+      match(StableOption.Some<unknown>("text")).with(P.Some((_: unknown) => true), (value: number) => value.toFixed())
+      // @ts-expect-error Unknown Ok payloads cannot require strings.
+      match(Result.Ok<unknown>("text")).with(P.Ok((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Unknown Ok payloads cannot require numeric handlers.
+      match(Result.Ok<unknown>("text")).with(P.Ok((_: unknown) => true), (value: number) => value.toFixed())
+      // @ts-expect-error Unknown stable Ok payloads cannot require strings.
+      match(StableResult.Ok<unknown>("text")).with(P.Ok((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Unknown stable Ok payloads cannot require numeric handlers.
+      match(StableResult.Ok<unknown>("text")).with(P.Ok((_: unknown) => true), (value: number) => value.toFixed())
+      // @ts-expect-error Unknown Err payloads cannot require strings.
+      match(Result.Err<unknown>("text")).with(P.Err((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Unknown Err payloads cannot require numeric handlers.
+      match(Result.Err<unknown>("text")).with(P.Err((_: unknown) => true), (value: number) => value.toFixed())
+      // @ts-expect-error Unknown stable Err payloads cannot require strings.
+      match(StableResult.Err<unknown>("text")).with(P.Err((value: string) => value.length > 0), () => 0)
+      // @ts-expect-error Unknown stable Err payloads cannot require numeric handlers.
+      match(StableResult.Err<unknown>("text")).with(P.Err((_: unknown) => true), (value: number) => value.toFixed())
+    }
+  })
+
+  it("should preserve unknown payloads in guarded handler inference", () => {
+    const acceptsUnknown = (value: unknown) => value !== undefined
+    const some = match(Option.Some<unknown>("some"))
+      .with(P.Some(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<unknown>()
+        return value
+      })
+      .otherwise(() => undefined)
+    const stableSome = match(StableOption.Some<unknown>("some"))
+      .with(P.Some(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<unknown>()
+        return value
+      })
+      .otherwise(() => undefined)
+    const ok = match(Result.Ok<unknown>("ok"))
+      .with(P.Ok(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<unknown>()
+        return value
+      })
+      .otherwise(() => undefined)
+    const stableOk = match(StableResult.Ok<unknown>("ok"))
+      .with(P.Ok(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<unknown>()
+        return value
+      })
+      .otherwise(() => undefined)
+    const err = match(Result.Err<unknown>("err"))
+      .with(P.Err(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<unknown>()
+        return value
+      })
+      .otherwise(() => undefined)
+    const stableErr = match(StableResult.Err<unknown>("err"))
+      .with(P.Err(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<unknown>()
+        return value
+      })
+      .otherwise(() => undefined)
+    expect([some, stableSome, ok, stableOk, err, stableErr]).toEqual([
+      "some", "some", "ok", "ok", "err", "err",
+    ])
+  })
+
+  it("should accept unknown predicates and infer exact payload handlers", () => {
+    const acceptsUnknown = (value: unknown) => value !== undefined
+    const some = match(Option.Some(2))
+      .with(P.Some(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<number>()
+        return value * 2
+      })
+      .otherwise(() => 0)
+    const stableSome = match(StableOption.Some(2))
+      .with(P.Some(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<number>()
+        return value * 2
+      })
+      .otherwise(() => 0)
+    const ok = match<Result<number, string>>(Result.Ok(3))
+      .with(P.Ok(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<number>()
+        return value * 2
+      })
+      .otherwise(() => 0)
+    const stableOk = match<StableResult<number, string>>(StableResult.Ok(3))
+      .with(P.Ok(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<number>()
+        return value * 2
+      })
+      .otherwise(() => 0)
+    const err = match<Result<number, string>>(Result.Err("error"))
+      .with(P.Err(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<string>()
+        return value.length
+      })
+      .otherwise(() => 0)
+    const stableErr = match<StableResult<number, string>>(StableResult.Err("error"))
+      .with(P.Err(acceptsUnknown), (value) => {
+        expectTypeOf(value).toEqualTypeOf<string>()
+        return value.length
+      })
+      .otherwise(() => 0)
+    expect([some, stableSome, ok, stableOk, err, stableErr]).toEqual([4, 4, 6, 6, 5, 5])
+  })
+
+  it("should pass custom Some, Ok and Err variants to guards and handlers", () => {
+    type CustomSome = { readonly _tag: "Some"; value: number }
+    type CustomOk = { readonly _tag: "Ok"; data: number }
+    type CustomErr = { readonly _tag: "Err"; code: number }
+    type Custom = CustomSome | CustomOk | CustomErr
+    const some: CustomSome = { _tag: "Some", value: 2 }
+    const ok: CustomOk = { _tag: "Ok", data: 3 }
+    const err: CustomErr = { _tag: "Err", code: 404 }
+
+    const run = (input: Custom) =>
+      match(input)
+        .with(P.Some((value: CustomSome) => {
+          expectTypeOf(value).toEqualTypeOf<CustomSome>()
+          expect(value === input).toBe(true)
+          return value.value > 0
+        }), (value) => {
+          expectTypeOf(value).toEqualTypeOf<CustomSome>()
+          expect(value === input).toBe(true)
+          return value.value
+        })
+        .with(P.Ok((value: CustomOk) => {
+          expectTypeOf(value).toEqualTypeOf<CustomOk>()
+          expect(value === input).toBe(true)
+          return value.data > 0
+        }), (value) => {
+          expectTypeOf(value).toEqualTypeOf<CustomOk>()
+          expect(value === input).toBe(true)
+          return value.data
+        })
+        .with(P.Err((value: CustomErr) => {
+          expectTypeOf(value).toEqualTypeOf<CustomErr>()
+          expect(value === input).toBe(true)
+          return value.code === 404
+        }), (value) => {
+          expectTypeOf(value).toEqualTypeOf<CustomErr>()
+          expect(value === input).toBe(true)
+          return value.code
+        })
+        .otherwise(() => -1)
+
+    expect([run(some), run(ok), run(err)]).toEqual([2, 3, 404])
+    if (false) {
+      // @ts-expect-error A custom Some guard receives the object, not its value.
+      match<Custom>(some).with(P.Some((value: number) => value > 0), () => 0)
+      // @ts-expect-error A custom Ok guard receives the object, not its data.
+      match<Custom>(ok).with(P.Ok((value: number) => value > 0), () => 0)
+      // @ts-expect-error A custom Err guard receives the object, not its code.
+      match<Custom>(err).with(P.Err((value: number) => value > 0), () => 0)
+    }
+  })
+
   it("should support P.eq helper in guarded patterns", () => {
     const result = match(Result.Ok(42) as Result<number, string>)
       .with(P.Ok(P.eq(42)), () => "exact")

@@ -63,11 +63,25 @@ type GetInnerType<T, Tag extends string> = Tag extends "Some"
         ? V
         : unknown
 
-type MatchInput<T, Tag extends string> = Tag extends "Some" | "Ok" | "Err"
-  ? IsExactlyUnknown<GetInnerType<T, Tag>> extends true
-    ? ExtractByTag<T, Tag>
-    : GetInnerType<T, Tag>
-  : ExtractByTag<T, Tag>
+type MatchInput<T, Tag extends string> = Tag extends "Some"
+  ? T extends Option<infer V>
+    ? V
+    : T extends OldOption<infer V>
+      ? V
+      : ExtractByTag<T, Tag>
+  : Tag extends "Ok"
+    ? T extends Result<infer V, unknown>
+      ? V
+      : T extends OldResult<infer V, unknown>
+        ? V
+        : ExtractByTag<T, Tag>
+    : Tag extends "Err"
+      ? T extends Result<unknown, infer E>
+        ? E
+        : T extends OldResult<unknown, infer E>
+          ? E
+          : ExtractByTag<T, Tag>
+      : ExtractByTag<T, Tag>
 
 type HasPromiseLikePayloadForTag<T, Tag extends string> =
   Tag extends GetTags<T>
@@ -442,6 +456,7 @@ interface MatchBuilder<T, Matched extends string, Returns> {
   /**
    * Add a pattern match case using a Pattern object with predicate guard.
    * This variant does NOT consume the tag (allows multiple guarded patterns).
+   * The predicate and handler receive the same payload or narrowed tagged object.
    *
    * @example
    * ```ts
@@ -453,8 +468,11 @@ interface MatchBuilder<T, Matched extends string, Returns> {
    * ```
    */
   with<Tag extends GetTags<T>, R>(
-    pattern: BasePattern<Tag> & { readonly _hasPredicate: true },
-    handler: MatchHandler<GetInnerType<T, Tag>, R>,
+    pattern: BasePattern<Tag> & {
+      readonly _hasPredicate: true
+      readonly predicate: (value: MatchInput<T, NoInfer<Tag>>) => boolean
+    },
+    handler: MatchHandler<MatchInput<T, Tag>, R>,
   ): MatchBuilder<T, Matched, Returns | R>
 
   /**
