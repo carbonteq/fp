@@ -13,6 +13,7 @@
 - Source-breaking: `ExperimentalResult.mapAsync`, `ExperimentalResult.flatMapAsync`, and stable and experimental `Flow.asyncGenAdapter` now expose caught rejection errors as `unknown`, preserving arbitrary rejection values and requiring callers to narrow them.
 - Correct awaited delegation types for stable and experimental Result async iterators and Result and Flow async generator adapters, while preserving synchronous promise payloads.
 - Check guarded match predicates against the actual handler input, preserving custom Some, Ok, and Err tagged objects.
+- Return false instead of throwing when `isTuple` receives null or undefined.
 
 ## 0.10.0
 
