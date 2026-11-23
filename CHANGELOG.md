@@ -15,6 +15,27 @@
 - Check guarded match predicates against the actual handler input, preserving custom Some, Ok, and Err tagged objects.
 - Return false instead of throwing when `isTuple` receives null or undefined.
 
+## 0.11.0
+
+### Minor Changes
+
+- c80f878: Make ExperimentalResult.validate() synchronous-only. Migrate asynchronous validators to validateAsync(), which always returns a promise.
+- 8062204: Expose caught promise rejections as unknown errors from ExperimentalResult.mapAsync/flatMapAsync and Flow.asyncGenAdapter. Narrow errors before accessing their properties.
+
+### Patch Changes
+
+- ce23cc4: Select any() successes in input order without waiting for irrelevant later promises, preserving Result error order.
+- 618fc28: Settle async-inner Option and Result values before selecting async generator success or failure branches.
+- ec9b875: Preserve pending absence and errors when converting between Option and Result, without exposing internal sentinels.
+- 68dcf4c: Normalize nested async Result failures in fromPromise() while preserving original errors and raw rejections.
+- 8262110: Return false instead of throwing when isTuple() receives null or undefined.
+- 8befc6c: Update the development toolchain to Node 22, current Bun and TypeScript tooling, and typed Oxlint/Oxfmt configuration.
+- 68d45b8: Use Awaited<T> for async Result delegation and Flow adapter iterators so inferred payload types match runtime values.
+- b42d7fa: Reject mapper exceptions in promise-backed Option.flatMap and Result.flatMap instead of leaving chains pending.
+- e22b604: Run finally cleanup when generator workflows short-circuit, await async cleanup, and preserve runner-observed failures.
+- 6782486: Constrain guarded match predicates and handlers to actual payload or custom variant types, preserving unknown payload safety.
+- e2e2d2c: Apply Option unwrapOr/unwrapOrElse fallbacks after pending absence settles and preserve promise-aware types through isNone().
+
 ## 0.10.0
 
 ### Minor Changes
