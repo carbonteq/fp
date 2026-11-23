@@ -236,7 +236,7 @@ describe("ExperimentalResult.asyncGen", () => {
         return value
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, never>>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(6)
     })
@@ -257,7 +257,7 @@ describe("ExperimentalResult.asyncGen", () => {
         return value
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, string>>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(10)
     })
@@ -331,14 +331,14 @@ describe("ExperimentalResult.asyncGen", () => {
       }
 
       const result = await Result.asyncGen(async function* () {
-        // Use mapAsync which returns Promise<Result<number, never>>
+        // mapAsync includes arbitrary promise rejection values in its error type.
         const value = yield* await Result.Ok(3).mapAsync(asyncDouble)
 
         expectTypeOf(value).toEqualTypeOf<number>()
         return value + 10
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, never>>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(16) // 3 * 2 + 10
     })
@@ -359,7 +359,7 @@ describe("ExperimentalResult.asyncGen", () => {
         return a + b
       })
 
-      expectTypeOf(result).toEqualTypeOf<Result<number, "err1" | "err2">>()
+      expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
       expect(result.isOk()).toBe(true)
       expect(result.unwrap()).toBe(25) // 10 + 15
     })

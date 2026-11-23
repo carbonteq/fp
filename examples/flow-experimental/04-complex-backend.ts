@@ -205,6 +205,9 @@ const enrichUser = (userId: number) =>
 // 4. Execution Examples
 // ============================================================================
 
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
 async function runDemo() {
   console.log("--- Scenario 1: Happy Path (Alice) ---")
   const res1 = await enrichUser(1)
@@ -213,28 +216,28 @@ async function runDemo() {
    */
   res1.match({
     Ok: (data) => console.log("SUCCESS:", JSON.stringify(data, null, 2)),
-    Err: (err) => console.error("FAILURE:", err.message),
+    Err: (err) => console.error("FAILURE:", errorMessage(err)),
   })
 
   console.log("\n--- Scenario 2: User Not Found (ID 99) ---")
   const res2 = await enrichUser(99)
   console.log(
     "Result:",
-    res2.isErr() ? `Left(${res2.unwrapErr().message})` : "Ok",
+    res2.isErr() ? `Left(${errorMessage(res2.unwrapErr())})` : "Ok",
   )
 
   console.log("\n--- Scenario 3: Validation Error (ID -5) ---")
   const res3 = await enrichUser(-5)
   console.log(
     "Result:",
-    res3.isErr() ? `Left(${res3.unwrapErr().message})` : "Ok",
+    res3.isErr() ? `Left(${errorMessage(res3.unwrapErr())})` : "Ok",
   )
 
   console.log("\n--- Scenario 4: Logical Validation (Bob - Inactive) ---")
   const res4 = await enrichUser(2)
   console.log(
     "Result:",
-    res4.isErr() ? `Left(${res4.unwrapErr().message})` : "Ok",
+    res4.isErr() ? `Left(${errorMessage(res4.unwrapErr())})` : "Ok",
   )
 }
 

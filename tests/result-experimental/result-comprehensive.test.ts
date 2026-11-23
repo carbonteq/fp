@@ -593,7 +593,7 @@ describe("Async Handling", () => {
       expect(result.unwrap()).toBe(10)
     })
 
-    it("Result<T, E> + async mapper → use mapAsync for Promise<Result<U, E>>", async () => {
+    it("Result<T, E> + async mapper → use mapAsync for Promise<Result<U, unknown>>", async () => {
       const result = await Result.Ok(5).mapAsync(async (x) => x * 2)
       expect(result.unwrap()).toBe(10)
     })

@@ -158,12 +158,6 @@ type ExtractWrapError<Y> =
     ? E // UnwrappedNone is added via adapter overload for Option
     : never
 
-type ExtractAsyncWrapError<Y> =
-  // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
-  Y extends AsyncFlowYieldWrap<any, infer E>
-    ? E // UnwrappedNone is added via adapter overload for Option
-    : never
-
 /**
  * Static namespace for composing stable Option/Result workflows via generators.
  * Short-circuits on yielded failures and returns a Result.
@@ -427,6 +421,7 @@ export class Flow {
 
   /**
    * Adapter variant of `asyncGen` for ergonomic mixed sync/async yielding.
+   * Promise rejections become Err values with an unknown error type.
    */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGenAdapter<Eff extends AsyncFlowYieldWrap<any, any>, T>(
@@ -439,7 +434,7 @@ export class Flow {
       ): AsyncFlowYieldWrap<A, E>
       fail: <E extends Error>(error: E) => AsyncFlowYieldWrap<never, E>
     }) => AsyncGenerator<Eff, T, unknown>,
-  ): Promise<Result<T, ExtractAsyncWrapError<Eff>>> {
+  ): Promise<Result<T, unknown>> {
     const baseAdapter = <A, E>(
       val: Option<A> | Result<A, E> | Promise<Option<A> | Result<A, E>>,
     ) => new AsyncFlowYieldWrap(val)
@@ -481,7 +476,7 @@ export class Flow {
               error.stack = `${error.name}: ${error.message}\n${userStack}`
             }
           }
-          return Result.Err(error) as Result<T, ExtractAsyncWrapError<Eff>>
+          return Result.Err(error)
         }
 
         if (isOption(value)) {
@@ -494,7 +489,7 @@ export class Flow {
                 err.stack = `${err.name}: ${err.message}\n${userStack}`
               }
             }
-            return Result.Err(err) as Result<T, ExtractAsyncWrapError<Eff>>
+            return Result.Err(err)
           }
           nextArg = value.unwrap()
         } else if (isResult(value)) {
@@ -507,7 +502,7 @@ export class Flow {
                 err.stack = `${err.name}: ${err.message}\n${userStack}`
               }
             }
-            return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>
+            return value as Result<T, unknown>
           }
           nextArg = value.unwrap()
         } else {

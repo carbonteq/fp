@@ -66,10 +66,12 @@ describe("XFlow.asyncGenAdapter", () => {
     })
 
     expect(result.isErr()).toBe(true)
-    expect(result.unwrapErr()).toBeInstanceOf(ValidationError)
-    expect((result.unwrapErr() as ValidationError).message).toBe(
-      "Value must be positive",
-    )
+    const error = result.unwrapErr()
+    expect(error).toBeInstanceOf(ValidationError)
+    if (!(error instanceof ValidationError)) {
+      throw new Error("Expected ValidationError")
+    }
+    expect(error.message).toBe("Value must be positive")
   })
 
   test("$.fail() short-circuits execution async", async () => {
@@ -83,8 +85,12 @@ describe("XFlow.asyncGenAdapter", () => {
 
     expect(result.isErr()).toBe(true)
     expect(executedAfterError).toBe(false)
-    expect(result.unwrapErr()).toBeInstanceOf(ServiceUnavailableError)
-    expect(result.unwrapErr().message).toBe("Database unavailable")
+    const error = result.unwrapErr()
+    expect(error).toBeInstanceOf(ServiceUnavailableError)
+    if (!(error instanceof ServiceUnavailableError)) {
+      throw new Error("Expected ServiceUnavailableError")
+    }
+    expect(error.message).toBe("Database unavailable")
   })
 
   test("$.fail() works with async operations", async () => {
@@ -135,5 +141,37 @@ describe("XFlow.asyncGenAdapter", () => {
 
     expect(result.isErr()).toBe(true)
     expect(result.unwrapErr()).toBe(rejection)
+  })
+
+  test("preserves arbitrary outer rejection values and skips the remaining body", async () => {
+    for (const rejection of [
+      "rejected",
+      42,
+      null,
+      undefined,
+      { reason: "rejected" },
+      new Error("rejected"),
+    ]) {
+      let continued = false
+      const result = await XFlow.asyncGenAdapter(async function* ($) {
+        yield* $(Promise.reject<Result<number, never>>(rejection))
+        continued = true
+        return 1
+      })
+
+      expect(result.isErr()).toBe(true)
+      expect(result.unwrapErr()).toBe(rejection)
+      expect(continued).toBe(false)
+    }
+  })
+
+  test("does not catch generator-body exceptions", async () => {
+    const rejection = { reason: "generator failed" }
+    const result = XFlow.asyncGenAdapter(async function* ($) {
+      yield* $(Result.Ok(1))
+      throw rejection
+    })
+
+    await expect(result).rejects.toBe(rejection)
   })
 })

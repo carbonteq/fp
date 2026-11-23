@@ -225,7 +225,7 @@ const label = match(settled)
 
 ## The `ExperimentalResult` type (Experimental)
 
-`ExperimentalResult` differs from the stable `Result` by providing explicit async methods like `mapAsync` and `flatMapAsync` that return `Promise<ExperimentalResult<T, E>>` directly, rather than returning `Result<Promise<T>, E>` and requiring `toPromise()`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) used by `Flow`.
+`ExperimentalResult` differs from the stable `Result` by providing explicit async methods like `mapAsync` and `flatMapAsync` that return `Promise<ExperimentalResult<T, unknown>>` directly, rather than returning `Result<Promise<T>, E>` and requiring `toPromise()`. Returned-promise rejections become `Err` with the original rejection value, which need not be an `Error`. Narrow errors before accessing properties, for example `error instanceof Error ? error.message : String(error)`. A promise-typed mapper that throws synchronously still rejects the method's promise. Both methods skip the mapper for an existing `Err`. It also includes generator-based APIs (`gen`, `asyncGen`, and adapter variants) used by `Flow`.
 
 `ExperimentalResult.validate` now accepts synchronous validators only. Migrate `await result.validate([asyncValidator])` to `await result.validateAsync([asyncValidator])`. `validateAsync` always returns a Promise, including when the input is already Err. Stable `Result.validate` is unchanged.
 

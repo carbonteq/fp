@@ -366,17 +366,25 @@ describe("Flow.genAdapter type inference with $.fail", () => {
 // ============================================================================
 
 describe("Flow.asyncGenAdapter type inference with $.fail", () => {
-  test("infers error type from $.fail async", async () => {
+  test("keeps errors unknown with $.fail async", async () => {
     const result = await Flow.asyncGenAdapter(async function* ($) {
       yield* $.fail(new ValidationError())
       return 1
     })
 
-    expectTypeOf(result).toEqualTypeOf<Result<number, ValidationError>>()
+    expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
+    const error = result.unwrapErr()
+    expectTypeOf(error).toEqualTypeOf<unknown>()
+    // @ts-expect-error Unknown errors require narrowing before property access.
+    error.message
+    if (error instanceof ValidationError) {
+      expectTypeOf(error).toEqualTypeOf<ValidationError>()
+      expect(error.message).toBeDefined()
+    }
     expect(result.isErr()).toBe(true)
   })
 
-  test("infers union with Promise and $.fail", async () => {
+  test("keeps errors unknown with Promise and $.fail", async () => {
     const fetchData = async (): Promise<Result<string, NetworkError>> =>
       Result.Ok("data that is long enough")
 
@@ -388,13 +396,11 @@ describe("Flow.asyncGenAdapter type inference with $.fail", () => {
       return data
     })
 
-    expectTypeOf(result).toEqualTypeOf<
-      Result<string, NetworkError | ValidationError>
-    >()
+    expectTypeOf(result).toEqualTypeOf<Result<string, unknown>>()
     expect(result.isOk()).toBe(true)
   })
 
-  test("infers complex union in real-world scenario", async () => {
+  test("keeps errors unknown in real-world scenario", async () => {
     const fetchUser = async (
       id: number,
     ): Promise<Result<{ name: string }, NotFoundError>> =>
@@ -422,7 +428,7 @@ describe("Flow.asyncGenAdapter type inference with $.fail", () => {
     expectTypeOf(result).toEqualTypeOf<
       Result<
         { user: { name: string }; settings: { theme: string } },
-        UnwrappedNone | NotFoundError | ValidationError
+        unknown
       >
     >()
     expect(result.isOk()).toBe(true)

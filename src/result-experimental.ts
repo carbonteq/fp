@@ -562,10 +562,12 @@ export class ExperimentalResult<T, E> {
   /**
    * Transforms the success value using an async function.
    *
-   * Same as `map` but for async mappers. Returns `Promise<Result<U, E>>`.
+   * Same as `map` but for async mappers. Returns `Promise<Result<U, unknown>>`.
+   * Returned-promise rejections become Err unchanged. Synchronous mapper throws
+   * reject this method's promise. An existing Err skips the mapper.
    *
    * @param fn - Async function to transform the success value
-   * @returns Promise resolving to Result<U, E> with transformed value or propagated error
+   * @returns Promise resolving to Result<U, unknown>, preserving arbitrary rejection values
    *
    * @example
    * ```ts
@@ -577,7 +579,7 @@ export class ExperimentalResult<T, E> {
    */
   async mapAsync<U>(
     fn: (val: T) => Promise<U>,
-  ): Promise<ExperimentalResult<U, E>> {
+  ): Promise<ExperimentalResult<U, unknown>> {
     if (this.isErr()) {
       return Promise.resolve(ExperimentalResult.Err<E, U>(this.#err))
     }
@@ -585,7 +587,7 @@ export class ExperimentalResult<T, E> {
     const curr = this.#val
     return fn(curr)
       .then((u) => ExperimentalResult.Ok(u))
-      .catch((e) => ExperimentalResult.Err(e as E))
+      .catch((e: unknown) => ExperimentalResult.Err(e))
   }
 
   /**
@@ -630,10 +632,12 @@ export class ExperimentalResult<T, E> {
    * Chains async operations that return Results.
    *
    * Same as `flatMap` but for async Result-returning functions.
-   * Returns `Promise<Result<U, E | E2>>`.
+   * Returns `Promise<Result<U, unknown>>`, preserving arbitrary rejection values.
+   * Returned-promise rejections become Err unchanged. Synchronous mapper throws
+   * reject this method's promise. An existing Err skips the mapper.
    *
    * @param fn - Async function that returns a Promise resolving to Result
-   * @returns Promise resolving to Result<U, E | E2>
+   * @returns Promise resolving to Result<U, unknown>
    *
    * @example
    * ```ts
@@ -650,7 +654,7 @@ export class ExperimentalResult<T, E> {
    */
   async flatMapAsync<U, E2>(
     fn: (val: T) => Promise<ExperimentalResult<U, E2>>,
-  ): Promise<ExperimentalResult<U, E | E2>> {
+  ): Promise<ExperimentalResult<U, unknown>> {
     if (this.isErr()) {
       return ExperimentalResult.Err<E | E2, U>(this.#err)
     }
@@ -658,10 +662,10 @@ export class ExperimentalResult<T, E> {
     return fn(this.#val as T)
       .then((r) =>
         r.isErr()
-          ? ExperimentalResult.Err<E | E2, U>(r.#err)
-          : (r as ExperimentalResult<U, E | E2>),
+          ? ExperimentalResult.Err<unknown, U>(r.#err)
+          : r,
       )
-      .catch((e) => ExperimentalResult.Err<E | E2, U>(e))
+      .catch((e: unknown) => ExperimentalResult.Err<unknown, U>(e))
   }
 
   /**

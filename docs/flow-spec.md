@@ -282,9 +282,9 @@ Asynchronous generator with adapter and `$.fail()` support.
 **Signature:**
 
 ```typescript
-asyncGenAdapter<T, E>(
+asyncGenAdapter<T>(
   genFn: ($: AsyncAdapter & { fail: <E extends Error>(error: E) => AsyncFlowYieldWrap<never, E> }) => AsyncGenerator<AsyncYieldWrap<any>, T, any>
-): Promise<Result<T, E | UnwrappedNone>>
+): Promise<Result<T, unknown>>
 ```
 
 **Capabilities:**
@@ -292,6 +292,11 @@ asyncGenAdapter<T, E>(
 - `$(val)` -> Wraps synchronous `Option` or `Result`
 - `$(promise)` -> Wraps `Promise<Option>` or `Promise<Result>`, handles await automatically.
 - `$.fail(error)` -> Wraps any Error for direct yielding
+- Rejections of wrapped promises become `Err` values without changing the rejected value. JavaScript promises can reject with any value, so the returned error type is `unknown`, even when yielded Results declare a narrower error type.
+- Narrow errors with `instanceof Error` before reading `.message`, or render other values with `String(error)`.
+- Exceptions from the generator body still reject the returned promise. Only wrapped promise rejections are converted to `Err`.
+
+These rules also apply to `ExperimentalFlow.asyncGenAdapter`, which returns `ExperimentalResult<T, unknown>`. The other three generator variants retain their inferred error types.
 
 **Example:**
 
@@ -346,7 +351,7 @@ if (result.isErr()) {
 | Feature | `gen` | `genAdapter` | `asyncGen` | `asyncGenAdapter` |
 |:---|:---:|:---:|:---:|:---:|
 | **Sync/Async** | Sync | Sync | Async | Async |
-| **Type Inference** | Good | **Excellent** | Good | **Excellent** |
+| **Type Inference** | Good | **Excellent** | Good | Success inferred, error `unknown` |
 | **Syntax** | `yield*` | `yield* $(...)` | `yield* await` | `yield* $(...)` |
 | **Auto-Await** | N/A | N/A | No (Manual) | **Yes** |
 | **Direct FlowError** | **Yes** | No | **Yes** | No |

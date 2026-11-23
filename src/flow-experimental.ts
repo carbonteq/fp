@@ -161,12 +161,6 @@ type ExtractWrapError<Y> =
     ? E // UnwrappedNone is added via adapter overload for Option
     : never
 
-type ExtractAsyncWrapError<Y> =
-  // biome-ignore lint/suspicious/noExplicitAny: generic type extraction
-  Y extends AsyncXFlowYieldWrap<any, infer E>
-    ? E // UnwrappedNone is added via adapter overload for Option
-    : never
-
 /**
  * Experimental flow namespace for composing ExperimentalOption/ExperimentalResult
  * workflows with generator syntax.
@@ -423,7 +417,10 @@ export class ExperimentalFlow {
     }
   }
 
-  /** Adapter variant of `asyncGen` for ergonomic mixed sync/async yielding. */
+  /**
+   * Adapter variant of `asyncGen` for ergonomic mixed sync/async yielding.
+   * Promise rejections become Err values with an unknown error type.
+   */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGenAdapter<Eff extends AsyncXFlowYieldWrap<any, any>, T>(
     genFn: (adapter: {
@@ -435,7 +432,7 @@ export class ExperimentalFlow {
       ): AsyncXFlowYieldWrap<A, E>
       fail: <E extends Error>(error: E) => AsyncXFlowYieldWrap<never, E>
     }) => AsyncGenerator<Eff, T, unknown>,
-  ): Promise<Result<T, ExtractAsyncWrapError<Eff>>> {
+  ): Promise<Result<T, unknown>> {
     const baseAdapter = <A, E>(
       val: Option<A> | Result<A, E> | Promise<Option<A> | Result<A, E>>,
     ) => new AsyncXFlowYieldWrap(val)
@@ -477,7 +474,7 @@ export class ExperimentalFlow {
               error.stack = `${error.name}: ${error.message}\n${userStack}`
             }
           }
-          return Result.Err(error) as Result<T, ExtractAsyncWrapError<Eff>>
+          return Result.Err(error)
         }
 
         if (isOption(value)) {
@@ -490,7 +487,7 @@ export class ExperimentalFlow {
                 err.stack = `${err.name}: ${err.message}\n${userStack}`
               }
             }
-            return Result.Err(err) as Result<T, ExtractAsyncWrapError<Eff>>
+            return Result.Err(err)
           }
           nextArg = value.unwrap()
         } else if (isResult(value)) {
@@ -503,7 +500,7 @@ export class ExperimentalFlow {
                 err.stack = `${err.name}: ${err.message}\n${userStack}`
               }
             }
-            return value as unknown as Result<T, ExtractAsyncWrapError<Eff>>
+            return value as Result<T, unknown>
           }
           nextArg = value.unwrap()
         } else {

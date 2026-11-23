@@ -41,7 +41,7 @@ describe("README Examples - Result Type", () => {
       const processUser = async (
         name: string,
         age: number,
-      ): Promise<Result<string, Error>> => {
+      ): Promise<Result<string, unknown>> => {
         const validationResult = await validateUserData(name, age).flatMapAsync(
           saveUserData,
         )
@@ -55,7 +55,8 @@ describe("README Examples - Result Type", () => {
 
       const invalidResult = await processUser("", 30)
       expect(invalidResult.isErr()).toBe(true)
-      expect(invalidResult.unwrapErr().message).toBe("Name cannot be empty")
+      const error = invalidResult.unwrapErr()
+      expect(error instanceof Error ? error.message : String(error)).toBe("Name cannot be empty")
     })
   })
 
@@ -70,7 +71,7 @@ describe("README Examples - Result Type", () => {
 
       async function applyDiscount(
         productId: string,
-      ): Promise<Result<[number, number], Error>> {
+      ): Promise<Result<[number, number], unknown>> {
         const originalPrice = await Result.Ok(productId)
           .flatMapAsync(fetchProductPrice)
           .then((r) => r.zip((price) => price * 0.9))
@@ -831,7 +832,7 @@ describe("README Examples - Result Type", () => {
 
       async function registerUser(
         input: UserInput,
-      ): Promise<Result<UserProfile, string | string[]>> {
+      ): Promise<Result<UserProfile, unknown>> {
         const validated = await Result.Ok(input).validateAsync([
           ({ email }) => Promise.resolve(guardEmail(email)),
           ({ email }) => guardEmailAvailability(email),
@@ -840,7 +841,7 @@ describe("README Examples - Result Type", () => {
         const created = await validated.flatMapAsync(createUserProfile)
         const res = await created.flatMapAsync(sendVerificationEmail)
 
-        return res as Result<UserProfile, string | string[]>
+        return res
       }
 
       const userInput: UserInput = {
