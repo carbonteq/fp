@@ -15,6 +15,12 @@
 - Check guarded match predicates against the actual handler input, preserving custom Some, Ok, and Err tagged objects.
 - Return false instead of throwing when `isTuple` receives null or undefined.
 
+## 0.11.1
+
+### Patch Changes
+
+- 5161c28: Fix the npm release workflow to publish packages with Changesets v3 and trusted publishing.
+
 ## 0.11.0
 
 ### Minor Changes
