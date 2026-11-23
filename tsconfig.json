@@ -19,6 +19,7 @@
     "declaration": true,
     "resolveJsonModule": true,
     "sourceMap": true,
+    "types": ["node", "bun"],
     "paths": {
       "@": ["./src"],
       "@/*": ["./src/*"],
