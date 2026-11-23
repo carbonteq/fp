@@ -6,6 +6,36 @@ import { Result } from "@/result.js"
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe("Result.asyncGen", () => {
+  it("should infer awaited promise payloads during delegation", async () => {
+    const result = await Result.asyncGen(async function* () {
+      const value = yield* Result.Ok(Promise.resolve(1))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not a promise.
+        value.then(() => {})
+      }
+      expect(value).toBe(1)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<number>()
+    expect(result.unwrap()).toBe(1)
+  })
+
+  it("should preserve promise payloads during synchronous delegation", async () => {
+    const promise = Promise.resolve(1)
+    const result = Result.gen(function* () {
+      const value = yield* Result.Ok(promise)
+      expectTypeOf(value).toEqualTypeOf<Promise<number>>()
+      expect(value).toBeInstanceOf(Promise)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<Promise<number>>()
+    expect(result.unwrap()).toBeInstanceOf(Promise)
+    expect(await result.unwrap()).toBe(1)
+  })
+
   it("should preserve a pending Err's identity without continuing the body", async () => {
     const error = new Error("pending failure")
     const { promise, resolve } = Promise.withResolvers<Result<number, Error>>()

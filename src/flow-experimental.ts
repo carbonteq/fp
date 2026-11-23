@@ -144,14 +144,14 @@ class AsyncXFlowYieldWrap<T, E> {
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
     AsyncXFlowYieldWrap<T, E>,
-    T,
+    Awaited<T>,
     unknown
   > {
     const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as AsyncXFlowYieldWrap<T, E>) as T
+    ) as unknown as AsyncXFlowYieldWrap<T, E>) as Awaited<T>
   }
 }
 
@@ -420,6 +420,7 @@ export class ExperimentalFlow {
   /**
    * Adapter variant of `asyncGen` for ergonomic mixed sync/async yielding.
    * Promise rejections become Err values with an unknown error type.
+   * Delegating a promised payload yields its awaited value.
    */
   // biome-ignore lint/suspicious/noExplicitAny: generic type constraint
   static async asyncGenAdapter<Eff extends AsyncXFlowYieldWrap<any, any>, T>(

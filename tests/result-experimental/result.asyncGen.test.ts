@@ -6,6 +6,35 @@ import { ExperimentalResult as Result } from "@/result-experimental.js"
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe("ExperimentalResult.asyncGen", () => {
+  it("should infer awaited promise payloads during delegation", async () => {
+    const result = await Result.asyncGen(async function* () {
+      const value = yield* Result.Ok(Promise.resolve(1))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not a promise.
+        value.then(() => {})
+      }
+      expect(value).toBe(1)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<number>()
+    expect(result.unwrap()).toBe(1)
+  })
+
+  it("should preserve promise payloads during synchronous delegation", () => {
+    const promise = Promise.resolve(1)
+    const result = Result.gen(function* () {
+      const value = yield* Result.Ok(promise)
+      expectTypeOf(value).toEqualTypeOf<Promise<number>>()
+      expect(value).toBe(promise)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<Promise<number>>()
+    expect(result.unwrap()).toBe(promise)
+  })
+
   describe("basic functionality", () => {
     it("should unwrap a single Ok value", async () => {
       const result = await Result.asyncGen(async function* () {

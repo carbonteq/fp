@@ -6,6 +6,41 @@ import { Result } from "@/result.js"
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe("Result.asyncGenAdapter", () => {
+  it("should infer awaited promise payloads through the adapter", async () => {
+    const result = await Result.asyncGenAdapter(async function* ($) {
+      const value = yield* $(Result.Ok(Promise.resolve(1)))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not a promise.
+        value.then(() => {})
+      }
+      expect(value).toBe(1)
+      const promisedResultValue = yield* $(
+        Promise.resolve(Result.Ok(Promise.resolve(2))),
+      )
+      expectTypeOf(promisedResultValue).toEqualTypeOf<number>()
+      expect(promisedResultValue).toBe(2)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<number>()
+    expect(result.unwrap()).toBe(1)
+  })
+
+  it("should preserve promise payloads through the synchronous adapter", async () => {
+    const promise = Promise.resolve(1)
+    const result = Result.genAdapter(function* ($) {
+      const value = yield* $(Result.Ok(promise))
+      expectTypeOf(value).toEqualTypeOf<Promise<number>>()
+      expect(value).toBeInstanceOf(Promise)
+      return value
+    })
+
+    expectTypeOf(result.unwrap()).toEqualTypeOf<Promise<number>>()
+    expect(result.unwrap()).toBeInstanceOf(Promise)
+    expect(await result.unwrap()).toBe(1)
+  })
+
   it("should preserve a pending Err inside Promise<Result> without continuing the body", async () => {
     const error = new Error("pending failure")
     const { promise, resolve } = Promise.withResolvers<Result<number, Error>>()

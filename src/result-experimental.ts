@@ -55,6 +55,7 @@ class ResultYieldWrap<T, E> {
 /**
  * Wrapper that makes Result yieldable in async generators with proper type tracking.
  * Supports Promise<Result<T, E>> for async result chaining.
+ * Delegation returns the awaited success value, including promise-backed payloads.
  *
  * @internal
  */
@@ -63,14 +64,14 @@ class AsyncResultYieldWrap<T, E> {
 
   async *[Symbol.asyncIterator](): AsyncGenerator<
     AsyncResultYieldWrap<T, E>,
-    T,
+    Awaited<T>,
     unknown
   > {
     const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as AsyncResultYieldWrap<T, E>) as T
+    ) as unknown as AsyncResultYieldWrap<T, E>) as Awaited<T>
   }
 }
 
@@ -1451,7 +1452,7 @@ export class ExperimentalResult<T, E> {
 
   /**
    * Makes Result iterable for use with async generator-based syntax.
-   * Yields self and returns the unwrapped value when resumed.
+   * Yields self and returns the awaited unwrapped value when resumed.
    *
    * @example
    * ```ts
@@ -1463,14 +1464,14 @@ export class ExperimentalResult<T, E> {
    */
   async *[Symbol.asyncIterator](): AsyncGenerator<
     ExperimentalResult<T, E>,
-    T,
+    Awaited<T>,
     unknown
   > {
     const trace = new Error().stack
     return (yield new CapturedTrace(
       this,
       trace,
-    ) as unknown as ExperimentalResult<T, E>) as T
+    ) as unknown as ExperimentalResult<T, E>) as Awaited<T>
   }
 
   // Static constructors

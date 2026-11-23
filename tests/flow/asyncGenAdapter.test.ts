@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, expectTypeOf, test } from "bun:test"
 import { Flow } from "@/flow.js"
 import { Option, UnwrappedNone } from "@/option.js"
 import { Result } from "@/result.js"
@@ -20,6 +20,28 @@ class ServiceUnavailableError extends Error {
 }
 
 describe("Flow.asyncGenAdapter", () => {
+  test("awaits Option and Result payloads with precise delegated types", async () => {
+    const option = await Flow.asyncGenAdapter(async function* ($) {
+      const value = yield* $(Option.Some(Promise.resolve(21)))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      if (false) {
+        // @ts-expect-error Async delegation returns a number, not its stored promise.
+        value.then(() => {})
+      }
+      return value
+    })
+    const result = await Flow.asyncGenAdapter(async function* ($) {
+      const value = yield* $(Result.Ok(Promise.resolve(42)))
+      expectTypeOf(value).toEqualTypeOf<number>()
+      return value
+    })
+
+    expectTypeOf(option).toEqualTypeOf<Result<number, unknown>>()
+    expectTypeOf(result).toEqualTypeOf<Result<number, unknown>>()
+    expect(option.unwrap()).toBe(21)
+    expect(result.unwrap()).toBe(42)
+  })
+
   test("handles all successes with adapter async", async () => {
     const result = await Flow.asyncGenAdapter(async function* ($) {
       const a = yield* $(Option.Some(10))
