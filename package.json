@@ -116,8 +116,7 @@
     "dev": "tsdown --watch",
     "test": "bun test",
     "test:dbg": "bun test --inspect",
-    "release": "changeset publish",
-    "tag": "changeset tag"
+    "release": "changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
