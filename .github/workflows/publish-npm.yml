@@ -2,8 +2,6 @@ name: Publish (NPM)
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -28,7 +26,7 @@ jobs:
       - name: Setup Node 22 for NPM publishing
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: "22.x"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install Dependencies
@@ -41,7 +39,7 @@ jobs:
         run: npm --version
 
       - name: Update npm for publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: log updated npm version
         run: npm --version
