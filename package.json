@@ -116,7 +116,8 @@
     "dev": "tsdown --watch",
     "test": "bun test",
     "test:dbg": "bun test --inspect",
-    "release": "changeset publish"
+    "ver": "changeset version && node sync_versions.mjs && oxfmt deno.jsonc",
+    "release": "changeset git-tag"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
